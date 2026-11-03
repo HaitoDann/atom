@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atom</title>
+<style>
+  :root {
+    --bg: #232322;
+    --bg-2: #1c1c1b;
+    --text: #ece7dd;
+    --muted: #9a958c;
+    --faint: #6c6862;
+    --accent: #d97757;
+    --glass: rgba(255, 255, 255, 0.055);
+    --glass-border: rgba(255, 255, 255, 0.09);
+    --tint: 120, 140, 170;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15.5px/1.65 var(--sans);
+    overflow: hidden;
+    transition: background-color 1.2s ease;
+  }
+
+  /* ---------- fond : entité + vignette ---------- */
+  #entity {
+    position: fixed; inset: 0; z-index: 0;
+    width: 100vw; height: 100vh;
+    opacity: 0.42;
+    pointer-events: none;
+  }
+  #vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(var(--tint), 0.07) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(20, 20, 19, 0.55) 70%, rgba(18, 18, 17, 0.92) 100%);
+    transition: background 1.2s ease;
+  }
+
+  /* ---------- structure ---------- */
+  #app {
+    position: relative; z-index: 2;
+    height: 100%;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 20px;
+  }
+  .brand {
+    font-size: 12px; letter-spacing: 0.32em; font-weight: 600;
+    font-variant: small-caps; color: var(--muted);
+  }
+  .spacer { flex: 1; }
+  select, input, textarea, button { font: inherit; color: inherit; }
+  #model {
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    color: var(--muted); font-size: 13px; padding: 4px 6px; cursor: pointer; max-width: 200px;
+  }
+  #model:hover { border-color: var(--glass-border); }
+  #model option { background: var(--bg-2); color: var(--text); }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #c4554d; box-shadow: 0 0 8px rgba(196, 85, 77, 0.6);
+    transition: background .3s, box-shadow .3s;
+  }
+  .dot.on { background: #7fb38a; box-shadow: 0 0 8px rgba(127, 179, 138, 0.6); }
+
+  main {
+    flex: 1; overflow-y: auto;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.08) transparent;
+  }
+  #chat {
+    max-width: 680px; margin: 0 auto;
+    padding: 24px 20px 40px;
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .msg { white-space: pre-wrap; word-wrap: break-word; animation: rise .35s ease both; }
+  .msg.atom { color: var(--text); }
+  .msg.user {
+    align-self: flex-end; max-width: 82%;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: 10px 16px; border-radius: 20px;
+  }
+  .msg.err { color: #d98a7a; font-size: 14px; }
+  .msg.pending { color: var(--faint); font-family: var(--mono); font-size: 12px; letter-spacing: .08em; }
+  .msg.pending::after { content: "…"; animation: blink 1.2s steps(3) infinite; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  #empty {
+    text-align: center; color: var(--faint); margin-top: 22vh;
+    font-size: 14px;
+  }
+  #empty b { display: block; color: var(--muted); font-weight: 500; font-size: 18px; margin-bottom: 4px; }
+
+  /* ---------- saisie ---------- */
+  footer { padding: 0 20px 22px; }
+  form {
+    max-width: 680px; margin: 0 auto;
+    display: flex; align-items: flex-end; gap: 8px;
+    background: rgba(40, 40, 38, 0.55);
+    border: 1px solid var(--glass-border);
+    border-radius: 26px;
+    padding: 7px 7px 7px 20px;
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 8px 30px rgba(0,0,0,.25);
+  }
+  form:focus-within { border-color: rgba(217, 119, 87, 0.35); }
+  #input {
+    flex: 1; resize: none; border: 0; outline: 0; background: transparent;
+    padding: 8px 0; max-height: 180px; line-height: 1.5;
+  }
+  #input::placeholder { color: var(--faint); }
+  #send {
+    width: 36px; height: 36px; flex: none;
+    border: 0; border-radius: 50%; cursor: pointer;
+    background: var(--accent); color: #1c1c1b; font-size: 17px; font-weight: 700;
+    transition: opacity .2s, transform .15s;
+  }
+  #send:disabled { opacity: .3; cursor: default; }
+  #send:not(:disabled):active { transform: scale(.94); }
+  .hints {
+    max-width: 680px; margin: 8px auto 0; text-align: center;
+    font: 10.5px var(--mono); letter-spacing: .06em; color: var(--faint);
+  }
+
+  /* ---------- puce d'état ---------- */
+  #chip {
+    position: fixed; right: 18px; bottom: 18px; z-index: 3;
+    font: 11px var(--mono); letter-spacing: .1em; text-transform: lowercase;
+    color: rgb(var(--tint));
+    background: rgba(28, 28, 27, 0.6);
+    border: 1px solid rgba(var(--tint), 0.3);
+    padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: color 1s, border-color 1s;
+  }
+  #chip::before { content: "● "; }
+
+  /* ---------- panneau réglages ---------- */
+  #panel {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 10;
+    width: min(400px, 100vw);
+    background: rgba(28, 28, 27, 0.92);
+    border-left: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    transform: translateX(102%); transition: transform .3s ease;
+    overflow-y: auto; padding: 22px 22px 40px;
+  }
+  #panel.open { transform: none; }
+  #panel h2 { font-size: 12px; letter-spacing: .3em; font-variant: small-caps; color: var(--muted); margin: 0 0 18px; font-weight: 600; }
+  #panel h3 { font: 11px var(--mono); letter-spacing: .1em; color: var(--faint); text-transform: uppercase; margin: 22px 0 8px; font-weight: 400; }
+  #panel .close { position: absolute; top: 14px; right: 16px; background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .field {
+    width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--glass-border);
+    border-radius: 10px; padding: 8px 11px; outline: 0; font-size: 13.5px;
+  }
+  .field:focus { border-color: rgba(217, 119, 87, .4); }
+  textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
+  .row { display: flex; gap: 8px; }
+  .btn {
+    background: rgba(255,255,255,.06); border: 1px solid var(--glass-border);
+    border-radius: 10px; padding: 7px 12px; cursor: pointer; font-size: 13px; color: var(--text);
+    white-space: nowrap;
+  }
+  .btn:hover { background: rgba(255,255,255,.1); }
+  .btn.danger { color: #d98a7a; }
+  #memList { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+  #memList li { display: flex; gap: 6px; align-items: center; }
+  #memList input { flex: 1; }
+  #memList button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 16px; }
+  #memList button:hover { color: #d98a7a; }
+  .small { font-size: 12px; color: var(--faint); margin: 6px 0 0; }
+  .small code { font-family: var(--mono); color: var(--muted); }
+  .emos { display: flex; flex-wrap: wrap; gap: 5px; }
+  .emos button { font: 11px var(--mono); padding: 4px 8px; border-radius: 999px; background: none; border: 1px solid var(--glass-border); color: var(--muted); cursor: pointer; }
+  .emos button:hover { color: var(--text); }
+
+  @media (max-width: 600px) {
+    #chat { padding: 16px 16px 32px; }
+    footer { padding: 0 12px 14px; }
+    .hints { display: none; }
+    #chip { bottom: 84px; right: 12px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="entity"></canvas>
+<div id="vignette"></div>
+
+<div id="app">
+  <header>
+    <span class="brand">Atom</span>
+    <span class="spacer"></span>
+    <select id="model" title="Modèle"></select>
+    <span id="dot" class="dot" title="Ollama hors ligne"></span>
+  </header>
+
+  <main id="scroller">
+    <div id="chat">
+      <div id="empty"><b>Atom est là.</b>Écrivez-lui quelque chose.</div>
+    </div>
+  </main>
+
+  <footer>
+    <form id="form" autocomplete="off">
+      <textarea id="input" rows="1" placeholder="Parler à Atom…"></textarea>
+      <button id="send" type="submit" disabled aria-label="Envoyer">↑</button>
+    </form>
+    <div class="hints">entrée pour envoyer · maj+entrée pour un saut de ligne · la puce ouvre les réglages</div>
+  </footer>
+</div>
+
+<button id="chip" title="Réglages">veille</button>
+
+<aside id="panel" aria-hidden="true">
+  <button class="close" id="closePanel" aria-label="Fermer">×</button>
+  <h2>Réglages</h2>
+
+  <h3>Serveur Ollama</h3>
+  <div class="row">
+    <input id="url" class="field" spellcheck="false">
+    <button class="btn" id="reconnect">Tester</button>
+  </div>
+  <p class="small">Si la pastille reste rouge : <code>OLLAMA_ORIGINS=* ollama serve</code></p>
+
+  <h3>Personnalité</h3>
+  <textarea id="persona" class="field"></textarea>
+
+  <h3>Souvenirs durables</h3>
+  <ul id="memList"></ul>
+  <div class="row">
+    <input id="memNew" class="field" placeholder="Ajouter un souvenir…">
+    <button class="btn" id="memAdd">+</button>
+  </div>
+  <p class="small">Injectés dans chaque requête comme faits connus.</p>
+
+  <h3>Historique</h3>
+  <p class="small" id="histInfo" style="margin-bottom:8px"></p>
+  <button class="btn danger" id="clearHist">Effacer la conversation</button>
+
+  <h3>Tester une émotion</h3>
+  <div class="emos" id="emos"></div>
+</aside>
+
+<script>
+"use strict";
+
+/* ============================================================
+   ÉTATS ÉMOTIONNELS — palette adaptée au fond anthracite
+   ============================================================ */
+const ACTIVITIES = {
+  idle:     { label: "veille",     color: [140, 160, 185], bg: [35, 35, 34], radius: 1.0,  oscAmp: 3,   oscFreq: 0.9,  pulse: 0,     stretchY: 1,    spike: 0,    dim: 0.8  },
+  thinking: { label: "réflexion",  color: [155, 125, 230], bg: [34, 32, 40], radius: 1.55, oscAmp: 14,  oscFreq: 0.5,  pulse: 0,     stretchY: 1,    spike: 0.06, dim: 0.5  },
+  talking:  { label: "réponse",    color: [140, 185, 150], bg: [32, 36, 33], radius: 0.96, oscAmp: 6,   oscFreq: 1.6,  pulse: 0.04,  stretchY: 1,    spike: 0,    dim: 0.9  },
+  joy:      { label: "joie",       color: [217, 119, 87],  bg: [40, 34, 31], radius: 1.05, oscAmp: 8,   oscFreq: 2.2,  pulse: 0.08,  stretchY: 0.96, spike: 0,    dim: 1.0  },
+  angry:    { label: "colère",     color: [220, 80, 80],   bg: [40, 30, 30], radius: 1.08, oscAmp: 20,  oscFreq: 2.8,  pulse: 0.05,  stretchY: 1.04, spike: 0.22, dim: 0.85 },
+  sad:      { label: "tristesse",  color: [105, 125, 190], bg: [30, 32, 38], radius: 0.88, oscAmp: 1.6, oscFreq: 0.4,  pulse: 0,     stretchY: 0.8,  spike: 0,    dim: 0.55 },
+  surprise: { label: "surprise",   color: [150, 215, 225], bg: [32, 37, 39], radius: 1.35, oscAmp: 10,  oscFreq: 3.4,  pulse: 0,     stretchY: 1.25, spike: 0.04, dim: 1.0  },
+  fear:     { label: "inquiétude", color: [180, 140, 220], bg: [34, 31, 38], radius: 0.8,  oscAmp: 3,   oscFreq: 5.2,  pulse: 0,     stretchY: 0.9,  spike: 0.02, dim: 0.6  },
+  sleep:    { label: "sommeil",    color: [95, 105, 140],  bg: [28, 28, 28], radius: 0.82, oscAmp: 0.9, oscFreq: 0.22, pulse: 0.015, stretchY: 0.85, spike: 0,    dim: 0.4  },
+};
+const EMOTIONS = Object.keys(ACTIVITIES);
+
+const entity = { activity: "idle", rippleT: 99 };
+function setEmotion(e) {
+  if (!ACTIVITIES[e]) e = "talking";
+  if (entity.activity === e) return;
+  entity.activity = e;
+  entity.rippleT = 0; // onde de choc
+  chip.textContent = ACTIVITIES[e].label;
+}
+
+/* ============================================================
+   ENTITÉ — sphère de fragments (canvas 2D, plein écran)
+   ============================================================ */
+(function initEntity() {
+  const canvas = document.getElementById("entity");
+  const ctx = canvas.getContext("2d");
+  const N = 3200;
+  const R0 = 130;
+  let W = 0, H = 0;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = (W * dpr) | 0; canvas.height = (H * dpr) | 0;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  // générateur déterministe
+  let seed = 42;
+  const rand = () => (seed = (seed * 16807) % 2147483647, (seed - 1) / 2147483646);
+
+  // buffers SoA — aucune allocation par frame
+  const ax = new Float32Array(N), ay = new Float32Array(N), az = new Float32Array(N);
+  const ux = new Float32Array(N), uy = new Float32Array(N), uz = new Float32Array(N);
+  const rN = new Float32Array(N);
+  const px = new Float32Array(N), py = new Float32Array(N), pz = new Float32Array(N);
+  const phase = new Float32Array(N), size = new Float32Array(N), depth = new Float32Array(N);
+  const orbR = new Float32Array(N), orbSpeed = new Float32Array(N);
+  const isOrb = new Uint8Array(N);
+
+  for (let i = 0; i < N; i++) {
+    const orb = i >= N * 0.86; // 14 % en orbite
+    isOrb[i] = orb ? 1 : 0;
+    if (!orb) {
+      const u = rand() * 2 - 1, th = rand() * Math.PI * 2;
+      const shell = rand() < 0.75; // 75 % coque, 25 % cœur
+      const r = shell ? R0 * (0.94 + rand() * 0.06) : R0 * rand() * 0.85;
+      const s = Math.sqrt(1 - u * u);
+      ax[i] = r * s * Math.cos(th); ay[i] = r * u; az[i] = r * s * Math.sin(th);
+      const inv = r > 1 ? 1 / r : 0;
+      ux[i] = ax[i] * inv; uy[i] = ay[i] * inv; uz[i] = az[i] * inv;
+      rN[i] = r / R0;
+      depth[i] = shell ? 1 : 0.5;
+    } else {
+      orbR[i] = R0 * (1.9 + rand() * 1.6);
+      orbSpeed[i] = (0.18 + rand() * 0.5) * (rand() < 0.5 ? 1 : -1);
+    }
+    phase[i] = rand() * Math.PI * 2;
+    size[i] = 0.9 + rand() * 1.4;
+    px[i] = (rand() - 0.5) * 900; py[i] = (rand() - 0.5) * 900; pz[i] = (rand() - 0.5) * 900;
+  }
+
+  const A0 = ACTIVITIES.idle;
+  const cur = { r: A0.color[0], g: A0.color[1], b: A0.color[2], br: 35, bg: 35, bb: 34,
+    radius: 1, oscAmp: 3, oscFreq: 0.9, pulse: 0, stretchY: 1, spike: 0, dim: 0.8 };
+
+  const mouse = { x: 0, y: 0, active: false };
+  window.addEventListener("pointermove", (e) => {
+    mouse.x = e.clientX - W / 2; mouse.y = e.clientY - H / 2; mouse.active = true;
+  });
+  document.addEventListener("pointerleave", () => { mouse.active = false; });
+
+  const rootStyle = document.documentElement.style;
+  let lastTint = "", lastBg = "";
+  let last = performance.now(), t = 0;
+
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now; t += dt;
+    const A = ACTIVITIES[entity.activity];
+    entity.rippleT += dt;
+
+    // interpolation de l'état
+    const k = Math.min(1, dt * 2.5), kb = Math.min(1, dt * 1.2);
+    cur.r += (A.color[0] - cur.r) * k; cur.g += (A.color[1] - cur.g) * k; cur.b += (A.color[2] - cur.b) * k;
+    cur.br += (A.bg[0] - cur.br) * kb; cur.bg += (A.bg[1] - cur.bg) * kb; cur.bb += (A.bg[2] - cur.bb) * kb;
+    cur.radius += (A.radius - cur.radius) * k;
+    cur.oscAmp += (A.oscAmp - cur.oscAmp) * k;
+    cur.oscFreq += (A.oscFreq - cur.oscFreq) * k;
+    cur.pulse += (A.pulse - cur.pulse) * k;
+    cur.stretchY += (A.stretchY - cur.stretchY) * k;
+    cur.spike += (A.spike - cur.spike) * k;
+    cur.dim += (A.dim - cur.dim) * k;
+
+    // ambiance : fond + teinte de l'interface (uniquement si changement)
+    const tint = `${cur.r | 0}, ${cur.g | 0}, ${cur.b | 0}`;
+    if (tint !== lastTint) { lastTint = tint; rootStyle.setProperty("--tint", tint); }
+    const bgs = `rgb(${cur.br | 0},${cur.bg | 0},${cur.bb | 0})`;
+    if (bgs !== lastBg) { lastBg = bgs; document.body.style.backgroundColor = bgs; }
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+
+    // halo
+    const hr = R0 * 2.1 * cur.radius;
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hr);
+    g.addColorStop(0, `rgba(${tint},${0.16 * cur.dim})`);
+    g.addColorStop(1, `rgba(${tint},0)`);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.fillRect(-hr, -hr, hr * 2, hr * 2);
+
+    ctx.fillStyle = `rgb(${tint})`;
+
+    const cosR = Math.cos(t * 0.16), sinR = Math.sin(t * 0.16);
+    const fov = 560;
+    const rad = cur.radius * (1 + Math.sin(t * 1.1) * 0.015);
+    const oA = cur.oscAmp, oF = cur.oscFreq;
+    const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse;
+    const sY = cur.stretchY, spk = cur.spike;
+    const orbMul = 1 + (cur.radius - 1) * 0.6;
+    const mx = mouse.x, my = mouse.y, mAct = mouse.active;
+    const rt = entity.rippleT, rippleOn = rt < 1.6;
+    const rippleK = rippleOn ? Math.exp(-rt * 2.2) * 34 : 0;
+    const front0 = rt * 14 * 0.09;
+    const spring = Math.min(1, dt * 4);
+    const repel = 200 * dt, RR = 8100;
+    let lastQ = -1;
+
+    for (let i = 0; i < N; i++) {
+      let tx, ty, tz;
+      if (isOrb[i]) {
+        const a = t * orbSpeed[i] * orbMul + phase[i];
+        const R = orbR[i] * orbMul;
+        tx = Math.cos(a) * R;
+        ty = Math.sin(a * 1.3 + phase[i]) * R * 0.35;
+        tz = Math.sin(a) * R;
+      } else {
+        const ph = phase[i];
+        const o1 = Math.sin(t * oF + ph) * oA;
+        const o2 = Math.cos(t * oF * 0.83 + ph * 1.7) * oA * 0.7;
+        const o3 = Math.sin(t * oF * 1.15 + ph * 2.3) * oA * 0.6;
+        const spikeK = spk > 0 ? 1 + Math.sin(ph * 5.7) * spk : 1;
+        const rr = rad * beat * spikeK;
+        let rip = 0;
+        if (rippleOn) {
+          const d = rN[i] - front0;
+          const env = 1 - Math.abs(d) * 3.5;
+          if (env > 0) rip = Math.sin(d * 9) * rippleK * env;
+        }
+        tx = ax[i] * rr + ux[i] * rip + o1;
+        ty = (ay[i] * rr + uy[i] * rip + o2) * sY;
+        tz = az[i] * rr + uz[i] * rip + o3;
+
+        if (mAct) {
+          const dx = px[i] - mx, dy = py[i] - my, d2 = dx * dx + dy * dy;
+          if (d2 < RR) {
+            const d = Math.sqrt(d2) || 1, f = (1 - d2 / RR) * repel;
+            px[i] += (dx / d) * f; py[i] += (dy / d) * f;
+          }
+        }
+      }
+
+      px[i] += (tx - px[i]) * spring;
+      py[i] += (ty - py[i]) * spring;
+      pz[i] += (tz - pz[i]) * spring;
+
+      const rx = px[i] * cosR - pz[i] * sinR;
+      const rz = px[i] * sinR + pz[i] * cosR;
+      const sc = fov / (fov + rz);
+      if (sc <= 0) continue;
+      const sx = rx * sc, sy = py[i] * sc;
+
+      const backFade = rz > 0 ? 1 - Math.min(0.8, rz / 420) : 1;
+      let alpha = (sc * 0.9 > 1 ? 1 : sc * 0.9) * 0.8;
+      if (isOrb[i]) alpha *= 0.5; else alpha *= depth[i] * cur.dim * backFade;
+      alpha *= 0.65 + Math.abs(Math.sin(t * 0.9 + phase[i] * 3)) * 0.35;
+
+      const q = (alpha * 32) | 0;
+      if (q !== lastQ) { lastQ = q; ctx.globalAlpha = q / 32; }
+      const sz = size[i] * sc;
+      ctx.fillRect(sx - sz * 0.5, sy - sz * 0.5, sz, sz);
+    }
+
+    ctx.restore();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ============================================================
+   STOCKAGE
+   ============================================================ */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("atom." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("atom." + k, JSON.stringify(v)); } catch {} },
+};
+
+const DEFAULT_PERSONA =
+  "Tu es Atom, une entité numérique bienveillante, curieuse et concise. " +
+  "Tu parles français avec naturel et chaleur, sans emphase inutile.";
+
+const settings = Object.assign(
+  { url: "http://localhost:11434", model: "", persona: DEFAULT_PERSONA },
+  store.get("settings", {})
+);
+let history = store.get("history", []);   // [{role, content, emotion?}]
+let memories = store.get("memories", []); // [string]
+const saveSettings = () => store.set("settings", settings);
+const saveHistory = () => store.set("history", history);
+const saveMemories = () => store.set("memories", memories);
+
+/* ============================================================
+   UI
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const chat = $("chat"), scroller = $("scroller"), input = $("input"), send = $("send"),
+      form = $("form"), modelSel = $("model"), dot = $("dot"), chip = $("chip"), panel = $("panel");
+
+function addMsg(role, text, cls) {
+  $("empty")?.remove();
+  const el = document.createElement("div");
+  el.className = "msg " + (cls || (role === "user" ? "user" : "atom"));
+  el.textContent = text;
+  chat.appendChild(el);
+  scroller.scrollTop = scroller.scrollHeight;
+  return el;
+}
+
+function renderHistory() {
+  chat.innerHTML = "";
+  if (!history.length) {
+    chat.innerHTML = '<div id="empty"><b>Atom est là.</b>Écrivez-lui quelque chose.</div>';
+  }
+  for (const m of history) addMsg(m.role, m.content);
+  $("histInfo").textContent = `${Math.floor(history.length / 2)} échange(s) enregistré(s) · 20 derniers envoyés au modèle`;
+}
+
+function autoGrow() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 180) + "px";
+  send.disabled = busy || !input.value.trim();
+}
+input.addEventListener("input", autoGrow);
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+});
+
+/* ---------- panneau ---------- */
+function openPanel(open) {
+  panel.classList.toggle("open", open);
+  panel.setAttribute("aria-hidden", String(!open));
+}
+chip.onclick = () => openPanel(!panel.classList.contains("open"));
+$("closePanel").onclick = () => openPanel(false);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") openPanel(false); });
+
+$("url").value = settings.url;
+$("url").onchange = () => { settings.url = $("url").value.trim().replace(/\/+$/, ""); saveSettings(); connect(); };
+$("reconnect").onclick = () => $("url").onchange();
+$("persona").value = settings.persona;
+$("persona").oninput = () => { settings.persona = $("persona").value; saveSettings(); };
+
+function renderMemories() {
+  const ul = $("memList");
+  ul.innerHTML = "";
+  memories.forEach((m, i) => {
+    const li = document.createElement("li");
+    const inp = document.createElement("input");
+    inp.className = "field"; inp.value = m;
+    inp.onchange = () => { memories[i] = inp.value.trim(); memories = memories.filter(Boolean); saveMemories(); renderMemories(); };
+    const del = document.createElement("button");
+    del.textContent = "×"; del.title = "Oublier";
+    del.onclick = () => { memories.splice(i, 1); saveMemories(); renderMemories(); };
+    li.append(inp, del);
+    ul.appendChild(li);
+  });
+}
+$("memAdd").onclick = () => {
+  const v = $("memNew").value.trim();
+  if (!v) return;
+  memories.push(v); saveMemories(); renderMemories(); $("memNew").value = "";
+};
+$("memNew").onkeydown = (e) => { if (e.key === "Enter") $("memAdd").onclick(); };
+
+$("clearHist").onclick = () => {
+  if (!confirm("Effacer toute la conversation ?")) return;
+  history = []; saveHistory(); renderHistory(); setEmotion("idle");
+};
+
+for (const e of EMOTIONS) {
+  const b = document.createElement("button");
+  b.textContent = ACTIVITIES[e].label;
+  b.onclick = () => setEmotion(e);
+  $("emos").appendChild(b);
+}
+
+/* ============================================================
+   OLLAMA
+   ============================================================ */
+let online = false;
+
+async function connect() {
+  try {
+    const r = await fetch(settings.url + "/api/tags");
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    const names = (data.models || []).map((m) => m.name);
+    modelSel.innerHTML = "";
+    if (!names.length) modelSel.add(new Option("aucun modèle — ollama pull qwen3:4b", ""));
+    for (const n of names) modelSel.add(new Option(n, n));
+    if (!names.includes(settings.model)) {
+      settings.model = names.find((n) => n.startsWith("qwen3")) || names[0] || "";
+      saveSettings();
+    }
+    modelSel.value = settings.model;
+    online = true;
+  } catch {
+    online = false;
+    if (!modelSel.options.length) modelSel.add(new Option(settings.model || "hors ligne", settings.model));
+  }
+  dot.classList.toggle("on", online);
+  dot.title = online ? "Ollama en ligne" : "Ollama hors ligne";
+}
+modelSel.onchange = () => { settings.model = modelSel.value; saveSettings(); };
+
+const SCHEMA = {
+  type: "object",
+  properties: {
+    reponse: { type: "string" },
+    emotion: { type: "string", enum: EMOTIONS },
+  },
+  required: ["reponse", "emotion"],
+};
+
+function systemPrompt() {
+  let s = settings.persona.trim() + "\n\n" +
+    "Tu possèdes un corps : une sphère de fragments lumineux qui exprime ton état émotionnel.\n" +
+    "Réponds TOUJOURS par un objet JSON strict, sans texte autour :\n" +
+    '{"reponse": "ton message", "emotion": "<une de : ' + EMOTIONS.join(", ") + '>"}\n' +
+    "Choisis l'émotion qui correspond sincèrement à ta réponse " +
+    "(talking = neutre, joy = content, sad = triste, angry = agacé, surprise = étonné, " +
+    "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme).";
+  if (memories.length) {
+    s += "\n\nCe que tu sais durablement de l'utilisateur et du contexte :\n" +
+      memories.map((m) => "- " + m).join("\n");
+  }
+  return s;
+}
+
+function parseReply(raw) {
+  raw = (raw || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  try {
+    const m = raw.match(/\{[\s\S]*\}/);
+    const o = JSON.parse(m ? m[0] : raw);
+    if (typeof o.reponse === "string") return { text: o.reponse.trim(), emotion: o.emotion };
+  } catch {}
+  return { text: raw, emotion: "talking" };
+}
+
+let busy = false, idleTimer = 0, sleepTimer = 0;
+function scheduleRest() {
+  clearTimeout(idleTimer); clearTimeout(sleepTimer);
+  idleTimer = setTimeout(() => { if (!busy) setEmotion("idle"); }, 9000);
+  sleepTimer = setTimeout(() => { if (!busy) setEmotion("sleep"); }, 180000);
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text || busy) return;
+  busy = true;
+  input.value = ""; autoGrow();
+  clearTimeout(idleTimer); clearTimeout(sleepTimer);
+
+  addMsg("user", text);
+  history.push({ role: "user", content: text });
+  saveHistory();
+
+  setEmotion("thinking");
+  const pending = addMsg("atom", "réflexion", "pending");
+
+  const context = history.slice(-40).map((m) =>
+    m.role === "assistant"
+      ? { role: "assistant", content: JSON.stringify({ reponse: m.content, emotion: m.emotion || "talking" }) }
+      : { role: "user", content: m.content });
+
+  try {
+    if (!settings.model && !online) throw new TypeError("offline");
+    if (!settings.model) throw new Error("Aucun modèle sélectionné. Lancez `ollama pull qwen3:4b`.");
+    const r = await fetch(settings.url + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: settings.model,
+        messages: [{ role: "system", content: systemPrompt() }, ...context],
+        format: SCHEMA,
+        stream: false,
+        think: false,
+        options: { temperature: 0.7 },
+      }),
+    });
+    if (!r.ok) throw new Error(`Ollama a répondu ${r.status} — ${(await r.text()).slice(0, 200)}`);
+    const data = await r.json();
+    const { text: reply, emotion } = parseReply(data.message?.content);
+    pending.remove();
+    addMsg("assistant", reply || "…");
+    history.push({ role: "assistant", content: reply, emotion: ACTIVITIES[emotion] ? emotion : "talking" });
+    saveHistory();
+    setEmotion(emotion);
+    if (!online) connect();
+  } catch (err) {
+    pending.remove();
+    const msg = err instanceof TypeError
+      ? "Impossible de joindre Ollama sur " + settings.url + ". Vérifiez qu'il tourne avec OLLAMA_ORIGINS=* ollama serve."
+      : err.message;
+    addMsg("atom", msg, "err");
+    setEmotion("fear");
+    online = false; dot.classList.remove("on");
+  } finally {
+    busy = false; autoGrow();
+    $("histInfo").textContent = `${Math.floor(history.length / 2)} échange(s) enregistré(s) · 20 derniers envoyés au modèle`;
+    scheduleRest();
+    input.focus();
+  }
+});
+
+/* ============================================================
+   DÉMARRAGE
+   ============================================================ */
+renderHistory();
+renderMemories();
+connect();
+setInterval(() => { if (!busy) connect(); }, 15000);
+scheduleRest();
+input.focus();
+</script>
+</body>
+</html>
