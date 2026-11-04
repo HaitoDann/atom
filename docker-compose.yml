@@ -69,7 +69,8 @@ services:
   tailscale:
     image: tailscale/tailscale:stable
     profiles: ["tailscale"]
-    hostname: ${TS_HOSTNAME:-atom}
+    # Pas de « hostname: atom » ici : le conteneur se résoudrait lui-même au lieu du service atom.
+    # Le nom sur le réseau Tailscale vient de TS_HOSTNAME.
     restart: unless-stopped
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY:-}
