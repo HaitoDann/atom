@@ -122,5 +122,5 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
 3. Atom qui écrit : ntfy auto-hébergé, rappels, brief du matin
 4. Documents : import de notes et de PDF, puis recherche dedans
-5. Voix (Whisper + Piper), mode appel ; outils (Proxmox, web, domotique)
+5. Outils : Proxmox, recherche web, domotique
 6. Accès distant via Tailscale ; plus tard, API externes en secours
