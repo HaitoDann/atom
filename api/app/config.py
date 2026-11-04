@@ -35,3 +35,10 @@ NTFY_TOPIC = os.getenv("ATOM_NTFY_TOPIC", "atom")
 NTFY_TOKEN = os.getenv("ATOM_NTFY_TOKEN", "")               # si le serveur ntfy exige une auth
 PUBLIC_URL = os.getenv("ATOM_PUBLIC_URL", "").rstrip("/")   # URL de l'interface, pour le clic sur la notification
 SCHEDULER_INTERVAL = float(os.getenv("ATOM_SCHEDULER_INTERVAL", "20"))
+
+# Telegram (bot de discussion bidirectionnel)
+TELEGRAM_TOKEN = os.getenv("ATOM_TELEGRAM_TOKEN", "")
+# Identifiants Telegram autorisés, séparés par des virgules (les autres sont refusés)
+TELEGRAM_ALLOWED = {
+    int(x) for x in os.getenv("ATOM_TELEGRAM_ALLOWED", "").replace(" ", "").split(",") if x.isdigit()
+}

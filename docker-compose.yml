@@ -59,6 +59,8 @@ services:
       - ATOM_NTFY_URL=http://ntfy:80
       - ATOM_NTFY_TOPIC=${ATOM_NTFY_TOPIC:-atom}
       - ATOM_PUBLIC_URL=${ATOM_PUBLIC_URL:-}
+      - ATOM_TELEGRAM_TOKEN=${ATOM_TELEGRAM_TOKEN:-}
+      - ATOM_TELEGRAM_ALLOWED=${ATOM_TELEGRAM_ALLOWED:-}
     volumes:
       - atom-data:/data
 

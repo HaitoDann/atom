@@ -19,7 +19,9 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
 | `api/app/llm.py` | Accès à Ollama : chat, JSON contraint, embeddings |
 | `api/app/reminders.py` | Rappels : commandes du modèle, planificateur |
-| `api/app/notify.py` | Canaux sortants (ntfy) |
+| `api/app/agent.py` | Cœur de l'agent : prompt, streaming, commandes (partagé web / Telegram) |
+| `api/app/telegram.py` | Bot Telegram bidirectionnel |
+| `api/app/notify.py` | Canaux sortants (ntfy, Telegram) |
 | `api/app/db.py` | Stockage SQLite et migrations |
 | `docker-compose.yml` | Ollama + téléchargement du modèle + backend |
 
@@ -113,6 +115,25 @@ Atom connaît la date et l'heure, et la liste des rappels programmés : « Quels
 > **iPhone** : iOS n'autorise le push instantané que via les serveurs d'Apple. Décommente `NTFY_UPSTREAM_BASE_URL=https://ntfy.sh` : ton serveur envoie alors seulement un signal anonyme à ntfy.sh (pas le contenu), qui réveille l'appli.
 > Pour l'instant, les notifications n'arrivent que quand le téléphone est sur ton réseau local ; ce sera réglé avec l'accès distant (Tailscale).
 
+## Telegram
+
+Discute avec Atom depuis n'importe où, sans Tailscale ni port ouvert : c'est Atom qui va chercher tes messages chez Telegram.
+
+1. Dans Telegram, ouvre **@BotFather** → `/newbot` → choisis un nom (ex. « Atom ») et un identifiant (ex. `atom_haito_bot`). Copie le **jeton** qu'il te donne.
+2. Dans `.env` : `ATOM_TELEGRAM_TOKEN=<le jeton>`, puis `docker compose up -d atom`.
+3. Écris à ton bot : il te répond avec **ton identifiant Telegram**. Mets-le dans `.env` : `ATOM_TELEGRAM_ALLOWED=<ton identifiant>`, puis relance `docker compose up -d atom`.
+4. Écris-lui à nouveau : c'est Atom qui répond. 🎉
+
+Comportement :
+- la réponse s'écrit progressivement, puis s'affiche mise en forme (gras, listes, code ; les tableaux sont alignés en police fixe) ;
+- l'émotion d'Atom s'affiche en **réaction** sur ton message (😁 🤔 😢 🤯…) ;
+- les rappels arrivent directement dans la discussion (en plus de ntfy s'il est configuré) ;
+- `/nouveau` démarre une nouvelle conversation, `/rappels` liste les rappels, `/souvenirs` montre ce qu'Atom sait de toi ;
+- les conversations Telegram apparaissent aussi dans l'interface web (préfixe ✈), avec la même mémoire ;
+- Atom utilise la personnalité et le modèle choisis en dernier dans l'interface web.
+
+> Sécurité : seuls les identifiants de `ATOM_TELEGRAM_ALLOWED` sont servis ; garde le jeton secret (quiconque l'a peut piloter le bot). Les messages transitent par Telegram ; le modèle et la mémoire restent chez toi.
+
 ## Comportement de l'agent
 
 - Atom **adapte la longueur** : court pour discuter, complet et structuré en Markdown (titres, listes, tableaux, code) pour une demande de travail.
@@ -149,7 +170,7 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 
 1. ✅ Backend + Docker Compose + streaming
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
-3. ✅ Atom qui écrit : ntfy auto-hébergé, rappels — prochain : brief du matin, relances, messagerie bidirectionnelle
+3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel — prochain : brief du matin, relances
 4. Documents : import de notes et de PDF, puis recherche dedans
 5. Outils : Proxmox, recherche web, domotique
 6. Accès distant via Tailscale ; plus tard, API externes en secours

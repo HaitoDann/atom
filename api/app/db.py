@@ -61,6 +61,10 @@ def init() -> None:
                 created_at REAL NOT NULL,
                 sent_at REAL
             );
+            CREATE TABLE IF NOT EXISTS kv (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             -- Échanges passés indexés pour le rappel sémantique
             CREATE TABLE IF NOT EXISTS recall (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -271,3 +275,21 @@ def delete_reminder(rid: int) -> bool:
         return c.execute(
             "DELETE FROM reminders WHERE id = ? AND status = 'pending'", (rid,)
         ).rowcount > 0
+
+
+# ---------------------------------------------------------------- clé / valeur
+
+
+def kv_get(key: str, default: str | None = None) -> str | None:
+    with conn() as c:
+        r = c.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()
+    return r["value"] if r else default
+
+
+def kv_set(key: str, value: str) -> None:
+    with conn() as c:
+        c.execute(
+            "INSERT INTO kv (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )

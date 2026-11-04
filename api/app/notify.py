@@ -16,7 +16,9 @@ log = logging.getLogger("atom.notify")
 
 
 def enabled() -> bool:
-    return bool(NTFY_URL)
+    from . import telegram
+
+    return bool(NTFY_URL) or (telegram.enabled() and bool(telegram.TELEGRAM_ALLOWED))
 
 
 def _ascii_header(v: str) -> str:
@@ -31,9 +33,18 @@ def _ascii_header(v: str) -> str:
 
 
 async def send(title: str, body: str, conversation_id: int | None = None, tags: str = "") -> bool:
-    if not enabled():
-        log.info("ntfy désactivé (ATOM_NTFY_URL vide) — message non envoyé : %s", title)
-        return False
+    """Envoie sur tous les canaux configurés. Vrai si au moins un a réussi."""
+    from . import telegram
+
+    results = [await telegram.broadcast(f"**{title}**\n{body}")]
+    if NTFY_URL:
+        results.append(await _ntfy(title, body, conversation_id, tags))
+    if not any(results):
+        log.info("aucun canal n'a pu envoyer : %s", title)
+    return any(results)
+
+
+async def _ntfy(title: str, body: str, conversation_id: int | None, tags: str) -> bool:
     headers = {"Title": _ascii_header(title), "Markdown": "yes"}
     if tags:
         headers["Tags"] = tags
