@@ -131,6 +131,11 @@ async def ollama_tokens(model: str, messages: list[dict]) -> AsyncIterator[str]:
         async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as r:
             if r.status_code != 200:
                 body = (await r.aread()).decode(errors="replace")[:300]
+                if r.status_code == 404 and "not found" in body:
+                    raise RuntimeError(
+                        f"Le modèle « {model} » n'est pas encore installé (téléchargement en cours ?). "
+                        f"Vérifie avec : docker compose logs ollama-pull"
+                    )
                 raise RuntimeError(f"Ollama a répondu {r.status_code} : {body}")
             async for line in r.aiter_lines():
                 if not line:
@@ -218,14 +223,17 @@ class MemoriesIn(BaseModel):
 
 @app.get("/api/health")
 async def health():
-    ollama_ok = PROVIDER == "mock"
+    ollama_ok = model_ready = PROVIDER == "mock"
     if not ollama_ok:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
-                ollama_ok = (await client.get(f"{OLLAMA_URL}/api/tags")).status_code == 200
-        except httpx.HTTPError:
+                r = await client.get(f"{OLLAMA_URL}/api/tags")
+                ollama_ok = r.status_code == 200
+                model_ready = ollama_ok and bool(r.json().get("models"))
+        except (httpx.HTTPError, ValueError):
             pass
-    return {"ok": True, "provider": PROVIDER, "ollama": ollama_ok, "default_model": DEFAULT_MODEL}
+    return {"ok": True, "provider": PROVIDER, "ollama": ollama_ok, "model_ready": model_ready,
+            "default_model": DEFAULT_MODEL}
 
 
 @app.get("/api/models")

@@ -70,6 +70,7 @@
     background: #c4554d; box-shadow: 0 0 8px rgba(196, 85, 77, 0.6);
     transition: background .3s, box-shadow .3s;
   }
+  .dot.wait { background: #d9a557; box-shadow: 0 0 8px rgba(217, 165, 87, 0.6); }
   .dot.on { background: #7fb38a; box-shadow: 0 0 8px rgba(127, 179, 138, 0.6); }
 
   main {
@@ -605,9 +606,13 @@ async function connect() {
   let info = "";
   try {
     const h = await (await api("/api/health")).json();
-    online = h.ollama;
-    info = h.provider === "mock" ? "mode test (sans modèle)" : online ? "Ollama en ligne" : "Ollama injoignable depuis le serveur";
-    if (online) {
+    online = h.ollama && h.model_ready;
+    info = h.provider === "mock" ? "mode test (sans modèle)"
+      : !h.ollama ? "Ollama injoignable depuis le serveur"
+      : !h.model_ready ? "aucun modèle installé — téléchargement en cours ?"
+      : "Ollama en ligne";
+    dot.classList.toggle("wait", h.ollama && !h.model_ready);
+    if (h.ollama) {
       const m = await (await api("/api/models")).json();
       modelSel.innerHTML = "";
       if (!m.models.length) modelSel.add(new Option("aucun modèle — ollama pull qwen3:4b", ""));
