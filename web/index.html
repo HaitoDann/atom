@@ -186,6 +186,73 @@
   .emos button { font: 11px var(--mono); padding: 4px 8px; border-radius: 999px; background: none; border: 1px solid var(--glass-border); color: var(--muted); cursor: pointer; }
   .emos button:hover { color: var(--text); }
 
+  /* ---------- markdown ---------- */
+  .msg.atom.md { white-space: normal; }
+  .md > :first-child { margin-top: 0; }
+  .md > :last-child { margin-bottom: 0; }
+  .md p { margin: 0 0 .8em; }
+  .md h1, .md h2, .md h3, .md h4 { font-size: 1.02em; font-weight: 600; margin: 1.2em 0 .5em; color: #f4efe6; }
+  .md h1 { font-size: 1.15em; }
+  .md ul, .md ol { margin: 0 0 .8em; padding-left: 1.4em; }
+  .md li { margin: .2em 0; }
+  .md strong { color: #f6f1e8; font-weight: 600; }
+  .md a { color: var(--accent); }
+  .md code { font: .88em var(--mono); background: rgba(255,255,255,.07); padding: .1em .35em; border-radius: 5px; }
+  .md pre { background: rgba(20,20,19,.75); border: 1px solid var(--glass-border); border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 0 0 .8em; }
+  .md pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
+  .md blockquote { margin: 0 0 .8em; padding-left: 12px; border-left: 2px solid rgba(var(--tint), .5); color: var(--muted); }
+  .md hr { border: 0; border-top: 1px solid var(--glass-border); margin: 1em 0; }
+  .md .tbl { overflow-x: auto; margin: 0 0 .8em; }
+  .md table { border-collapse: collapse; font-size: 14px; min-width: 60%; background: rgba(20,20,19,.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .md th, .md td { border: 1px solid rgba(255,255,255,.1); padding: 6px 11px; text-align: left; vertical-align: top; }
+  .md th { background: rgba(255,255,255,.05); font-weight: 600; }
+
+  /* ---------- conversations ---------- */
+  .iconbtn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 15px; line-height: 1; }
+  .iconbtn:hover { border-color: var(--glass-border); color: var(--text); }
+  #convs {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 10;
+    width: min(300px, 86vw);
+    background: rgba(28, 28, 27, 0.94);
+    border-right: 1px solid var(--glass-border);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    transform: translateX(-102%); transition: transform .3s ease;
+    display: flex; flex-direction: column; padding: 16px 12px;
+  }
+  #convs.open { transform: none; }
+  #convs .top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0 4px; }
+  #convs h2 { flex: 1; margin: 0; font-size: 12px; letter-spacing: .3em; font-variant: small-caps; color: var(--muted); font-weight: 600; }
+  #convList { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  #convList li { display: flex; align-items: center; border-radius: 9px; }
+  #convList li:hover { background: rgba(255,255,255,.05); }
+  #convList li.active { background: rgba(255,255,255,.08); }
+  #convList .t { flex: 1; padding: 8px 10px; font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  #convList li.active .t { color: var(--text); }
+  #convList button { visibility: hidden; background: none; border: 0; color: var(--faint); cursor: pointer; padding: 0 8px; font-size: 15px; }
+  #convList li:hover button { visibility: visible; }
+  #convList button:hover { color: #d98a7a; }
+  #scrim { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.25); display: none; }
+  #scrim.on { display: block; }
+
+  /* ---------- souvenirs ---------- */
+  #memList .src { font: 9.5px var(--mono); letter-spacing: .06em; color: var(--faint); border: 1px solid var(--glass-border); border-radius: 999px; padding: 1px 6px; flex: none; }
+  #memList .src.auto { color: rgb(var(--tint)); border-color: rgba(var(--tint), .35); }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; margin-bottom: 10px; }
+  .toggle input { accent-color: var(--accent); }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 112px; z-index: 4; transform: translate(-50%, 10px);
+    max-width: min(560px, 90vw); opacity: 0; pointer-events: none;
+    font-size: 12.5px; color: var(--muted);
+    background: rgba(28,28,27,.8); border: 1px solid rgba(var(--tint), .3);
+    padding: 7px 14px; border-radius: 999px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: opacity .3s, transform .3s;
+  }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+  #toast b { color: rgb(var(--tint)); font-weight: 500; }
+
   @media (max-width: 600px) {
     #chat { padding: 16px 16px 32px; }
     footer { padding: 0 12px 14px; }
@@ -200,7 +267,9 @@
 
 <div id="app">
   <header>
+    <button class="iconbtn" id="convBtn" title="Conversations" aria-label="Conversations">☰</button>
     <span class="brand">Atom</span>
+    <button class="iconbtn" id="newConv" title="Nouvelle conversation" aria-label="Nouvelle conversation">＋</button>
     <span class="spacer"></span>
     <select id="model" title="Modèle"></select>
     <span id="dot" class="dot" title="Ollama hors ligne"></span>
@@ -222,6 +291,16 @@
 </div>
 
 <button id="chip" title="Réglages">veille</button>
+<div id="toast"></div>
+<div id="scrim"></div>
+
+<aside id="convs" aria-hidden="true">
+  <div class="top">
+    <h2>Conversations</h2>
+    <button class="iconbtn" id="newConv2" title="Nouvelle conversation">＋</button>
+  </div>
+  <ul id="convList"></ul>
+</aside>
 
 <aside id="panel" aria-hidden="true">
   <button class="close" id="closePanel" aria-label="Fermer">×</button>
@@ -236,17 +315,19 @@
   <h3>Personnalité</h3>
   <textarea id="persona" class="field"></textarea>
 
-  <h3>Souvenirs durables</h3>
+  <h3>Ce qu'Atom sait de toi</h3>
+  <label class="toggle"><input type="checkbox" id="autoMem"> Mémoire automatique</label>
   <ul id="memList"></ul>
   <div class="row">
     <input id="memNew" class="field" placeholder="Ajouter un souvenir…">
     <button class="btn" id="memAdd">+</button>
   </div>
-  <p class="small">Injectés dans chaque requête comme faits connus.</p>
+  <p class="small" id="memInfo">Atom retient seul les faits durables sur toi. Modifie ou supprime ce qui ne te convient pas.</p>
+  <button class="btn danger" id="clearMem" style="margin-top:8px">Tout oublier</button>
 
-  <h3>Historique</h3>
+  <h3>Conversation</h3>
   <p class="small" id="histInfo" style="margin-bottom:8px"></p>
-  <button class="btn danger" id="clearHist">Effacer la conversation</button>
+  <button class="btn danger" id="clearHist">Supprimer cette conversation</button>
 
   <h3>Tester une émotion</h3>
   <div class="emos" id="emos"></div>
@@ -476,10 +557,98 @@ const DEFAULT_PERSONA =
   "Tu es Atom, une entité numérique bienveillante, curieuse et concise. " +
   "Tu parles français avec naturel et chaleur.";
 
-const settings = Object.assign({ model: "", persona: DEFAULT_PERSONA }, store.get("settings", {}));
+const settings = Object.assign(
+  { model: "", persona: DEFAULT_PERSONA, autoMemory: true, conversationId: null },
+  store.get("settings", {})
+);
 const saveSettings = () => store.set("settings", settings);
-let history = [];   // [{role, content, emotion}] — copie de l'historique serveur
-let memories = [];  // [string] — stockés côté serveur
+let history = [];        // messages de la conversation courante
+let memories = [];       // [{id, content, source}]
+let conversations = [];  // [{id, title, updated_at}]
+
+/* ============================================================
+   MARKDOWN — rendu minimal et sûr (tout est échappé d'abord)
+   ============================================================ */
+const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function inline(t) {
+  const codes = [];
+  t = t.replace(/`([^`\n]+)`/g, (_, c) => (codes.push(c), `\u0000${codes.length - 1}\u0000`));
+  t = esc(t)
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/__([^_\n]+)__/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>")
+    .replace(/~~([^~\n]+)~~/g, "<del>$1</del>")
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  return t.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[+i])}</code>`);
+}
+
+const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
+const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
+const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+
+function md(src) {
+  const lines = src.replace(/\r/g, "").split("\n");
+  let out = "", i = 0, para = [];
+  const flush = () => { if (para.length) { out += `<p>${para.map(inline).join("<br>")}</p>`; para = []; } };
+
+  while (i < lines.length) {
+    const l = lines[i];
+    let m;
+    if ((m = l.match(/^\s*```\s*([\w+-]*)/))) {            // bloc de code
+      flush();
+      const buf = [];
+      i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
+      i++;
+      out += `<pre><code>${esc(buf.join("\n"))}</code></pre>`;
+      continue;
+    }
+    if (isRow(l) && i + 1 < lines.length && isSep(lines[i + 1])) {   // tableau
+      flush();
+      const head = cells(l);
+      i += 2;
+      let body = "";
+      while (i < lines.length && isRow(lines[i])) {
+        body += "<tr>" + cells(lines[i]).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>";
+        i++;
+      }
+      out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
+      continue;
+    }
+    if ((m = l.match(/^\s*(#{1,4})\s+(.*)$/))) {           // titre
+      flush();
+      out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`;
+      i++; continue;
+    }
+    if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(l)) { flush(); out += "<hr>"; i++; continue; }
+    if (/^\s*>/.test(l)) {                                   // citation
+      flush();
+      const buf = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ""));
+      out += `<blockquote>${md(buf.join("\n"))}</blockquote>`;
+      continue;
+    }
+    if ((m = l.match(/^\s*([-*+]|\d+[.)])\s+/))) {          // liste
+      flush();
+      const ordered = /\d/.test(m[1]);
+      let items = "";
+      while (i < lines.length && (m = lines[i].match(/^\s*([-*+]|\d+[.)])\s+(.*)$/)) && /\d/.test(m[1]) === ordered) {
+        let item = m[2];
+        i++;
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) item += " " + lines[i++].trim();
+        items += `<li>${inline(item)}</li>`;
+      }
+      out += ordered ? `<ol>${items}</ol>` : `<ul>${items}</ul>`;
+      continue;
+    }
+    if (!l.trim()) { flush(); i++; continue; }
+    para.push(l);
+    i++;
+  }
+  flush();
+  return out;
+}
 
 /* ============================================================
    API Atom (même origine que la page)
@@ -489,29 +658,43 @@ async function api(path, opts = {}) {
     ...opts,
     headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
   });
-  if (!r.ok) throw new Error(`${path} → ${r.status} ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) {
+    let detail = "";
+    try { detail = (await r.json()).detail; } catch {}
+    throw new Error(detail || `${path} → ${r.status}`);
+  }
   return r;
 }
+const getJSON = async (path) => (await api(path)).json();
 
 /* ============================================================
    UI
    ============================================================ */
 const $ = (id) => document.getElementById(id);
 const chat = $("chat"), scroller = $("scroller"), input = $("input"), send = $("send"),
-      form = $("form"), modelSel = $("model"), dot = $("dot"), chip = $("chip"), panel = $("panel");
+      form = $("form"), modelSel = $("model"), dot = $("dot"), chip = $("chip"), panel = $("panel"),
+      convs = $("convs"), scrim = $("scrim");
+
+function setAtomText(el, text) {
+  el.classList.add("md");
+  el.innerHTML = md(text);
+}
 
 function addMsg(role, text, cls) {
   $("empty")?.remove();
   const el = document.createElement("div");
   el.className = "msg " + (cls || (role === "user" ? "user" : "atom"));
-  el.textContent = text;
+  if (role === "assistant" && !cls) setAtomText(el, text);
+  else el.textContent = text;
   chat.appendChild(el);
   scroller.scrollTop = scroller.scrollHeight;
   return el;
 }
 
 function updateHistInfo() {
-  $("histInfo").textContent = `${Math.floor(history.length / 2)} échange(s) enregistré(s) sur le serveur · 20 derniers envoyés au modèle`;
+  $("histInfo").textContent = settings.conversationId
+    ? `${Math.floor(history.length / 2)} échange(s) · les 20 derniers sont envoyés au modèle`
+    : "Nouvelle conversation, pas encore enregistrée.";
 }
 
 function renderHistory() {
@@ -523,13 +706,13 @@ function renderHistory() {
   updateHistInfo();
 }
 
-async function loadServerState() {
-  try {
-    history = (await (await api("/api/history")).json()).messages;
-    memories = (await (await api("/api/memories")).json()).memories;
-  } catch (e) { console.warn(e); }
-  renderHistory();
-  renderMemories();
+let toastTimer = 0;
+function toast(html) {
+  const t = $("toast");
+  t.innerHTML = html;
+  t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("on"), 5000);
 }
 
 function autoGrow() {
@@ -542,52 +725,147 @@ input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
 });
 
-/* ---------- panneau ---------- */
+/* ---------- panneaux ---------- */
 function openPanel(open) {
   panel.classList.toggle("open", open);
   panel.setAttribute("aria-hidden", String(!open));
+  if (open) { openConvs(false); loadMemories(); }
+  scrim.classList.toggle("on", open || convs.classList.contains("open"));
+}
+function openConvs(open) {
+  convs.classList.toggle("open", open);
+  convs.setAttribute("aria-hidden", String(!open));
+  if (open) { panel.classList.remove("open"); loadConversations(); }
+  scrim.classList.toggle("on", open || panel.classList.contains("open"));
 }
 chip.onclick = () => openPanel(!panel.classList.contains("open"));
 $("closePanel").onclick = () => openPanel(false);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") openPanel(false); });
+$("convBtn").onclick = () => openConvs(!convs.classList.contains("open"));
+scrim.onclick = () => { openPanel(false); openConvs(false); };
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { openPanel(false); openConvs(false); } });
 
 $("reconnect").onclick = () => connect();
 $("persona").value = settings.persona;
 $("persona").oninput = () => { settings.persona = $("persona").value; saveSettings(); };
+$("autoMem").checked = settings.autoMemory;
+$("autoMem").onchange = () => { settings.autoMemory = $("autoMem").checked; saveSettings(); };
 
-async function saveMemories() {
+/* ---------- conversations ---------- */
+async function loadConversations() {
+  try { conversations = (await getJSON("/api/conversations")).conversations; } catch (e) { console.warn(e); }
+  renderConversations();
+}
+
+function renderConversations() {
+  const ul = $("convList");
+  ul.innerHTML = "";
+  if (!conversations.length) {
+    ul.innerHTML = '<li><span class="t" style="cursor:default">Aucune conversation</span></li>';
+    return;
+  }
+  for (const c of conversations) {
+    const li = document.createElement("li");
+    if (c.id === settings.conversationId) li.className = "active";
+    const t = document.createElement("span");
+    t.className = "t"; t.textContent = c.title; t.title = c.title;
+    t.onclick = () => { openConversation(c.id); openConvs(false); };
+    const del = document.createElement("button");
+    del.textContent = "×"; del.title = "Supprimer";
+    del.onclick = async () => {
+      if (!confirm(`Supprimer « ${c.title} » ?`)) return;
+      await api(`/api/conversations/${c.id}`, { method: "DELETE" });
+      if (c.id === settings.conversationId) newConversation();
+      loadConversations();
+    };
+    li.append(t, del);
+    ul.appendChild(li);
+  }
+}
+
+async function openConversation(id) {
+  if (busy) return;
   try {
-    memories = (await (await api("/api/memories", { method: "PUT", body: JSON.stringify({ memories }) })).json()).memories;
-  } catch (e) { console.warn(e); }
+    history = (await getJSON(`/api/conversations/${id}/messages`)).messages;
+    settings.conversationId = id;
+  } catch {
+    history = [];
+    settings.conversationId = null;
+  }
+  saveSettings();
+  renderHistory();
+}
+
+function newConversation() {
+  if (busy) return;
+  settings.conversationId = null;
+  saveSettings();
+  history = [];
+  renderHistory();
+  setEmotion("idle");
+  openConvs(false);
+  input.focus();
+}
+$("newConv").onclick = newConversation;
+$("newConv2").onclick = newConversation;
+
+$("clearHist").onclick = async () => {
+  if (!settings.conversationId) return;
+  if (!confirm("Supprimer cette conversation ?")) return;
+  try { await api(`/api/conversations/${settings.conversationId}`, { method: "DELETE" }); } catch (e) { console.warn(e); }
+  newConversation();
+};
+
+/* ---------- souvenirs ---------- */
+async function loadMemories() {
+  try { memories = (await getJSON("/api/memories")).memories; } catch (e) { console.warn(e); }
   renderMemories();
 }
 
 function renderMemories() {
   const ul = $("memList");
   ul.innerHTML = "";
-  memories.forEach((m, i) => {
+  for (const m of memories) {
     const li = document.createElement("li");
+    const src = document.createElement("span");
+    src.className = "src " + m.source;
+    src.textContent = m.source === "auto" ? "auto" : "moi";
+    src.title = m.source === "auto" ? "Retenu automatiquement par Atom" : "Ajouté par toi";
     const inp = document.createElement("input");
-    inp.className = "field"; inp.value = m;
-    inp.onchange = () => { memories[i] = inp.value.trim(); memories = memories.filter(Boolean); saveMemories(); };
+    inp.className = "field"; inp.value = m.content;
+    inp.onchange = async () => {
+      const v = inp.value.trim();
+      if (!v) return del.onclick();
+      try { await api(`/api/memories/${m.id}`, { method: "PATCH", body: JSON.stringify({ content: v }) }); m.content = v; }
+      catch (e) { toast(esc(e.message)); inp.value = m.content; }
+    };
     const del = document.createElement("button");
     del.textContent = "×"; del.title = "Oublier";
-    del.onclick = () => { memories.splice(i, 1); saveMemories(); };
-    li.append(inp, del);
+    del.onclick = async () => {
+      try { await api(`/api/memories/${m.id}`, { method: "DELETE" }); } catch (e) { console.warn(e); }
+      loadMemories();
+    };
+    li.append(src, inp, del);
     ul.appendChild(li);
-  });
+  }
+  $("memInfo").textContent = memories.length
+    ? `${memories.length} souvenir(s). Modifie ou supprime ce qui ne te convient pas.`
+    : "Atom n'a encore rien retenu. Il apprendra au fil des conversations.";
 }
-$("memAdd").onclick = () => {
+
+$("memAdd").onclick = async () => {
   const v = $("memNew").value.trim();
   if (!v) return;
-  memories.push(v); saveMemories(); $("memNew").value = "";
+  try {
+    await api("/api/memories", { method: "POST", body: JSON.stringify({ content: v }) });
+    $("memNew").value = "";
+  } catch (e) { toast(esc(e.message)); }
+  loadMemories();
 };
 $("memNew").onkeydown = (e) => { if (e.key === "Enter") $("memAdd").onclick(); };
-
-$("clearHist").onclick = async () => {
-  if (!confirm("Effacer toute la conversation ?")) return;
-  try { await api("/api/history", { method: "DELETE" }); } catch (e) { console.warn(e); }
-  history = []; renderHistory(); setEmotion("idle");
+$("clearMem").onclick = async () => {
+  if (!confirm("Effacer tout ce qu'Atom sait de toi ?")) return;
+  try { await api("/api/memories", { method: "DELETE" }); } catch (e) { console.warn(e); }
+  loadMemories();
 };
 
 for (const e of EMOTIONS) {
@@ -604,18 +882,20 @@ let online = false;
 
 async function connect() {
   let info = "";
+  let h = null;
   try {
-    const h = await (await api("/api/health")).json();
+    h = await getJSON("/api/health");
     online = h.ollama && h.model_ready;
     info = h.provider === "mock" ? "mode test (sans modèle)"
       : !h.ollama ? "Ollama injoignable depuis le serveur"
       : !h.model_ready ? "aucun modèle installé — téléchargement en cours ?"
-      : "Ollama en ligne";
+      : h.embeddings ? "Ollama en ligne · mémoire sémantique active"
+      : "Ollama en ligne · mémoire sans recherche sémantique (nomic-embed-text absent)";
     dot.classList.toggle("wait", h.ollama && !h.model_ready);
     if (h.ollama) {
-      const m = await (await api("/api/models")).json();
+      const m = await getJSON("/api/models");
       modelSel.innerHTML = "";
-      if (!m.models.length) modelSel.add(new Option("aucun modèle — ollama pull qwen3:4b", ""));
+      if (!m.models.length) modelSel.add(new Option("aucun modèle installé", ""));
       for (const n of m.models) modelSel.add(new Option(n, n));
       if (!m.models.includes(settings.model)) {
         settings.model = m.models.includes(m.default) ? m.default : (m.models[0] || "");
@@ -644,6 +924,12 @@ function scheduleRest() {
   sleepTimer = setTimeout(() => { if (!busy) setEmotion("sleep"); }, 180000);
 }
 
+function onMemoryAdded(added) {
+  const list = added.map((m) => esc(m.content.replace(/^L'utilisateur\s+/i, ""))).join(" · ");
+  toast(`<b>Atom a retenu</b> : ${list}`);
+  if (panel.classList.contains("open")) loadMemories();
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = input.value.trim();
@@ -656,12 +942,39 @@ form.addEventListener("submit", async (e) => {
   history.push({ role: "user", content: text });
   setEmotion("thinking");
   const pending = addMsg("atom", "réflexion", "pending");
-  let bubble = null, reply = "", emotion = "talking";
+  let bubble = null, reply = "", emotion = "talking", renderQueued = false, finished = false;
+
+  const render = () => {
+    renderQueued = false;
+    if (!bubble) return;
+    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
+    setAtomText(bubble, reply.trimStart());
+    if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
+  };
+
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (!bubble) { pending.remove(); bubble = addMsg("assistant", "…"); }
+    render();
+    history.push({ role: "assistant", content: reply.trim(), emotion });
+    setEmotion(emotion);
+    busy = false; autoGrow();
+    updateHistInfo();
+    scheduleRest();
+    input.focus();
+  };
 
   try {
     const r = await api("/api/chat", {
       method: "POST",
-      body: JSON.stringify({ message: text, model: settings.model || null, persona: settings.persona }),
+      body: JSON.stringify({
+        message: text,
+        conversation_id: settings.conversationId,
+        model: settings.model || null,
+        persona: settings.persona,
+        auto_memory: settings.autoMemory,
+      }),
     });
     const reader = r.body.getReader();
     const dec = new TextDecoder();
@@ -676,43 +989,51 @@ form.addEventListener("submit", async (e) => {
         buf = buf.slice(nl + 1);
         if (!line) continue;
         const ev = JSON.parse(line);
-        if (ev.type === "emotion") {
+        if (ev.type === "meta") {
+          if (settings.conversationId !== ev.conversation_id) {
+            settings.conversationId = ev.conversation_id;
+            saveSettings();
+          }
+        } else if (ev.type === "emotion") {
           emotion = ev.emotion;
           setEmotion(emotion);
         } else if (ev.type === "token") {
           if (!bubble) { pending.remove(); bubble = addMsg("assistant", ""); }
           reply += ev.text;
-          bubble.textContent = reply.trimStart();
           entity.tokenKick = 1; // petite pulsation par token
-          scroller.scrollTop = scroller.scrollHeight;
+          if (!renderQueued) { renderQueued = true; requestAnimationFrame(render); }
         } else if (ev.type === "done") {
           emotion = ev.emotion;
+          finish(); // l'utilisateur peut répondre pendant que la mémoire travaille
+        } else if (ev.type === "memory") {
+          onMemoryAdded(ev.added);
         } else if (ev.type === "error") {
           throw new Error(ev.message);
         }
       }
     }
-    if (!bubble) { pending.remove(); bubble = addMsg("assistant", "…"); }
-    history.push({ role: "assistant", content: reply.trim(), emotion });
-    setEmotion(emotion);
+    finish();
   } catch (err) {
+    if (finished) { console.warn(err); return; }
+    finished = true;
     pending.remove();
     const msg = err instanceof TypeError ? "Serveur Atom injoignable." : err.message;
     addMsg("atom", msg, "err");
     setEmotion("fear");
     connect();
-  } finally {
     busy = false; autoGrow();
-    updateHistInfo();
     scheduleRest();
-    input.focus();
   }
 });
 
 /* ============================================================
    DÉMARRAGE
    ============================================================ */
-loadServerState();
+(async () => {
+  if (settings.conversationId) await openConversation(settings.conversationId);
+  else renderHistory();
+  loadMemories();
+})();
 connect();
 setInterval(() => { if (!busy) connect(); }, 15000);
 scheduleRest();

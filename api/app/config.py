@@ -1,0 +1,27 @@
+"""Configuration lue dans l'environnement (voir .env.example)."""
+
+import os
+from pathlib import Path
+
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+DEFAULT_MODEL = os.getenv("ATOM_MODEL", "qwen3:4b-instruct-2507-q4_K_M")
+EMBED_MODEL = os.getenv("ATOM_EMBED_MODEL", "nomic-embed-text")
+PROVIDER = os.getenv("ATOM_PROVIDER", "ollama")  # "ollama" | "mock"
+DB_PATH = Path(os.getenv("ATOM_DB", "data/atom.db"))
+WEB_DIR = Path(os.getenv("ATOM_WEB", Path(__file__).resolve().parents[2] / "web"))
+CONTEXT_TURNS = int(os.getenv("ATOM_CONTEXT_TURNS", "20"))
+MAX_TOKENS = int(os.getenv("ATOM_MAX_TOKENS", "1500"))
+
+# Mémoire
+FACTS_IN_PROMPT = int(os.getenv("ATOM_FACTS_IN_PROMPT", "8"))
+RECALL_IN_PROMPT = int(os.getenv("ATOM_RECALL_IN_PROMPT", "3"))
+FACT_MIN_SCORE = float(os.getenv("ATOM_FACT_MIN_SCORE", "0.45"))
+RECALL_MIN_SCORE = float(os.getenv("ATOM_RECALL_MIN_SCORE", "0.55"))
+DUPLICATE_SCORE = float(os.getenv("ATOM_DUPLICATE_SCORE", "0.9"))
+
+EMOTIONS = ["idle", "thinking", "talking", "joy", "angry", "sad", "surprise", "fear", "sleep"]
+
+DEFAULT_PERSONA = (
+    "Tu es Atom, une entité numérique bienveillante, curieuse et concise. "
+    "Tu parles français avec naturel et chaleur."
+)

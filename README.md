@@ -5,8 +5,8 @@ Assistant IA auto-hébergé : une interface web minimaliste avec un avatar vivan
 ```
 Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
                                    ├─ atom    : FastAPI, port 8000 (sert l'interface + API)
-                                   │    └─ SQLite (historique, souvenirs) dans le volume atom-data
-                                   └─ ollama  : qwen3:4b-instruct-2507 (sans mode réflexion), sur CPU
+                                   │    └─ SQLite (conversations, souvenirs, index de rappel) — volume atom-data
+                                   └─ ollama  : qwen3:4b-instruct-2507 (chat) + nomic-embed-text (mémoire), sur CPU
 ```
 
 ## Arborescence
@@ -14,7 +14,10 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | Chemin | Rôle |
 |---|---|
 | `web/index.html` | L'interface (un seul fichier, sans build) |
-| `api/app/main.py` | Le backend : relais Ollama en streaming, historique, souvenirs |
+| `api/app/main.py` | Routes HTTP et boucle de chat en streaming |
+| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
+| `api/app/llm.py` | Accès à Ollama : chat, JSON contraint, embeddings |
+| `api/app/db.py` | Stockage SQLite et migrations |
 | `docker-compose.yml` | Ollama + téléchargement du modèle + backend |
 
 ## Premier essai sur Proxmox (réseau local)
@@ -70,12 +73,24 @@ sudo docker compose up -d --build atom
 
 Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 
+## Mémoire
+
+Atom retient seul ce qui compte, et tu gardes la main.
+
+- **Faits sur toi** : après chaque réponse, le modèle relit l'échange en arrière-plan et en extrait les informations durables (« L'utilisateur a un serveur Proxmox »). Un bandeau « Atom a retenu… » s'affiche quand il apprend quelque chose. Les doublons sont écartés par similarité sémantique.
+- **Anciennes conversations** : chaque échange est indexé (`nomic-embed-text`). Quand tu écris, les passages les plus proches tirés d'*autres* conversations sont rappelés au modèle.
+- **Injection ciblée** : seuls les faits pertinents pour ton message sont ajoutés au prompt, pas toute la mémoire.
+- **Contrôle** : puce en bas à droite → « Ce qu'Atom sait de toi ». Chaque souvenir est marqué `auto` ou `moi`, modifiable et supprimable ; la mémoire automatique se coupe d'une case à cocher ; « Tout oublier » efface tout.
+
+Sans `nomic-embed-text`, la mémoire fonctionne quand même en mode simple (faits les plus récents, pas de rappel des anciennes conversations).
+
 ## Comportement de l'agent
 
-- Atom répond en **une à trois phrases courtes**, avec un modèle local uniquement.
+- Atom **adapte la longueur** : court pour discuter, complet et structuré en Markdown (titres, listes, tableaux, code) pour une demande de travail.
+- **Plusieurs conversations** : bouton ☰ en haut à gauche pour la liste, ＋ pour en commencer une nouvelle.
 - Les réponses arrivent **en streaming**, et la sphère pulse légèrement à chaque token.
 - Le modèle commence sa réponse par un tag d'émotion, par exemple `[joy] Salut !`. Le backend le retire et pilote la sphère avec ; sans tag, l'émotion par défaut est `talking`.
-- **L'historique et les souvenirs sont stockés sur le serveur**, en SQLite : on retrouve la conversation depuis n'importe quel navigateur. Les 20 derniers échanges sont envoyés au modèle.
+- **Tout est stocké sur le serveur**, en SQLite : on retrouve ses conversations depuis n'importe quel navigateur. Les 20 derniers échanges de la conversation courante sont envoyés au modèle.
 - La personnalité et le choix du modèle restent propres à chaque navigateur.
 
 ## Développement sans Docker
@@ -94,13 +109,18 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 |---|---|---|
 | GET | `/api/health` | État du backend et d'Ollama |
 | GET | `/api/models` | Modèles installés |
-| POST | `/api/chat` | `{message, model?, persona?}` → flux NDJSON : `emotion`, `token`…, `done` ou `error` |
-| GET / DELETE | `/api/history` | Lire ou effacer l'historique |
-| GET / PUT | `/api/memories` | Lire ou remplacer les souvenirs |
+| POST | `/api/chat` | `{message, conversation_id?, model?, persona?, auto_memory?}` → flux NDJSON : `meta`, `emotion`, `token`…, `done`, puis `memory` ; ou `error` |
+| GET | `/api/conversations` | Liste des conversations |
+| GET | `/api/conversations/{id}/messages` | Messages d'une conversation |
+| PATCH / DELETE | `/api/conversations/{id}` | Renommer / supprimer |
+| GET / POST / DELETE | `/api/memories` | Lister / ajouter / tout effacer |
+| PATCH / DELETE | `/api/memories/{id}` | Modifier / oublier un souvenir |
 
 ## Feuille de route
 
 1. ✅ Backend + Docker Compose + streaming
-2. Mémoire automatique : extraction de faits, recherche dans les anciennes conversations (`sqlite-vec` + `nomic-embed-text`), panneau de contrôle
-3. Documents : import de notes et de PDF, puis recherche dedans
-4. Accès distant via Tailscale ; plus tard, API externes en secours et voix
+2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
+3. Atom qui écrit : ntfy auto-hébergé, rappels, brief du matin
+4. Documents : import de notes et de PDF, puis recherche dedans
+5. Voix (Whisper + Piper), mode appel ; outils (Proxmox, web, domotique)
+6. Accès distant via Tailscale ; plus tard, API externes en secours

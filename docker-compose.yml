@@ -20,7 +20,7 @@ services:
         condition: service_healthy
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}"]
+    entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M} && ollama pull ${ATOM_EMBED_MODEL:-nomic-embed-text}"]
     restart: "no"
 
   atom:
@@ -35,6 +35,7 @@ services:
     environment:
       - OLLAMA_URL=http://ollama:11434
       - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+      - ATOM_EMBED_MODEL=${ATOM_EMBED_MODEL:-nomic-embed-text}
       - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
     volumes:
       - atom-data:/data
