@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import agent, db, llm, memory, notify, reminders, telegram
+from . import agent, db, llm, memory, notify, reminders, system, telegram
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -62,8 +62,13 @@ class MemoryIn(BaseModel):
     content: str = Field(min_length=1, max_length=500)
 
 
-class TitleIn(BaseModel):
-    title: str = Field(min_length=1, max_length=120)
+class ConvPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=120)
+    pinned: bool | None = None
+
+
+class TruncateIn(BaseModel):
+    from_id: int
 
 
 @app.get("/api/health")
@@ -136,9 +141,29 @@ def get_messages(cid: int):
 
 
 @app.patch("/api/conversations/{cid}")
-def patch_conversation(cid: int, body: TitleIn):
-    db.rename_conversation(cid, body.title.strip())
+def patch_conversation(cid: int, body: ConvPatch):
+    if body.title:
+        db.rename_conversation(cid, body.title.strip())
+    if body.pinned is not None:
+        db.pin_conversation(cid, body.pinned)
     return {"ok": True}
+
+
+@app.post("/api/conversations/{cid}/truncate")
+def truncate(cid: int, body: TruncateIn):
+    """Supprime les messages à partir d'un message (pour modifier ou régénérer)."""
+    return {"deleted": db.truncate_conversation(cid, body.from_id)}
+
+
+@app.get("/api/search")
+def search(q: str):
+    q = q.strip()
+    return {"results": db.search(q) if len(q) >= 2 else []}
+
+
+@app.get("/api/system")
+async def system_info():
+    return await system.snapshot()
 
 
 @app.delete("/api/conversations/{cid}")

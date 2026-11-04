@@ -85,6 +85,8 @@ def init() -> None:
                     ("Première conversation", now, now),
                 ).lastrowid
                 c.execute("UPDATE messages SET conversation_id = ?", (cid,))
+        if "pinned" not in _columns(c, "conversations"):
+            c.execute("ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
         mem_cols = _columns(c, "memories")
         for col, ddl in [
             ("source", "TEXT NOT NULL DEFAULT 'manuel'"),
@@ -111,7 +113,7 @@ def create_conversation(title: str = "Nouvelle conversation") -> int:
 def list_conversations() -> list[dict]:
     with conn() as c:
         rows = c.execute(
-            "SELECT id, title, updated_at FROM conversations ORDER BY updated_at DESC"
+            "SELECT id, title, pinned, updated_at FROM conversations ORDER BY updated_at DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -124,6 +126,39 @@ def conversation_exists(cid: int) -> bool:
 def rename_conversation(cid: int, title: str) -> None:
     with conn() as c:
         c.execute("UPDATE conversations SET title = ? WHERE id = ?", (title, cid))
+
+
+def pin_conversation(cid: int, pinned: bool) -> None:
+    with conn() as c:
+        c.execute("UPDATE conversations SET pinned = ? WHERE id = ?", (1 if pinned else 0, cid))
+
+
+def truncate_conversation(cid: int, from_id: int) -> int:
+    """Supprime les messages à partir de from_id (modifier / régénérer)."""
+    with conn() as c:
+        return c.execute(
+            "DELETE FROM messages WHERE conversation_id = ? AND id >= ?", (cid, from_id)
+        ).rowcount
+
+
+def search(q: str, limit: int = 30) -> list[dict]:
+    like = "%" + q.replace("%", r"\%").replace("_", r"\_") + "%"
+    with conn() as c:
+        rows = c.execute(
+            """
+            SELECT c.id, c.title, c.updated_at,
+                   (SELECT m.content FROM messages m
+                     WHERE m.conversation_id = c.id AND m.content LIKE ? ESCAPE '\\'
+                     ORDER BY m.id DESC LIMIT 1) AS snippet
+            FROM conversations c
+            WHERE c.title LIKE ? ESCAPE '\\'
+               OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id
+                          AND m.content LIKE ? ESCAPE '\\')
+            ORDER BY c.updated_at DESC LIMIT ?
+            """,
+            (like, like, like, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def delete_conversation(cid: int) -> None:
@@ -150,7 +185,7 @@ def add_message(cid: int, role: str, content: str, emotion: str | None = None) -
 def messages(cid: int, limit: int) -> list[dict]:
     with conn() as c:
         rows = c.execute(
-            "SELECT role, content, emotion FROM messages WHERE conversation_id = ? "
+            "SELECT id, role, content, emotion, created_at FROM messages WHERE conversation_id = ? "
             "ORDER BY id DESC LIMIT ?",
             (cid, limit),
         ).fetchall()

@@ -68,6 +68,7 @@ async def chat_events(
     db.add_message(conversation_id, "user", message)
 
     emotion: str | None = None
+    saved = False
     cmds = reminders.CommandFilter()
     head = ""  # tampon tant que le tag d'émotion n'est pas résolu
     text = ""
@@ -109,7 +110,13 @@ async def chat_events(
             yield reminders.execute(cmd, arg, conversation_id)
         text = text.strip() or "…"
         db.add_message(conversation_id, "assistant", text, emotion)
+        saved = True
         yield dict(type="done", emotion=emotion)
+    except GeneratorExit:
+        # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
+        if not saved and text.strip():
+            db.add_message(conversation_id, "assistant", text.strip() + " …", emotion or "talking")
+        raise
     except Exception as e:  # noqa: BLE001 — on renvoie l'erreur à l'interface
         msg = str(e) or e.__class__.__name__
         if isinstance(e, httpx.ConnectError):

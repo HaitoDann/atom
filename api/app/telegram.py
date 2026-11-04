@@ -264,7 +264,7 @@ async def handle_message(client, msg: dict) -> None:
     persona = db.kv_get("persona") or DEFAULT_PERSONA
     model = db.kv_get("model") or DEFAULT_MODEL
     try:
-        async for ev in agent.chat_events(text, conversation_for(chat_id), model, persona, True, "✈ "):
+        async for ev in agent.chat_events(text, conversation_for(chat_id), model, persona, True, "Telegram · "):
             t = ev["type"]
             if t == "meta":
                 db.kv_set(f"tg_conv:{chat_id}", str(ev["conversation_id"]))

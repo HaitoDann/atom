@@ -78,6 +78,14 @@ sudo docker compose up -d --build atom
 
 Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 
+## Interface
+
+- **Barre latérale** : conversations groupées par date, épinglage, renommage (double-clic), recherche dans tout l'historique (`Ctrl+K`), nouvelle conversation (`Ctrl+Maj+O`).
+- **Messages** : copier, modifier un message envoyé (`↑` pour le dernier), régénérer la dernière réponse, bouton Stop pendant la génération, copie des blocs de code, export de la conversation en Markdown.
+- **Panneau de l'entité** (à droite) : la sphère, son émotion, l'état du serveur (CPU, RAM, modèle chargé, vitesse en tokens/s), les prochains rappels et les derniers souvenirs. Repliable ; en tiroir sur écran étroit.
+- **Boutons rapides** sous la saisie et suggestions à l'ouverture d'une conversation vide.
+- Thème monochrome : la seule couleur vient de l'émotion de l'entité.
+
 ## Mémoire
 
 Atom retient seul ce qui compte, et tu gardes la main.

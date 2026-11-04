@@ -2,366 +2,527 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1b1b">
 <title>Atom</title>
 <style>
   :root {
-    --bg: #232322;
-    --bg-2: #1c1c1b;
-    --text: #ece7dd;
-    --muted: #9a958c;
-    --faint: #6c6862;
-    --accent: #d97757;
-    --glass: rgba(255, 255, 255, 0.055);
-    --glass-border: rgba(255, 255, 255, 0.09);
-    --tint: 120, 140, 170;
-    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
-    --sans: ui-sans-serif, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+    --bg: #1e1e1e;
+    --side: #181818;
+    --surface: #252525;
+    --surface-2: #2c2c2c;
+    --surface-3: #333333;
+    --border: #2c2c2c;
+    --border-2: #3a3a3a;
+    --text: #ececec;
+    --text-2: #c2c2c2;
+    --muted: #8e8e8e;
+    --faint: #626262;
+    --strong: #f5f5f5;
+    --danger: #e07a70;
+    --radius: 12px;
+    --sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font: 15.5px/1.65 var(--sans);
+    background: var(--bg); color: var(--text);
+    font: 14.5px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
     overflow: hidden;
-    transition: background-color 1.2s ease;
   }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  ::selection { background: rgba(255,255,255,.18); }
+  * { scrollbar-width: thin; scrollbar-color: #3a3a3a transparent; }
+  svg.i { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ---------- fond : entité + vignette ---------- */
-  #entity {
-    position: fixed; inset: 0; z-index: 0;
-    width: 100vw; height: 100vh;
-    opacity: 0.42;
-    pointer-events: none;
-  }
-  #vignette {
-    position: fixed; inset: 0; z-index: 1; pointer-events: none;
-    background:
-      radial-gradient(ellipse at 50% 45%, rgba(var(--tint), 0.07) 0%, transparent 45%),
-      radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(20, 20, 19, 0.55) 70%, rgba(18, 18, 17, 0.92) 100%);
-    transition: background 1.2s ease;
-  }
-
-  /* ---------- structure ---------- */
+  /* ---------------------------------------------------------------- layout */
   #app {
-    position: relative; z-index: 2;
     height: 100%;
-    display: flex; flex-direction: column;
+    display: grid;
+    grid-template-columns: 264px minmax(0, 1fr) 312px;
+    transition: grid-template-columns .25s ease;
   }
-  header {
-    display: flex; align-items: center; gap: 14px;
-    padding: 14px 20px;
+  #app.no-side { grid-template-columns: 0 minmax(0, 1fr) 312px; }
+  #app.no-panel { grid-template-columns: 264px minmax(0, 1fr) 0; }
+  #app.no-side.no-panel { grid-template-columns: 0 minmax(0, 1fr) 0; }
+
+  .iconbtn {
+    display: inline-grid; place-items: center;
+    width: 32px; height: 32px; border-radius: 8px;
+    background: none; border: 0; color: var(--muted);
   }
-  .brand {
-    font-size: 12px; letter-spacing: 0.32em; font-weight: 600;
-    font-variant: small-caps; color: var(--muted);
+  .iconbtn:hover { background: var(--surface-2); color: var(--text); }
+  .iconbtn.on { color: var(--text); }
+
+  /* ---------------------------------------------------------------- sidebar */
+  #side {
+    background: var(--side); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; min-width: 0; overflow: hidden;
   }
+  #app.no-side #side { border-right: 0; }
+  .side-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 10px 8px 16px; }
+  .wordmark { font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: lowercase; color: var(--strong); }
+  .side-new {
+    margin: 4px 10px 8px; display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 9px; border: 1px solid var(--border-2);
+    background: var(--surface); color: var(--text); font-size: 13.5px; text-align: left;
+  }
+  .side-new:hover { background: var(--surface-2); }
+  .search kbd { flex: none; }
+  kbd { font: 10.5px var(--mono); color: var(--faint); border: 1px solid var(--border-2); border-radius: 5px; padding: 0 5px; }
+  .search {
+    margin: 0 10px 6px; display: flex; align-items: center; gap: 8px;
+    padding: 0 10px; border-radius: 9px; background: transparent; border: 1px solid transparent; color: var(--muted);
+  }
+  .search:focus-within { border-color: var(--border-2); background: var(--surface); }
+  .search input { flex: 1; border: 0; outline: 0; background: none; padding: 8px 0; font-size: 13.5px; color: var(--text); }
+  .search input::placeholder { color: var(--muted); }
+  #convList { flex: 1; overflow-y: auto; padding: 4px 8px 12px; }
+  .group { font-size: 11.5px; color: var(--faint); padding: 14px 8px 4px; font-weight: 500; }
+  .conv {
+    display: flex; align-items: center; gap: 2px; border-radius: 8px; padding-right: 4px;
+    color: var(--text-2); font-size: 13.5px;
+  }
+  .conv:hover { background: var(--surface); }
+  .conv.active { background: var(--surface-2); color: var(--strong); }
+  .conv .t { flex: 1; min-width: 0; padding: 7px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .conv .snip { display: block; font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv .a { display: none; width: 26px; height: 26px; }
+  .conv:hover .a, .conv.active .a { display: inline-grid; }
+  .conv .a svg { width: 14px; height: 14px; }
+  .conv input { flex: 1; min-width: 0; margin: 3px 4px; padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border-2); background: var(--bg); outline: 0; font-size: 13.5px; }
+  .side-empty { padding: 16px 10px; color: var(--faint); font-size: 13px; }
+  .side-bottom { border-top: 1px solid var(--border); padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+  .status { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+  .status span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #6b6b6b; flex: none; }
+  .dot.on { background: #d8d8d8; box-shadow: 0 0 0 3px rgba(255,255,255,.06); }
+  .dot.err { background: var(--danger); }
+
+  /* ---------------------------------------------------------------- main */
+  #side { grid-column: 1; grid-row: 1; }
+  #panel { grid-column: 3; grid-row: 1; }
+  #main { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+  .topbar { height: 52px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 10px; border-bottom: 1px solid transparent; }
+  .topbar.scrolled { border-bottom-color: var(--border); }
+  .title {
+    min-width: 0; max-width: 46%; padding: 5px 9px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: none; border: 0; text-align: left;
+  }
+  .title:hover { background: var(--surface-2); }
+  .title-input { font-size: 14px; font-weight: 500; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface); outline: 0; width: min(380px, 50vw); }
   .spacer { flex: 1; }
-  select, input, textarea, button { font: inherit; color: inherit; }
   #model {
-    background: transparent; border: 1px solid transparent; border-radius: 8px;
-    color: var(--muted); font-size: 13px; padding: 4px 6px; cursor: pointer; max-width: 200px;
+    max-width: 230px; padding: 5px 26px 5px 9px; border-radius: 8px; font-size: 12.5px; color: var(--muted);
+    border: 1px solid transparent; background: transparent; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238e8e8e' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 9px center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  #model:hover { border-color: var(--glass-border); }
-  #model option { background: var(--bg-2); color: var(--text); }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #c4554d; box-shadow: 0 0 8px rgba(196, 85, 77, 0.6);
-    transition: background .3s, box-shadow .3s;
-  }
-  .dot.wait { background: #d9a557; box-shadow: 0 0 8px rgba(217, 165, 87, 0.6); }
-  .dot.on { background: #7fb38a; box-shadow: 0 0 8px rgba(127, 179, 138, 0.6); }
+  #model:hover { background-color: var(--surface-2); color: var(--text); }
+  #model option { background: var(--surface); color: var(--text); }
 
-  main {
-    flex: 1; overflow-y: auto;
-    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.08) transparent;
-  }
-  #chat {
-    max-width: 680px; margin: 0 auto;
-    padding: 24px 20px 40px;
-    display: flex; flex-direction: column; gap: 22px;
-  }
-  .msg { white-space: pre-wrap; word-wrap: break-word; animation: rise .35s ease both; }
-  .msg.atom { color: var(--text); }
-  .msg.user {
-    align-self: flex-end; max-width: 82%;
-    background: var(--glass);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    padding: 10px 16px; border-radius: 20px;
-  }
-  .msg.err { color: #d98a7a; font-size: 14px; }
-  .msg.pending { color: var(--faint); font-family: var(--mono); font-size: 12px; letter-spacing: .08em; }
-  .msg.pending::after { content: "…"; animation: blink 1.2s steps(3) infinite; }
-  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @keyframes blink { 50% { opacity: .3; } }
+  #scroller { flex: 1; overflow-y: auto; }
+  #chat { max-width: 760px; margin: 0 auto; padding: 18px 28px 30px; }
 
-  #empty {
-    text-align: center; color: var(--faint); margin-top: 22vh;
-    font-size: 14px;
+  /* messages */
+  .msg { position: relative; margin: 0 0 26px; }
+  .msg.user { display: flex; flex-direction: column; align-items: flex-end; }
+  .msg.user .body {
+    max-width: 80%; background: var(--surface-2); padding: 9px 15px; border-radius: 18px;
+    white-space: pre-wrap; word-wrap: break-word; color: var(--strong);
   }
-  #empty b { display: block; color: var(--muted); font-weight: 500; font-size: 18px; margin-bottom: 4px; }
+  .msg.atom .body { color: var(--text); word-wrap: break-word; }
+  .msg.err .body { color: var(--danger); font-size: 14px; }
+  .acts { display: flex; gap: 2px; margin-top: 4px; opacity: 0; transition: opacity .15s; align-items: center; }
+  .msg:hover .acts, .msg.last .acts { opacity: 1; }
+  .acts .iconbtn { width: 28px; height: 28px; }
+  .acts .iconbtn svg { width: 15px; height: 15px; }
+  .acts time { font-size: 11.5px; color: var(--faint); padding: 0 6px; }
+  .msg.user .acts { justify-content: flex-end; }
+  .edit-box { width: min(100%, 620px); background: var(--surface); border: 1px solid var(--border-2); border-radius: 14px; padding: 10px 12px; }
+  .edit-box textarea { width: 100%; border: 0; outline: 0; background: none; resize: none; min-height: 60px; line-height: 1.55; }
+  .edit-box .row { display: flex; justify-content: flex-end; gap: 6px; }
 
-  /* ---------- saisie ---------- */
-  footer { padding: 0 20px 22px; }
-  form {
-    max-width: 680px; margin: 0 auto;
-    display: flex; align-items: flex-end; gap: 8px;
-    background: rgba(40, 40, 38, 0.55);
-    border: 1px solid var(--glass-border);
-    border-radius: 26px;
-    padding: 7px 7px 7px 20px;
-    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    box-shadow: 0 8px 30px rgba(0,0,0,.25);
-  }
-  form:focus-within { border-color: rgba(217, 119, 87, 0.35); }
-  #input {
-    flex: 1; resize: none; border: 0; outline: 0; background: transparent;
-    padding: 8px 0; max-height: 180px; line-height: 1.5;
-  }
-  #input::placeholder { color: var(--faint); }
-  #send {
-    width: 36px; height: 36px; flex: none;
-    border: 0; border-radius: 50%; cursor: pointer;
-    background: var(--accent); color: #1c1c1b; font-size: 17px; font-weight: 700;
-    transition: opacity .2s, transform .15s;
-  }
-  #send:disabled { opacity: .3; cursor: default; }
-  #send:not(:disabled):active { transform: scale(.94); }
-  .hints {
-    max-width: 680px; margin: 8px auto 0; text-align: center;
-    font: 10.5px var(--mono); letter-spacing: .06em; color: var(--faint);
-  }
+  .thinking { display: inline-flex; gap: 5px; padding: 8px 0; }
+  .thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: pulse 1.2s infinite ease-in-out; }
+  .thinking i:nth-child(2) { animation-delay: .15s; }
+  .thinking i:nth-child(3) { animation-delay: .3s; }
+  @keyframes pulse { 0%, 80%, 100% { opacity: .25; transform: scale(.85); } 40% { opacity: 1; transform: none; } }
+  .cursor::after { content: ""; display: inline-block; width: 7px; height: 15px; background: var(--text-2); margin-left: 2px; vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
 
-  /* ---------- puce d'état ---------- */
-  #chip {
-    position: fixed; right: 18px; bottom: 18px; z-index: 3;
-    font: 11px var(--mono); letter-spacing: .1em; text-transform: lowercase;
-    color: rgb(var(--tint));
-    background: rgba(28, 28, 27, 0.6);
-    border: 1px solid rgba(var(--tint), 0.3);
-    padding: 5px 11px; border-radius: 999px; cursor: pointer;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    transition: color 1s, border-color 1s;
-  }
-  #chip::before { content: "● "; }
-
-  /* ---------- panneau réglages ---------- */
-  #panel {
-    position: fixed; top: 0; right: 0; bottom: 0; z-index: 10;
-    width: min(400px, 100vw);
-    background: rgba(28, 28, 27, 0.92);
-    border-left: 1px solid var(--glass-border);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    transform: translateX(102%); transition: transform .3s ease;
-    overflow-y: auto; padding: 22px 22px 40px;
-  }
-  #panel.open { transform: none; }
-  #panel h2 { font-size: 12px; letter-spacing: .3em; font-variant: small-caps; color: var(--muted); margin: 0 0 18px; font-weight: 600; }
-  #panel h3 { font: 11px var(--mono); letter-spacing: .1em; color: var(--faint); text-transform: uppercase; margin: 22px 0 8px; font-weight: 400; }
-  #panel .close { position: absolute; top: 14px; right: 16px; background: none; border: 0; color: var(--muted); font-size: 20px; cursor: pointer; }
-  .field {
-    width: 100%; background: rgba(255,255,255,.04); border: 1px solid var(--glass-border);
-    border-radius: 10px; padding: 8px 11px; outline: 0; font-size: 13.5px;
-  }
-  .field:focus { border-color: rgba(217, 119, 87, .4); }
-  textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
-  .row { display: flex; gap: 8px; }
-  .btn {
-    background: rgba(255,255,255,.06); border: 1px solid var(--glass-border);
-    border-radius: 10px; padding: 7px 12px; cursor: pointer; font-size: 13px; color: var(--text);
-    white-space: nowrap;
-  }
-  .btn:hover { background: rgba(255,255,255,.1); }
-  .btn.danger { color: #d98a7a; }
-  #memList { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
-  #memList li { display: flex; gap: 6px; align-items: center; }
-  #memList input { flex: 1; }
-  #memList button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 16px; }
-  #memList button:hover { color: #d98a7a; }
-  .small { font-size: 12px; color: var(--faint); margin: 6px 0 0; }
-  .small code { font-family: var(--mono); color: var(--muted); }
-  .emos { display: flex; flex-wrap: wrap; gap: 5px; }
-  .emos button { font: 11px var(--mono); padding: 4px 8px; border-radius: 999px; background: none; border: 1px solid var(--glass-border); color: var(--muted); cursor: pointer; }
-  .emos button:hover { color: var(--text); }
-
-  /* ---------- markdown ---------- */
-  .msg.atom.md { white-space: normal; }
+  /* markdown */
   .md > :first-child { margin-top: 0; }
   .md > :last-child { margin-bottom: 0; }
-  .md p { margin: 0 0 .8em; }
-  .md h1, .md h2, .md h3, .md h4 { font-size: 1.02em; font-weight: 600; margin: 1.2em 0 .5em; color: #f4efe6; }
-  .md h1 { font-size: 1.15em; }
-  .md ul, .md ol { margin: 0 0 .8em; padding-left: 1.4em; }
-  .md li { margin: .2em 0; }
-  .md strong { color: #f6f1e8; font-weight: 600; }
-  .md a { color: var(--accent); }
-  .md code { font: .88em var(--mono); background: rgba(255,255,255,.07); padding: .1em .35em; border-radius: 5px; }
-  .md pre { background: rgba(20,20,19,.75); border: 1px solid var(--glass-border); border-radius: 10px; padding: 12px 14px; overflow-x: auto; margin: 0 0 .8em; }
-  .md pre code { background: none; padding: 0; font-size: 13px; line-height: 1.55; }
-  .md blockquote { margin: 0 0 .8em; padding-left: 12px; border-left: 2px solid rgba(var(--tint), .5); color: var(--muted); }
-  .md hr { border: 0; border-top: 1px solid var(--glass-border); margin: 1em 0; }
-  .md .tbl { overflow-x: auto; margin: 0 0 .8em; }
-  .md table { border-collapse: collapse; font-size: 14px; min-width: 60%; background: rgba(20,20,19,.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-  .md th, .md td { border: 1px solid rgba(255,255,255,.1); padding: 6px 11px; text-align: left; vertical-align: top; }
-  .md th { background: rgba(255,255,255,.05); font-weight: 600; }
+  .md p { margin: 0 0 .85em; }
+  .md h1, .md h2, .md h3, .md h4 { font-weight: 600; margin: 1.3em 0 .5em; color: var(--strong); line-height: 1.35; }
+  .md h1 { font-size: 1.25em; } .md h2 { font-size: 1.12em; } .md h3, .md h4 { font-size: 1em; }
+  .md ul, .md ol { margin: 0 0 .85em; padding-left: 1.35em; }
+  .md li { margin: .25em 0; }
+  .md li::marker { color: var(--muted); }
+  .md strong { color: var(--strong); font-weight: 600; }
+  .md a { color: var(--strong); text-decoration: underline; text-decoration-color: var(--faint); text-underline-offset: 2px; }
+  .md code { font: .87em var(--mono); background: var(--surface-2); padding: .12em .38em; border-radius: 5px; }
+  .md blockquote { margin: 0 0 .85em; padding-left: 14px; border-left: 2px solid var(--border-2); color: var(--muted); }
+  .md hr { border: 0; border-top: 1px solid var(--border); margin: 1.2em 0; }
+  .md .code { border: 1px solid var(--border); border-radius: 10px; margin: 0 0 .9em; overflow: hidden; background: #161616; }
+  .md .code-h { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px 5px 12px; font: 11.5px var(--mono); color: var(--muted); background: #1b1b1b; border-bottom: 1px solid var(--border); }
+  .md .code-h button { display: inline-flex; align-items: center; gap: 5px; background: none; border: 0; color: var(--muted); font-size: 11.5px; padding: 2px 6px; border-radius: 5px; }
+  .md .code-h button:hover { color: var(--text); background: var(--surface-2); }
+  .md .code-h svg { width: 13px; height: 13px; }
+  .md pre { margin: 0; padding: 12px 14px; overflow-x: auto; }
+  .md pre code { background: none; padding: 0; font-size: 12.8px; line-height: 1.6; }
+  .md .tbl { overflow-x: auto; margin: 0 0 .9em; border: 1px solid var(--border); border-radius: 10px; }
+  .md table { border-collapse: collapse; font-size: 13.5px; width: 100%; }
+  .md th, .md td { padding: 7px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  .md tr:last-child td { border-bottom: 0; }
+  .md th { font-weight: 600; color: var(--strong); background: var(--surface); }
 
-  /* ---------- conversations ---------- */
-  .iconbtn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; font-size: 15px; line-height: 1; }
-  .iconbtn:hover { border-color: var(--glass-border); color: var(--text); }
-  #convs {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: 10;
-    width: min(300px, 86vw);
-    background: rgba(28, 28, 27, 0.94);
-    border-right: 1px solid var(--glass-border);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-    transform: translateX(-102%); transition: transform .3s ease;
-    display: flex; flex-direction: column; padding: 16px 12px;
+  /* empty state */
+  #empty { max-width: 640px; margin: 14vh auto 0; padding: 0 8px; }
+  #empty h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; color: var(--strong); letter-spacing: -.01em; }
+  #empty p { margin: 0 0 26px; color: var(--muted); }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .card { text-align: left; background: transparent; border: 1px solid var(--border-2); border-radius: 12px; padding: 12px 14px; color: var(--text-2); }
+  .card:hover { background: var(--surface); color: var(--text); }
+  .card b { display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--text); font-size: 13.5px; margin-bottom: 3px; }
+  .card span { font-size: 12.5px; color: var(--muted); }
+
+  /* composer */
+  .composer { flex: none; padding: 0 28px 14px; }
+  .composer-in { max-width: 760px; margin: 0 auto; position: relative; }
+  #toBottom {
+    position: absolute; left: 50%; top: -46px; transform: translateX(-50%);
+    width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface);
+    color: var(--text-2); display: none; place-items: center;
   }
-  #convs.open { transform: none; }
-  #convs .top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0 4px; }
-  #convs h2 { flex: 1; margin: 0; font-size: 12px; letter-spacing: .3em; font-variant: small-caps; color: var(--muted); font-weight: 600; }
-  #convList { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-  #convList li { display: flex; align-items: center; border-radius: 9px; }
-  #convList li:hover { background: rgba(255,255,255,.05); }
-  #convList li.active { background: rgba(255,255,255,.08); }
-  #convList .t { flex: 1; padding: 8px 10px; font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
-  #convList li.active .t { color: var(--text); }
-  #convList button { visibility: hidden; background: none; border: 0; color: var(--faint); cursor: pointer; padding: 0 8px; font-size: 15px; }
-  #convList li:hover button { visibility: visible; }
-  #convList button:hover { color: #d98a7a; }
-  #scrim { position: fixed; inset: 0; z-index: 9; background: rgba(0,0,0,.25); display: none; }
-  #scrim.on { display: block; }
+  #toBottom.on { display: grid; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--border-2); background: transparent; color: var(--muted); font-size: 12.5px;
+  }
+  .chip:hover { color: var(--text); background: var(--surface); }
+  .chip svg { width: 14px; height: 14px; }
+  form#form {
+    background: var(--surface); border: 1px solid var(--border-2); border-radius: 18px;
+    padding: 10px 10px 10px 16px; display: flex; align-items: flex-end; gap: 10px;
+    transition: border-color .15s;
+  }
+  form#form:focus-within { border-color: #4a4a4a; }
+  #input { flex: 1; border: 0; outline: 0; background: none; resize: none; max-height: 220px; line-height: 1.5; padding: 6px 0; }
+  #input::placeholder { color: var(--faint); }
+  #send {
+    width: 34px; height: 34px; border-radius: 10px; border: 0; flex: none;
+    display: grid; place-items: center; background: var(--strong); color: #161616;
+    transition: opacity .15s;
+  }
+  #send svg { stroke-width: 2.2; }
+  #send:disabled { opacity: .25; cursor: default; }
+  #send.stop svg { fill: currentColor; stroke: none; }
+  .fine { text-align: center; font-size: 11.5px; color: var(--faint); margin-top: 8px; }
 
-  /* ---------- souvenirs ---------- */
-  #memList .src { font: 9.5px var(--mono); letter-spacing: .06em; color: var(--faint); border: 1px solid var(--glass-border); border-radius: 999px; padding: 1px 6px; flex: none; }
-  #memList .src.auto { color: rgb(var(--tint)); border-color: rgba(var(--tint), .35); }
-  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; margin-bottom: 10px; }
-  .toggle input { accent-color: var(--accent); }
+  /* ---------------------------------------------------------------- panneau entité */
+  #panel {
+    background: var(--side); border-left: 1px solid var(--border); min-width: 0; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  #app.no-panel #panel { border-left: 0; }
+  .panel-in { width: 312px; height: 100%; overflow-y: auto; display: flex; flex-direction: column; }
+  .stage { position: relative; height: 300px; flex: none; border-bottom: 1px solid var(--border); }
+  #entity { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stage-meta { position: absolute; left: 16px; right: 16px; bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; pointer-events: none; }
+  #emoName { font-size: 13px; color: var(--strong); font-weight: 500; }
+  #emoState { font: 11px var(--mono); color: var(--muted); }
+  .stage-top { position: absolute; top: 10px; left: 16px; right: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .stage-top span { font-size: 11.5px; color: var(--faint); letter-spacing: .04em; }
+  .sec { padding: 14px 16px 6px; }
+  .sec h3 { margin: 0 0 10px; font-size: 11.5px; font-weight: 500; color: var(--faint); display: flex; justify-content: space-between; align-items: center; }
+  .sec h3 button { background: none; border: 0; color: var(--faint); font-size: 11.5px; padding: 0; }
+  .sec h3 button:hover { color: var(--text); }
+  .metric { margin-bottom: 10px; }
+  .metric .l { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-2); margin-bottom: 5px; }
+  .metric .l span:last-child { font: 11.5px var(--mono); color: var(--muted); }
+  .bar { height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: #cfcfcf; border-radius: 2px; transition: width .6s ease; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 3px 0; }
+  .kv span:first-child { color: var(--muted); }
+  .kv span:last-child { color: var(--text-2); font: 11.5px var(--mono); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list { list-style: none; margin: 0; padding: 0; }
+  .list li { font-size: 12.8px; color: var(--text-2); padding: 7px 0; border-bottom: 1px solid var(--border); line-height: 1.45; }
+  .list li:last-child { border-bottom: 0; }
+  .list li small { display: block; font: 11px var(--mono); color: var(--muted); margin-bottom: 2px; }
+  .list .none { color: var(--faint); }
 
-  /* ---------- rappels ---------- */
-  .remlist { list-style: none; padding: 0; margin: 0 0 6px; display: flex; flex-direction: column; gap: 6px; }
-  .remlist li { display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; background: rgba(255,255,255,.04); border: 1px solid var(--glass-border); border-radius: 10px; padding: 7px 10px; }
-  .remlist .when { font: 11px var(--mono); color: rgb(var(--tint)); flex: none; }
-  .remlist .what { flex: 1; }
-  .remlist button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 16px; }
-  .remlist button:hover { color: #d98a7a; }
+  /* ---------------------------------------------------------------- réglages */
+  #settings {
+    position: fixed; inset: 0; z-index: 50; display: none; place-items: center;
+    background: rgba(0,0,0,.55);
+  }
+  #settings.open { display: grid; }
+  .dialog {
+    width: min(760px, calc(100vw - 32px)); height: min(560px, calc(100vh - 48px));
+    background: var(--bg); border: 1px solid var(--border-2); border-radius: 14px;
+    display: grid; grid-template-columns: 180px 1fr; overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  }
+  .tabs { background: var(--side); border-right: 1px solid var(--border); padding: 14px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .tabs h2 { font-size: 13px; font-weight: 600; margin: 0 8px 12px; }
+  .tab { text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 10px; color: var(--muted); font-size: 13.5px; display: flex; gap: 9px; align-items: center; }
+  .tab:hover { color: var(--text); background: var(--surface); }
+  .tab.on { color: var(--strong); background: var(--surface-2); }
+  .pane-wrap { overflow-y: auto; padding: 18px 22px 24px; position: relative; }
+  .pane { display: none; }
+  .pane.on { display: block; }
+  .pane h4 { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--strong); }
+  .pane .desc { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .field { width: 100%; background: var(--surface); border: 1px solid var(--border-2); border-radius: 9px; padding: 8px 11px; outline: 0; font-size: 13.5px; }
+  .field:focus { border-color: #555; }
+  textarea.field { resize: vertical; min-height: 120px; line-height: 1.55; }
+  .btn { background: var(--surface); border: 1px solid var(--border-2); border-radius: 9px; padding: 7px 13px; font-size: 13px; color: var(--text); white-space: nowrap; }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--strong); color: #161616; border-color: var(--strong); }
+  .btn.danger { color: var(--danger); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .block { margin-bottom: 22px; }
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  .switch input { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; background: var(--surface-3); position: relative; cursor: pointer; flex: none; transition: background .15s; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #9a9a9a; transition: transform .15s, background .15s; }
+  .switch input:checked { background: #d9d9d9; }
+  .switch input:checked::after { transform: translateX(14px); background: #1b1b1b; }
+  .mem { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .mem input { flex: 1; min-width: 0; background: none; border: 1px solid transparent; border-radius: 7px; padding: 5px 7px; outline: 0; font-size: 13.5px; }
+  .mem input:hover { border-color: var(--border); }
+  .mem input:focus { border-color: var(--border-2); background: var(--surface); }
+  .tag { font: 10.5px var(--mono); color: var(--muted); border: 1px solid var(--border-2); border-radius: 5px; padding: 1px 6px; flex: none; }
+  .note { font-size: 12.5px; color: var(--faint); margin: 8px 0 0; }
+  .note code { font-family: var(--mono); color: var(--muted); }
+  .emos { display: flex; flex-wrap: wrap; gap: 6px; }
 
-  /* ---------- toast ---------- */
+  /* toast */
   #toast {
-    position: fixed; left: 50%; bottom: 112px; z-index: 4; transform: translate(-50%, 10px);
-    max-width: min(560px, 90vw); opacity: 0; pointer-events: none;
-    font-size: 12.5px; color: var(--muted);
-    background: rgba(28,28,27,.8); border: 1px solid rgba(var(--tint), .3);
-    padding: 7px 14px; border-radius: 999px;
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    transition: opacity .3s, transform .3s;
+    position: fixed; left: 50%; bottom: 26px; z-index: 60; transform: translate(-50%, 8px);
+    max-width: min(560px, 92vw); opacity: 0; pointer-events: none;
+    background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text);
+    padding: 8px 14px; border-radius: 10px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    transition: opacity .2s, transform .2s;
   }
   #toast.on { opacity: 1; transform: translate(-50%, 0); }
-  #toast b { color: rgb(var(--tint)); font-weight: 500; }
+  #toast b { font-weight: 600; }
 
-  @media (max-width: 600px) {
-    #chat { padding: 16px 16px 32px; }
-    footer { padding: 0 12px 14px; }
-    .hints { display: none; }
-    #chip { bottom: 84px; right: 12px; }
+  #scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: none; }
+
+  /* ---------------------------------------------------------------- responsive */
+  @media (max-width: 1180px) {
+    #app, #app.no-side, #app.no-panel { grid-template-columns: 264px minmax(0, 1fr) 0; }
+    #app.no-side { grid-template-columns: 0 minmax(0, 1fr) 0; }
+    #panel { position: fixed; top: 0; right: 0; bottom: 0; width: 312px; z-index: 30; transform: translateX(100%); transition: transform .25s ease; border-left: 1px solid var(--border); }
+    #app.panel-open #panel { transform: none; }
+    #app.panel-open #scrim { display: block; }
+  }
+  @media (max-width: 760px) {
+    #app, #app.no-side, #app.no-panel { grid-template-columns: 0 minmax(0, 1fr) 0; }
+    #side { position: fixed; top: 0; left: 0; bottom: 0; width: 284px; z-index: 30; transform: translateX(-100%); transition: transform .25s ease; border-right: 1px solid var(--border); }
+    #app.side-open #side { transform: none; }
+    #app.side-open #scrim { display: block; }
+    #chat { padding: 12px 16px 24px; }
+    .composer { padding: 0 12px 10px; }
+    .cards { grid-template-columns: 1fr; }
+    .title { max-width: 40%; }
+    .dialog { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .tabs { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px; }
+    .tabs h2 { display: none; }
+    .msg.user .body { max-width: 92%; }
+    .fine { display: none; }
+    .quick { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .chip { flex: none; }
   }
 </style>
 </head>
 <body>
-<canvas id="entity"></canvas>
-<div id="vignette"></div>
-
 <div id="app">
-  <header>
-    <button class="iconbtn" id="convBtn" title="Conversations" aria-label="Conversations">☰</button>
-    <span class="brand">Atom</span>
-    <button class="iconbtn" id="newConv" title="Nouvelle conversation" aria-label="Nouvelle conversation">＋</button>
-    <span class="spacer"></span>
-    <select id="model" title="Modèle"></select>
-    <span id="dot" class="dot" title="Ollama hors ligne"></span>
-  </header>
+  <!-- ============================================================ barre latérale -->
+  <aside id="side">
+    <div class="side-top">
+      <span class="wordmark">atom</span>
+      <button class="iconbtn" id="sideClose" title="Masquer la barre latérale" data-i="sidebar"></button>
+    </div>
+    <button class="side-new" id="newConv" title="Nouvelle conversation (Ctrl+Maj+O)"><span data-i="plus"></span>Nouvelle conversation</button>
+    <label class="search"><span data-i="search"></span><input id="search" placeholder="Rechercher" autocomplete="off"><kbd>Ctrl K</kbd></label>
+    <nav id="convList"></nav>
+    <div class="side-bottom">
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">Connexion…</span></div>
+      <button class="iconbtn" id="openSettings" title="Réglages" data-i="settings"></button>
+    </div>
+  </aside>
 
-  <main id="scroller">
-    <div id="chat">
-      <div id="empty"><b>Atom est là.</b>Écrivez-lui quelque chose.</div>
+  <!-- ============================================================ conversation -->
+  <main id="main">
+    <div class="topbar" id="topbar">
+      <button class="iconbtn" id="sideOpen" title="Conversations" data-i="sidebar"></button>
+      <button class="title" id="title" title="Renommer">Nouvelle conversation</button>
+      <span class="spacer"></span>
+      <select id="model" title="Modèle"></select>
+      <button class="iconbtn" id="pinBtn" title="Épingler" data-i="pin"></button>
+      <button class="iconbtn" id="exportBtn" title="Exporter en Markdown" data-i="download"></button>
+      <button class="iconbtn" id="panelBtn" title="Panneau de l'entité" data-i="panel"></button>
+    </div>
+    <div id="scroller"><div id="chat"></div></div>
+    <div class="composer">
+      <div class="composer-in">
+        <button id="toBottom" title="Aller en bas" data-i="down"></button>
+        <div class="quick" id="quick"></div>
+        <form id="form" autocomplete="off">
+          <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
+          <button id="send" type="submit" disabled title="Envoyer" data-i="up"></button>
+        </form>
+        <div class="fine">Atom fonctionne en local et peut se tromper.</div>
+      </div>
     </div>
   </main>
 
-  <footer>
-    <form id="form" autocomplete="off">
-      <textarea id="input" rows="1" placeholder="Parler à Atom…"></textarea>
-      <button id="send" type="submit" disabled aria-label="Envoyer">↑</button>
-    </form>
-    <div class="hints">entrée pour envoyer · maj+entrée pour un saut de ligne · la puce ouvre les réglages</div>
-  </footer>
+  <!-- ============================================================ panneau entité -->
+  <aside id="panel">
+    <div class="panel-in">
+      <div class="stage" id="stage">
+        <canvas id="entity"></canvas>
+        <div class="stage-top"><span>Entité</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
+        <div class="stage-meta"><span id="emoName">Veille</span><span id="emoState">en attente</span></div>
+      </div>
+      <section class="sec">
+        <h3>Système</h3>
+        <div class="metric"><div class="l"><span>Processeur</span><span id="cpuV">—</span></div><div class="bar"><i id="cpuB"></i></div></div>
+        <div class="metric"><div class="l"><span>Mémoire</span><span id="ramV">—</span></div><div class="bar"><i id="ramB"></i></div></div>
+        <div class="kv"><span>Modèle chargé</span><span id="loadedV">—</span></div>
+        <div class="kv"><span>Vitesse</span><span id="speedV">—</span></div>
+        <div class="kv"><span>Serveur actif depuis</span><span id="upV">—</span></div>
+      </section>
+      <section class="sec">
+        <h3>Prochains rappels <button data-goto="reminders">Tout voir</button></h3>
+        <ul class="list" id="pRem"></ul>
+      </section>
+      <section class="sec">
+        <h3>Derniers souvenirs <button data-goto="memory">Gérer</button></h3>
+        <ul class="list" id="pMem"></ul>
+      </section>
+    </div>
+  </aside>
+  <div id="scrim"></div>
 </div>
 
-<button id="chip" title="Réglages">veille</button>
+<!-- ============================================================ réglages -->
+<div id="settings" role="dialog" aria-modal="true" aria-label="Réglages">
+  <div class="dialog">
+    <nav class="tabs">
+      <h2>Réglages</h2>
+      <button class="tab on" data-tab="general"><span data-i="settings"></span>Général</button>
+      <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
+      <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
+      <button class="tab" data-tab="entity"><span data-i="orb"></span>Entité</button>
+    </nav>
+    <div class="pane-wrap">
+      <button class="iconbtn" id="closeSettings" style="position:absolute;top:10px;right:10px" title="Fermer" data-i="x"></button>
+
+      <section class="pane on" data-pane="general">
+        <div class="block">
+          <h4>Personnalité</h4>
+          <p class="desc">Comment Atom se présente et se comporte. Utilisée aussi par Telegram.</p>
+          <textarea id="persona" class="field"></textarea>
+        </div>
+        <div class="block">
+          <h4>Serveur</h4>
+          <p class="desc" id="srvInfo">…</p>
+          <button class="btn" id="reconnect">Tester la connexion</button>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="memory">
+        <div class="block">
+          <h4>Ce qu'Atom sait de toi</h4>
+          <p class="desc" id="memInfo">Atom retient seul les informations durables. Modifie ou supprime ce qui ne te convient pas.</p>
+          <label class="switch"><span>Mémoire automatique</span><input type="checkbox" id="autoMem"></label>
+          <div id="memList"></div>
+          <div class="row" style="margin-top:12px">
+            <input id="memNew" class="field" placeholder="Ajouter un souvenir…">
+            <button class="btn" id="memAdd">Ajouter</button>
+          </div>
+        </div>
+        <button class="btn danger" id="clearMem">Tout oublier</button>
+      </section>
+
+      <section class="pane" data-pane="reminders">
+        <div class="block">
+          <h4>Rappels programmés</h4>
+          <p class="desc">Demande simplement à Atom : « Rappelle-moi demain à 9 h d'appeler le garage ».</p>
+          <ul class="list" id="remList"></ul>
+          <p class="note" id="remInfo"></p>
+        </div>
+        <button class="btn" id="notifTest">Envoyer une notification de test</button>
+      </section>
+
+      <section class="pane" data-pane="entity">
+        <div class="block">
+          <h4>Tester une émotion</h4>
+          <p class="desc">Prévisualise les états de l'entité.</p>
+          <div class="emos" id="emos"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
-<div id="scrim"></div>
-
-<aside id="convs" aria-hidden="true">
-  <div class="top">
-    <h2>Conversations</h2>
-    <button class="iconbtn" id="newConv2" title="Nouvelle conversation">＋</button>
-  </div>
-  <ul id="convList"></ul>
-</aside>
-
-<aside id="panel" aria-hidden="true">
-  <button class="close" id="closePanel" aria-label="Fermer">×</button>
-  <h2>Réglages</h2>
-
-  <h3>Serveur</h3>
-  <div class="row">
-    <p class="small" id="srvInfo" style="flex:1;margin:0;align-self:center">…</p>
-    <button class="btn" id="reconnect">Tester</button>
-  </div>
-
-  <h3>Personnalité</h3>
-  <textarea id="persona" class="field"></textarea>
-
-  <h3>Ce qu'Atom sait de toi</h3>
-  <label class="toggle"><input type="checkbox" id="autoMem"> Mémoire automatique</label>
-  <ul id="memList"></ul>
-  <div class="row">
-    <input id="memNew" class="field" placeholder="Ajouter un souvenir…">
-    <button class="btn" id="memAdd">+</button>
-  </div>
-  <p class="small" id="memInfo">Atom retient seul les faits durables sur toi. Modifie ou supprime ce qui ne te convient pas.</p>
-  <button class="btn danger" id="clearMem" style="margin-top:8px">Tout oublier</button>
-
-  <h3>Rappels</h3>
-  <ul id="remList" class="remlist"></ul>
-  <p class="small" id="remInfo">Demande simplement à Atom : « Rappelle-moi demain à 9 h d'appeler le garage ».</p>
-  <button class="btn" id="notifTest" style="margin-top:8px">Tester la notification</button>
-
-  <h3>Conversation</h3>
-  <p class="small" id="histInfo" style="margin-bottom:8px"></p>
-  <button class="btn danger" id="clearHist">Supprimer cette conversation</button>
-
-  <h3>Tester une émotion</h3>
-  <div class="emos" id="emos"></div>
-</aside>
 
 <script>
 "use strict";
 
 /* ============================================================
-   ÉTATS ÉMOTIONNELS — palette adaptée au fond anthracite
+   ICÔNES (traits fins, monochromes)
+   ============================================================ */
+const ICONS = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>',
+  sidebar: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
+  panel: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14.5 4.5v15"/>',
+  settings: '<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>',
+  pin: '<path d="M12 16v5M8.5 3.5h7l-1 6 3 3.5h-11l3-3.5z"/>',
+  trash: '<path d="M4.5 7h15M10 11v6M14 11v6M6.5 7l.8 12.5a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5L17.5 7M9.5 7V4.5h5V7"/>',
+  edit: '<path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  refresh: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4"/>',
+  download: '<path d="M12 4.5v11M7.5 11l4.5 4.5 4.5-4.5M5 19.5h14"/>',
+  up: '<path d="M12 19V5.5M6.5 11L12 5.5l5.5 5.5"/>',
+  down: '<path d="M12 5v13.5M6.5 13l5.5 5.5 5.5-5.5"/>',
+  stop: '<rect x="7" y="7" width="10" height="10" rx="2"/>',
+  x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4.2l2.8 1.8"/>',
+  memory: '<ellipse cx="12" cy="6" rx="7.5" ry="2.8"/><path d="M4.5 6v12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8V6M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>',
+  list: '<path d="M9 6.5h10.5M9 12h10.5M9 17.5h10.5M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
+  doc: '<path d="M6.5 3.5h7l4 4v13h-11z"/><path d="M13.5 3.5v4h4M9 12h6M9 16h6"/>',
+  scale: '<path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
+  orb: '<circle cx="12" cy="12" r="7.5"/><ellipse cx="12" cy="12" rx="10" ry="3.2"/>',
+  user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+};
+const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
+document.querySelectorAll("[data-i]").forEach((el) => { el.insertAdjacentHTML("afterbegin", icon(el.dataset.i)); });
+
+/* ============================================================
+   ÉTATS ÉMOTIONNELS — seule source de couleur de l'interface
    ============================================================ */
 const ACTIVITIES = {
-  idle:     { label: "veille",     color: [140, 160, 185], bg: [35, 35, 34], radius: 1.0,  oscAmp: 3,   oscFreq: 0.9,  pulse: 0,     stretchY: 1,    spike: 0,    dim: 0.8  },
-  thinking: { label: "réflexion",  color: [155, 125, 230], bg: [34, 32, 40], radius: 1.55, oscAmp: 14,  oscFreq: 0.5,  pulse: 0,     stretchY: 1,    spike: 0.06, dim: 0.5  },
-  talking:  { label: "réponse",    color: [140, 185, 150], bg: [32, 36, 33], radius: 0.96, oscAmp: 6,   oscFreq: 1.6,  pulse: 0.04,  stretchY: 1,    spike: 0,    dim: 0.9  },
-  joy:      { label: "joie",       color: [217, 119, 87],  bg: [40, 34, 31], radius: 1.05, oscAmp: 8,   oscFreq: 2.2,  pulse: 0.08,  stretchY: 0.96, spike: 0,    dim: 1.0  },
-  angry:    { label: "colère",     color: [220, 80, 80],   bg: [40, 30, 30], radius: 1.08, oscAmp: 20,  oscFreq: 2.8,  pulse: 0.05,  stretchY: 1.04, spike: 0.22, dim: 0.85 },
-  sad:      { label: "tristesse",  color: [105, 125, 190], bg: [30, 32, 38], radius: 0.88, oscAmp: 1.6, oscFreq: 0.4,  pulse: 0,     stretchY: 0.8,  spike: 0,    dim: 0.55 },
-  surprise: { label: "surprise",   color: [150, 215, 225], bg: [32, 37, 39], radius: 1.35, oscAmp: 10,  oscFreq: 3.4,  pulse: 0,     stretchY: 1.25, spike: 0.04, dim: 1.0  },
-  fear:     { label: "inquiétude", color: [180, 140, 220], bg: [34, 31, 38], radius: 0.8,  oscAmp: 3,   oscFreq: 5.2,  pulse: 0,     stretchY: 0.9,  spike: 0.02, dim: 0.6  },
-  sleep:    { label: "sommeil",    color: [95, 105, 140],  bg: [28, 28, 28], radius: 0.82, oscAmp: 0.9, oscFreq: 0.22, pulse: 0.015, stretchY: 0.85, spike: 0,    dim: 0.4  },
+  idle:     { label: "Veille",     color: [196, 202, 212], radius: 1.0,  oscAmp: 3,   oscFreq: 0.9,  pulse: 0,     stretchY: 1,    spike: 0,    dim: 0.8  },
+  thinking: { label: "Réflexion",  color: [160, 140, 230], radius: 1.55, oscAmp: 14,  oscFreq: 0.5,  pulse: 0,     stretchY: 1,    spike: 0.06, dim: 0.55 },
+  talking:  { label: "Réponse",    color: [150, 200, 175], radius: 0.96, oscAmp: 6,   oscFreq: 1.6,  pulse: 0.04,  stretchY: 1,    spike: 0,    dim: 0.9  },
+  joy:      { label: "Joie",       color: [235, 170, 110], radius: 1.05, oscAmp: 8,   oscFreq: 2.2,  pulse: 0.08,  stretchY: 0.96, spike: 0,    dim: 1.0  },
+  angry:    { label: "Colère",     color: [230, 95, 90],   radius: 1.08, oscAmp: 20,  oscFreq: 2.8,  pulse: 0.05,  stretchY: 1.04, spike: 0.22, dim: 0.85 },
+  sad:      { label: "Tristesse",  color: [115, 140, 205], radius: 0.88, oscAmp: 1.6, oscFreq: 0.4,  pulse: 0,     stretchY: 0.8,  spike: 0,    dim: 0.6  },
+  surprise: { label: "Surprise",   color: [150, 220, 235], radius: 1.35, oscAmp: 10,  oscFreq: 3.4,  pulse: 0,     stretchY: 1.25, spike: 0.04, dim: 1.0  },
+  fear:     { label: "Inquiétude", color: [190, 150, 225], radius: 0.8,  oscAmp: 3,   oscFreq: 5.2,  pulse: 0,     stretchY: 0.9,  spike: 0.02, dim: 0.65 },
+  sleep:    { label: "Sommeil",    color: [120, 128, 150], radius: 0.82, oscAmp: 0.9, oscFreq: 0.22, pulse: 0.015, stretchY: 0.85, spike: 0,    dim: 0.45 },
 };
 const EMOTIONS = Object.keys(ACTIVITIES);
 
@@ -370,232 +531,208 @@ function setEmotion(e) {
   if (!ACTIVITIES[e]) e = "talking";
   if (entity.activity === e) return;
   entity.activity = e;
-  entity.rippleT = 0; // onde de choc
-  chip.textContent = ACTIVITIES[e].label;
+  entity.rippleT = 0;
+  $("emoName").textContent = ACTIVITIES[e].label;
 }
+function setEntityState(t) { $("emoState").textContent = t; }
 
 /* ============================================================
-   ENTITÉ — sphère de fragments (canvas 2D, plein écran)
+   ENTITÉ — sphère de fragments dans le panneau
    ============================================================ */
 (function initEntity() {
   const canvas = document.getElementById("entity");
+  const stage = document.getElementById("stage");
   const ctx = canvas.getContext("2d");
-  const N = 3200;
-  const R0 = 130;
-  let W = 0, H = 0;
+  const N = 3200, R0 = 100;
+  let W = 0, H = 0, scale = 1, visible = true;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
   function resize() {
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = (W * dpr) | 0; canvas.height = (H * dpr) | 0;
+    const r = stage.getBoundingClientRect();
+    W = r.width; H = r.height;
+    visible = W > 10 && H > 10;
+    canvas.width = Math.max(1, (W * dpr) | 0); canvas.height = Math.max(1, (H * dpr) | 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    scale = Math.min(W, H - 30) / (R0 * 2 * 1.85);
   }
+  new ResizeObserver(resize).observe(stage);
   resize();
-  window.addEventListener("resize", resize);
 
-  // générateur déterministe
   let seed = 42;
   const rand = () => (seed = (seed * 16807) % 2147483647, (seed - 1) / 2147483646);
-
-  // buffers SoA — aucune allocation par frame
   const ax = new Float32Array(N), ay = new Float32Array(N), az = new Float32Array(N);
-  const ux = new Float32Array(N), uy = new Float32Array(N), uz = new Float32Array(N);
-  const rN = new Float32Array(N);
+  const ux = new Float32Array(N), uy = new Float32Array(N), uz = new Float32Array(N), rN = new Float32Array(N);
   const px = new Float32Array(N), py = new Float32Array(N), pz = new Float32Array(N);
   const phase = new Float32Array(N), size = new Float32Array(N), depth = new Float32Array(N);
-  const orbR = new Float32Array(N), orbSpeed = new Float32Array(N);
-  const isOrb = new Uint8Array(N);
+  const orbR = new Float32Array(N), orbSpeed = new Float32Array(N), isOrb = new Uint8Array(N);
 
   for (let i = 0; i < N; i++) {
-    const orb = i >= N * 0.86; // 14 % en orbite
+    const orb = i >= N * 0.86;
     isOrb[i] = orb ? 1 : 0;
     if (!orb) {
-      const u = rand() * 2 - 1, th = rand() * Math.PI * 2;
-      const shell = rand() < 0.75; // 75 % coque, 25 % cœur
+      const u = rand() * 2 - 1, th = rand() * Math.PI * 2, shell = rand() < 0.75;
       const r = shell ? R0 * (0.94 + rand() * 0.06) : R0 * rand() * 0.85;
       const s = Math.sqrt(1 - u * u);
       ax[i] = r * s * Math.cos(th); ay[i] = r * u; az[i] = r * s * Math.sin(th);
       const inv = r > 1 ? 1 / r : 0;
       ux[i] = ax[i] * inv; uy[i] = ay[i] * inv; uz[i] = az[i] * inv;
-      rN[i] = r / R0;
-      depth[i] = shell ? 1 : 0.5;
+      rN[i] = r / R0; depth[i] = shell ? 1 : 0.5;
     } else {
-      orbR[i] = R0 * (1.9 + rand() * 1.6);
+      orbR[i] = R0 * (1.4 + rand() * 0.75);
       orbSpeed[i] = (0.18 + rand() * 0.5) * (rand() < 0.5 ? 1 : -1);
     }
     phase[i] = rand() * Math.PI * 2;
-    size[i] = 0.9 + rand() * 1.4;
-    px[i] = (rand() - 0.5) * 900; py[i] = (rand() - 0.5) * 900; pz[i] = (rand() - 0.5) * 900;
+    size[i] = 0.8 + rand() * 1.1;
+    px[i] = (rand() - 0.5) * 600; py[i] = (rand() - 0.5) * 600; pz[i] = (rand() - 0.5) * 600;
   }
 
   const A0 = ACTIVITIES.idle;
-  const cur = { r: A0.color[0], g: A0.color[1], b: A0.color[2], br: 35, bg: 35, bb: 34,
-    radius: 1, oscAmp: 3, oscFreq: 0.9, pulse: 0, stretchY: 1, spike: 0, dim: 0.8 };
-
+  const cur = { r: A0.color[0], g: A0.color[1], b: A0.color[2], radius: 1, oscAmp: 3, oscFreq: 0.9, pulse: 0, stretchY: 1, spike: 0, dim: 0.8 };
   const mouse = { x: 0, y: 0, active: false };
-  window.addEventListener("pointermove", (e) => {
-    mouse.x = e.clientX - W / 2; mouse.y = e.clientY - H / 2; mouse.active = true;
+  stage.addEventListener("pointermove", (e) => {
+    const r = stage.getBoundingClientRect();
+    mouse.x = (e.clientX - r.left - W / 2) / scale; mouse.y = (e.clientY - r.top - (H - 24) / 2) / scale; mouse.active = true;
   });
-  document.addEventListener("pointerleave", () => { mouse.active = false; });
+  stage.addEventListener("pointerleave", () => { mouse.active = false; });
 
-  const rootStyle = document.documentElement.style;
-  let lastTint = "", lastBg = "";
   let last = performance.now(), t = 0;
-
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now; t += dt;
+    requestAnimationFrame(frame);
+    if (!visible || document.hidden) return;
     const A = ACTIVITIES[entity.activity];
     entity.rippleT += dt;
-
-    // interpolation de l'état
-    const k = Math.min(1, dt * 2.5), kb = Math.min(1, dt * 1.2);
+    const k = Math.min(1, dt * 2.5);
+    for (const key of ["radius", "oscAmp", "oscFreq", "pulse", "stretchY", "spike", "dim"]) cur[key] += (A[key] - cur[key]) * k;
     cur.r += (A.color[0] - cur.r) * k; cur.g += (A.color[1] - cur.g) * k; cur.b += (A.color[2] - cur.b) * k;
-    cur.br += (A.bg[0] - cur.br) * kb; cur.bg += (A.bg[1] - cur.bg) * kb; cur.bb += (A.bg[2] - cur.bb) * kb;
-    cur.radius += (A.radius - cur.radius) * k;
-    cur.oscAmp += (A.oscAmp - cur.oscAmp) * k;
-    cur.oscFreq += (A.oscFreq - cur.oscFreq) * k;
-    cur.pulse += (A.pulse - cur.pulse) * k;
-    cur.stretchY += (A.stretchY - cur.stretchY) * k;
-    cur.spike += (A.spike - cur.spike) * k;
-    cur.dim += (A.dim - cur.dim) * k;
-
-    // ambiance : fond + teinte de l'interface (uniquement si changement)
-    const tint = `${cur.r | 0}, ${cur.g | 0}, ${cur.b | 0}`;
-    if (tint !== lastTint) { lastTint = tint; rootStyle.setProperty("--tint", tint); }
-    const bgs = `rgb(${cur.br | 0},${cur.bg | 0},${cur.bb | 0})`;
-    if (bgs !== lastBg) { lastBg = bgs; document.body.style.backgroundColor = bgs; }
+    const tint = `${cur.r | 0},${cur.g | 0},${cur.b | 0}`;
 
     ctx.clearRect(0, 0, W, H);
     ctx.save();
-    ctx.translate(W / 2, H / 2);
+    ctx.translate(W / 2, (H - 24) / 2);
+    ctx.scale(scale, scale);
 
-    // halo
-    const hr = R0 * 2.1 * cur.radius;
+    const hr = R0 * 2 * cur.radius;
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hr);
-    g.addColorStop(0, `rgba(${tint},${0.16 * cur.dim})`);
+    g.addColorStop(0, `rgba(${tint},${0.09 * cur.dim})`);
     g.addColorStop(1, `rgba(${tint},0)`);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = g;
-    ctx.fillRect(-hr, -hr, hr * 2, hr * 2);
-
+    ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(-hr, -hr, hr * 2, hr * 2);
     ctx.fillStyle = `rgb(${tint})`;
 
-    const cosR = Math.cos(t * 0.16), sinR = Math.sin(t * 0.16);
-    const fov = 560;
+    const cosR = Math.cos(t * 0.16), sinR = Math.sin(t * 0.16), fov = 460;
     const rad = cur.radius * (1 + Math.sin(t * 1.1) * 0.015);
-    const oA = cur.oscAmp, oF = cur.oscFreq;
+    const oA = cur.oscAmp * 0.75, oF = cur.oscFreq;
     entity.tokenKick *= Math.exp(-dt * 9);
     const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse + entity.tokenKick * 0.025;
-    const sY = cur.stretchY, spk = cur.spike;
-    const orbMul = 1 + (cur.radius - 1) * 0.6;
+    const sY = cur.stretchY, spk = cur.spike, orbMul = 1 + (cur.radius - 1) * 0.5;
     const mx = mouse.x, my = mouse.y, mAct = mouse.active;
-    const rt = entity.rippleT, rippleOn = rt < 1.6;
-    const rippleK = rippleOn ? Math.exp(-rt * 2.2) * 34 : 0;
-    const front0 = rt * 14 * 0.09;
-    const spring = Math.min(1, dt * 4);
-    const repel = 200 * dt, RR = 8100;
+    const rt = entity.rippleT, rippleOn = rt < 1.6, rippleK = rippleOn ? Math.exp(-rt * 2.2) * 26 : 0, front0 = rt * 1.26;
+    const spring = Math.min(1, dt * 4), repel = 160 * dt, RR = 2500;
+    const pxSize = 1 / scale;
     let lastQ = -1;
 
     for (let i = 0; i < N; i++) {
       let tx, ty, tz;
       if (isOrb[i]) {
-        const a = t * orbSpeed[i] * orbMul + phase[i];
-        const R = orbR[i] * orbMul;
-        tx = Math.cos(a) * R;
-        ty = Math.sin(a * 1.3 + phase[i]) * R * 0.35;
-        tz = Math.sin(a) * R;
+        const a = t * orbSpeed[i] * orbMul + phase[i], R = orbR[i] * orbMul;
+        tx = Math.cos(a) * R; ty = Math.sin(a * 1.3 + phase[i]) * R * 0.3; tz = Math.sin(a) * R;
       } else {
         const ph = phase[i];
-        const o1 = Math.sin(t * oF + ph) * oA;
-        const o2 = Math.cos(t * oF * 0.83 + ph * 1.7) * oA * 0.7;
-        const o3 = Math.sin(t * oF * 1.15 + ph * 2.3) * oA * 0.6;
-        const spikeK = spk > 0 ? 1 + Math.sin(ph * 5.7) * spk : 1;
-        const rr = rad * beat * spikeK;
+        const o1 = Math.sin(t * oF + ph) * oA, o2 = Math.cos(t * oF * 0.83 + ph * 1.7) * oA * 0.7, o3 = Math.sin(t * oF * 1.15 + ph * 2.3) * oA * 0.6;
+        const rr = rad * beat * (spk > 0 ? 1 + Math.sin(ph * 5.7) * spk : 1);
         let rip = 0;
-        if (rippleOn) {
-          const d = rN[i] - front0;
-          const env = 1 - Math.abs(d) * 3.5;
-          if (env > 0) rip = Math.sin(d * 9) * rippleK * env;
-        }
-        tx = ax[i] * rr + ux[i] * rip + o1;
-        ty = (ay[i] * rr + uy[i] * rip + o2) * sY;
-        tz = az[i] * rr + uz[i] * rip + o3;
-
+        if (rippleOn) { const d = rN[i] - front0, env = 1 - Math.abs(d) * 3.5; if (env > 0) rip = Math.sin(d * 9) * rippleK * env; }
+        tx = ax[i] * rr + ux[i] * rip + o1; ty = (ay[i] * rr + uy[i] * rip + o2) * sY; tz = az[i] * rr + uz[i] * rip + o3;
         if (mAct) {
           const dx = px[i] - mx, dy = py[i] - my, d2 = dx * dx + dy * dy;
-          if (d2 < RR) {
-            const d = Math.sqrt(d2) || 1, f = (1 - d2 / RR) * repel;
-            px[i] += (dx / d) * f; py[i] += (dy / d) * f;
-          }
+          if (d2 < RR) { const d = Math.sqrt(d2) || 1, f = (1 - d2 / RR) * repel; px[i] += (dx / d) * f; py[i] += (dy / d) * f; }
         }
       }
-
-      px[i] += (tx - px[i]) * spring;
-      py[i] += (ty - py[i]) * spring;
-      pz[i] += (tz - pz[i]) * spring;
-
-      const rx = px[i] * cosR - pz[i] * sinR;
-      const rz = px[i] * sinR + pz[i] * cosR;
-      const sc = fov / (fov + rz);
+      px[i] += (tx - px[i]) * spring; py[i] += (ty - py[i]) * spring; pz[i] += (tz - pz[i]) * spring;
+      const rx = px[i] * cosR - pz[i] * sinR, rz = px[i] * sinR + pz[i] * cosR, sc = fov / (fov + rz);
       if (sc <= 0) continue;
-      const sx = rx * sc, sy = py[i] * sc;
-
-      const backFade = rz > 0 ? 1 - Math.min(0.8, rz / 420) : 1;
-      let alpha = (sc * 0.9 > 1 ? 1 : sc * 0.9) * 0.8;
-      if (isOrb[i]) alpha *= 0.5; else alpha *= depth[i] * cur.dim * backFade;
+      const backFade = rz > 0 ? 1 - Math.min(0.8, rz / 320) : 1;
+      let alpha = (sc * 0.9 > 1 ? 1 : sc * 0.9) * 0.85;
+      alpha *= isOrb[i] ? 0.45 : depth[i] * cur.dim * backFade;
       alpha *= 0.65 + Math.abs(Math.sin(t * 0.9 + phase[i] * 3)) * 0.35;
-
       const q = (alpha * 32) | 0;
       if (q !== lastQ) { lastQ = q; ctx.globalAlpha = q / 32; }
-      const sz = size[i] * sc;
-      ctx.fillRect(sx - sz * 0.5, sy - sz * 0.5, sz, sz);
+      const sz = Math.max(size[i] * sc * pxSize * 1.15, pxSize * 0.8);
+      ctx.fillRect(rx * sc - sz * 0.5, py[i] * sc - sz * 0.5, sz, sz);
     }
-
     ctx.restore();
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 })();
 
 /* ============================================================
-   RÉGLAGES LOCAUX (le reste vit sur le serveur Atom)
+   OUTILS
    ============================================================ */
+const $ = (id) => document.getElementById(id);
 const store = {
   get(k, d) { try { const v = localStorage.getItem("atom." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem("atom." + k, JSON.stringify(v)); } catch {} },
 };
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const DEFAULT_PERSONA =
   "Tu es Atom, une entité numérique bienveillante, curieuse et concise. " +
   "Tu parles français avec naturel et chaleur.";
-
 const settings = Object.assign(
-  { model: "", persona: DEFAULT_PERSONA, autoMemory: true, conversationId: null },
+  { model: "", persona: DEFAULT_PERSONA, autoMemory: true, conversationId: null, side: true, panel: true },
   store.get("settings", {})
 );
 const saveSettings = () => store.set("settings", settings);
-let history = [];        // messages de la conversation courante
-let memories = [];       // [{id, content, source}]
-let conversations = [];  // [{id, title, updated_at}]
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } });
+  if (!r.ok) {
+    let detail = "";
+    try { detail = (await r.json()).detail; } catch {}
+    throw new Error(detail || `${path} → ${r.status}`);
+  }
+  return r;
+}
+const getJSON = async (p) => (await api(p)).json();
+const send_ = (p, method, body) => api(p, { method, body: body ? JSON.stringify(body) : undefined });
+
+let toastTimer = 0;
+function toast(html) {
+  const t = $("toast");
+  t.innerHTML = html;
+  t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("on"), 4500);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
+}
+const fmtTime = (ts) => new Date(ts * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function fmtBytes(b) { if (!b) return "0"; const u = ["o", "Ko", "Mo", "Go", "To"]; let i = 0; while (b >= 1024 && i < 4) { b /= 1024; i++; } return b.toFixed(i >= 3 ? 1 : 0) + " " + u[i]; }
+function fmtDur(s) { if (s == null) return "—"; const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return d ? `${d} j ${h} h` : h ? `${h} h ${m} min` : `${m} min`; }
 
 /* ============================================================
-   MARKDOWN — rendu minimal et sûr (tout est échappé d'abord)
+   MARKDOWN — rendu minimal et sûr
    ============================================================ */
-const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
 function inline(t) {
   const codes = [];
   t = t.replace(/`([^`\n]+)`/g, (_, c) => (codes.push(c), `\u0000${codes.length - 1}\u0000`));
   t = esc(t)
     .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
     .replace(/__([^_\n]+)__/g, "<strong>$1</strong>")
-    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>")
+    .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>")
+    .replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>")
     .replace(/~~([^~\n]+)~~/g, "<del>$1</del>")
     .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
   return t.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[+i])}</code>`);
 }
-
 const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
 const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
 const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
@@ -604,45 +741,37 @@ function md(src) {
   const lines = src.replace(/\r/g, "").split("\n");
   let out = "", i = 0, para = [];
   const flush = () => { if (para.length) { out += `<p>${para.map(inline).join("<br>")}</p>`; para = []; } };
-
   while (i < lines.length) {
     const l = lines[i];
     let m;
-    if ((m = l.match(/^\s*```\s*([\w+-]*)/))) {            // bloc de code
+    if ((m = l.match(/^\s*```\s*([\w+#.-]*)/))) {
       flush();
       const buf = [];
       i++;
       while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
       i++;
-      out += `<pre><code>${esc(buf.join("\n"))}</code></pre>`;
+      out += `<div class="code"><div class="code-h"><span>${esc(m[1] || "code")}</span><button data-copy>${icon("copy")}Copier</button></div><pre><code>${esc(buf.join("\n"))}</code></pre></div>`;
       continue;
     }
-    if (isRow(l) && i + 1 < lines.length && isSep(lines[i + 1])) {   // tableau
+    if (isRow(l) && i + 1 < lines.length && isSep(lines[i + 1])) {
       flush();
       const head = cells(l);
       i += 2;
       let body = "";
-      while (i < lines.length && isRow(lines[i])) {
-        body += "<tr>" + cells(lines[i]).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>";
-        i++;
-      }
+      while (i < lines.length && isRow(lines[i])) { body += "<tr>" + cells(lines[i]).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>"; i++; }
       out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
       continue;
     }
-    if ((m = l.match(/^\s*(#{1,4})\s+(.*)$/))) {           // titre
-      flush();
-      out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`;
-      i++; continue;
-    }
+    if ((m = l.match(/^\s*(#{1,4})\s+(.*)$/))) { flush(); out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; i++; continue; }
     if (/^\s*([-*_])\s*\1\s*\1[\s\1]*$/.test(l)) { flush(); out += "<hr>"; i++; continue; }
-    if (/^\s*>/.test(l)) {                                   // citation
+    if (/^\s*>/.test(l)) {
       flush();
       const buf = [];
       while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ""));
       out += `<blockquote>${md(buf.join("\n"))}</blockquote>`;
       continue;
     }
-    if ((m = l.match(/^\s*([-*+]|\d+[.)])\s+/))) {          // liste
+    if ((m = l.match(/^\s*([-*+]|\d+[.)])\s+/))) {
       flush();
       const ordered = /\d/.test(m[1]);
       let items = "";
@@ -656,156 +785,194 @@ function md(src) {
       continue;
     }
     if (!l.trim()) { flush(); i++; continue; }
-    para.push(l);
-    i++;
+    para.push(l); i++;
   }
   flush();
   return out;
 }
 
 /* ============================================================
-   API Atom (même origine que la page)
+   MISE EN PAGE (barre latérale, panneau)
    ============================================================ */
-async function api(path, opts = {}) {
-  const r = await fetch(path, {
-    ...opts,
-    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
-  });
-  if (!r.ok) {
-    let detail = "";
-    try { detail = (await r.json()).detail; } catch {}
-    throw new Error(detail || `${path} → ${r.status}`);
-  }
-  return r;
+const app = $("app");
+const narrow = () => matchMedia("(max-width: 760px)").matches;
+const medium = () => matchMedia("(max-width: 1180px)").matches;
+
+function applyLayout() {
+  app.classList.toggle("no-side", !settings.side);
+  app.classList.toggle("no-panel", !settings.panel);
+  $("sideOpen").style.display = (!settings.side || narrow()) ? "" : "none";
+  $("panelBtn").classList.toggle("on", medium() ? app.classList.contains("panel-open") : settings.panel);
 }
-const getJSON = async (path) => (await api(path)).json();
+$("sideClose").onclick = () => { if (narrow()) app.classList.remove("side-open"); else { settings.side = false; saveSettings(); applyLayout(); } };
+$("sideOpen").onclick = () => { if (narrow()) app.classList.add("side-open"); else { settings.side = true; saveSettings(); applyLayout(); } };
+$("panelBtn").onclick = () => {
+  if (medium()) app.classList.toggle("panel-open");
+  else { settings.panel = !settings.panel; saveSettings(); }
+  applyLayout();
+  refreshPanel();
+  refreshSystem();
+};
+$("panelClose").onclick = () => { if (medium()) app.classList.remove("panel-open"); else { settings.panel = false; saveSettings(); } applyLayout(); };
+$("scrim").onclick = () => { app.classList.remove("side-open", "panel-open"); applyLayout(); };
+addEventListener("resize", applyLayout);
+const panelVisible = () => medium() ? app.classList.contains("panel-open") : settings.panel;
 
 /* ============================================================
-   UI
+   CONVERSATIONS
    ============================================================ */
-const $ = (id) => document.getElementById(id);
-const chat = $("chat"), scroller = $("scroller"), input = $("input"), send = $("send"),
-      form = $("form"), modelSel = $("model"), dot = $("dot"), chip = $("chip"), panel = $("panel"),
-      convs = $("convs"), scrim = $("scrim");
+let history = [];
+let conversations = [];
 
-function setAtomText(el, text) {
-  el.classList.add("md");
-  el.innerHTML = md(text);
+function groupOf(ts) {
+  const d = new Date(ts * 1000), now = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = (day(now) - day(d)) / 86400000;
+  if (diff < 1) return "Aujourd'hui";
+  if (diff < 2) return "Hier";
+  if (diff < 7) return "7 derniers jours";
+  if (diff < 30) return "30 derniers jours";
+  return "Plus ancien";
 }
 
-function addMsg(role, text, cls) {
-  $("empty")?.remove();
+async function loadConversations() {
+  try { conversations = (await getJSON("/api/conversations")).conversations; } catch (e) { console.warn(e); }
+  if (!$("search").value.trim()) renderConversations(conversations);
+  updateTitle();
+}
+
+function convItem(c, snippet) {
   const el = document.createElement("div");
-  el.className = "msg " + (cls || (role === "user" ? "user" : "atom"));
-  if (role === "assistant" && !cls) setAtomText(el, text);
-  else el.textContent = text;
-  chat.appendChild(el);
-  scroller.scrollTop = scroller.scrollHeight;
+  el.className = "conv" + (c.id === settings.conversationId ? " active" : "");
+  const t = document.createElement("div");
+  t.className = "t"; t.title = c.title;
+  t.textContent = c.title;
+  if (snippet) { const s = document.createElement("span"); s.className = "snip"; s.textContent = snippet; t.appendChild(s); }
+  t.onclick = () => { openConversation(c.id); app.classList.remove("side-open"); };
+  t.ondblclick = () => renameInline(el, c);
+  const pin = document.createElement("button");
+  pin.className = "iconbtn a"; pin.title = c.pinned ? "Désépingler" : "Épingler"; pin.innerHTML = icon("pin");
+  if (c.pinned) pin.style.color = "var(--text)";
+  pin.onclick = async (e) => { e.stopPropagation(); await send_(`/api/conversations/${c.id}`, "PATCH", { pinned: !c.pinned }); loadConversations(); };
+  const del = document.createElement("button");
+  del.className = "iconbtn a"; del.title = "Supprimer"; del.innerHTML = icon("trash");
+  del.onclick = async (e) => {
+    e.stopPropagation();
+    if (!confirm(`Supprimer « ${c.title} » ?`)) return;
+    await send_(`/api/conversations/${c.id}`, "DELETE");
+    if (c.id === settings.conversationId) newConversation();
+    loadConversations();
+  };
+  el.append(t, pin, del);
   return el;
 }
 
-function updateHistInfo() {
-  $("histInfo").textContent = settings.conversationId
-    ? `${Math.floor(history.length / 2)} échange(s) · les 20 derniers sont envoyés au modèle`
-    : "Nouvelle conversation, pas encore enregistrée.";
-}
-
-function renderHistory() {
-  chat.innerHTML = "";
-  if (!history.length) {
-    chat.innerHTML = '<div id="empty"><b>Atom est là.</b>Écrivez-lui quelque chose.</div>';
-  }
-  for (const m of history) addMsg(m.role, m.content);
-  updateHistInfo();
-}
-
-let toastTimer = 0;
-function toast(html) {
-  const t = $("toast");
-  t.innerHTML = html;
-  t.classList.add("on");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("on"), 5000);
-}
-
-function autoGrow() {
-  input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, 180) + "px";
-  send.disabled = busy || !input.value.trim();
-}
-input.addEventListener("input", autoGrow);
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
-});
-
-/* ---------- panneaux ---------- */
-function openPanel(open) {
-  panel.classList.toggle("open", open);
-  panel.setAttribute("aria-hidden", String(!open));
-  if (open) { openConvs(false); loadMemories(); loadReminders(); }
-  scrim.classList.toggle("on", open || convs.classList.contains("open"));
-}
-function openConvs(open) {
-  convs.classList.toggle("open", open);
-  convs.setAttribute("aria-hidden", String(!open));
-  if (open) { panel.classList.remove("open"); loadConversations(); }
-  scrim.classList.toggle("on", open || panel.classList.contains("open"));
-}
-chip.onclick = () => openPanel(!panel.classList.contains("open"));
-$("closePanel").onclick = () => openPanel(false);
-$("convBtn").onclick = () => openConvs(!convs.classList.contains("open"));
-scrim.onclick = () => { openPanel(false); openConvs(false); };
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { openPanel(false); openConvs(false); } });
-
-$("reconnect").onclick = () => connect();
-$("persona").value = settings.persona;
-$("persona").oninput = () => { settings.persona = $("persona").value; saveSettings(); };
-$("autoMem").checked = settings.autoMemory;
-$("autoMem").onchange = () => { settings.autoMemory = $("autoMem").checked; saveSettings(); };
-
-/* ---------- conversations ---------- */
-async function loadConversations() {
-  try { conversations = (await getJSON("/api/conversations")).conversations; } catch (e) { console.warn(e); }
-  renderConversations();
-}
-
-function renderConversations() {
-  const ul = $("convList");
-  ul.innerHTML = "";
-  if (!conversations.length) {
-    ul.innerHTML = '<li><span class="t" style="cursor:default">Aucune conversation</span></li>';
+function renderConversations(list, search = false) {
+  const nav = $("convList");
+  nav.innerHTML = "";
+  if (!list.length) {
+    nav.innerHTML = `<div class="side-empty">${search ? "Aucun résultat." : "Aucune conversation pour l'instant."}</div>`;
     return;
   }
-  for (const c of conversations) {
-    const li = document.createElement("li");
-    if (c.id === settings.conversationId) li.className = "active";
-    const t = document.createElement("span");
-    t.className = "t"; t.textContent = c.title; t.title = c.title;
-    t.onclick = () => { openConversation(c.id); openConvs(false); };
-    const del = document.createElement("button");
-    del.textContent = "×"; del.title = "Supprimer";
-    del.onclick = async () => {
-      if (!confirm(`Supprimer « ${c.title} » ?`)) return;
-      await api(`/api/conversations/${c.id}`, { method: "DELETE" });
-      if (c.id === settings.conversationId) newConversation();
-      loadConversations();
-    };
-    li.append(t, del);
-    ul.appendChild(li);
+  if (search) {
+    for (const c of list) nav.appendChild(convItem(c, c.snippet ? c.snippet.slice(0, 80) : ""));
+    return;
+  }
+  const pinned = list.filter((c) => c.pinned);
+  const groups = new Map();
+  if (pinned.length) groups.set("Épinglées", pinned);
+  for (const c of list.filter((c) => !c.pinned)) {
+    const g = groupOf(c.updated_at);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(c);
+  }
+  for (const [name, items] of groups) {
+    const h = document.createElement("div"); h.className = "group"; h.textContent = name;
+    nav.appendChild(h);
+    for (const c of items) nav.appendChild(convItem(c));
   }
 }
+
+function renameInline(el, c) {
+  const inp = document.createElement("input");
+  inp.value = c.title;
+  el.innerHTML = ""; el.appendChild(inp); inp.focus(); inp.select();
+  const done = async (save) => {
+    const v = inp.value.trim();
+    if (save && v && v !== c.title) await send_(`/api/conversations/${c.id}`, "PATCH", { title: v });
+    loadConversations();
+  };
+  inp.onkeydown = (e) => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); };
+  inp.onblur = () => done(true);
+}
+
+let searchTimer = 0;
+$("search").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  const q = $("search").value.trim();
+  if (q.length < 2) { renderConversations(conversations); return; }
+  searchTimer = setTimeout(async () => {
+    try { renderConversations((await getJSON("/api/search?q=" + encodeURIComponent(q))).results, true); } catch {}
+  }, 200);
+});
+
+function currentConv() { return conversations.find((c) => c.id === settings.conversationId); }
+function updateTitle() {
+  const c = currentConv();
+  $("title").textContent = c ? c.title : "Nouvelle conversation";
+  $("pinBtn").style.display = c ? "" : "none";
+  $("exportBtn").style.display = c ? "" : "none";
+  $("pinBtn").classList.toggle("on", !!(c && c.pinned));
+  $("pinBtn").title = c && c.pinned ? "Désépingler" : "Épingler";
+  document.title = c ? `${c.title} · Atom` : "Atom";
+}
+$("title").onclick = () => {
+  const c = currentConv();
+  if (!c) return;
+  const inp = document.createElement("input");
+  inp.className = "title-input"; inp.value = c.title;
+  $("title").replaceWith(inp); inp.focus(); inp.select();
+  const done = async (save) => {
+    const v = inp.value.trim();
+    inp.replaceWith(titleBtn);
+    if (save && v && v !== c.title) await send_(`/api/conversations/${c.id}`, "PATCH", { title: v });
+    loadConversations();
+  };
+  inp.onkeydown = (e) => { if (e.key === "Enter") done(true); if (e.key === "Escape") done(false); };
+  inp.onblur = () => done(true);
+};
+const titleBtn = $("title");
+$("pinBtn").onclick = async () => {
+  const c = currentConv(); if (!c) return;
+  await send_(`/api/conversations/${c.id}`, "PATCH", { pinned: !c.pinned });
+  loadConversations();
+};
+$("exportBtn").onclick = () => {
+  const c = currentConv(); if (!c) return;
+  let out = `# ${c.title}\n\n`;
+  for (const m of history) {
+    const who = m.role === "user" ? "**Moi**" : "**Atom**";
+    const when = m.created_at ? ` · ${new Date(m.created_at * 1000).toLocaleString("fr-FR")}` : "";
+    out += `${who}${when}\n\n${m.content}\n\n---\n\n`;
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([out], { type: "text/markdown" }));
+  a.download = (c.title.replace(/[\\/:*?"<>|]+/g, "").slice(0, 60) || "conversation") + ".md";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
 
 async function openConversation(id) {
   if (busy) return;
   try {
     history = (await getJSON(`/api/conversations/${id}/messages`)).messages;
     settings.conversationId = id;
-  } catch {
-    history = [];
-    settings.conversationId = null;
-  }
+  } catch { history = []; settings.conversationId = null; }
   saveSettings();
   renderHistory();
+  renderConversations(conversations);
+  updateTitle();
+  input.focus();
 }
 
 function newConversation() {
@@ -814,202 +981,252 @@ function newConversation() {
   saveSettings();
   history = [];
   renderHistory();
+  renderConversations(conversations);
+  updateTitle();
   setEmotion("idle");
-  openConvs(false);
+  app.classList.remove("side-open");
   input.focus();
 }
 $("newConv").onclick = newConversation;
-$("newConv2").onclick = newConversation;
-
-$("clearHist").onclick = async () => {
-  if (!settings.conversationId) return;
-  if (!confirm("Supprimer cette conversation ?")) return;
-  try { await api(`/api/conversations/${settings.conversationId}`, { method: "DELETE" }); } catch (e) { console.warn(e); }
-  newConversation();
-};
-
-/* ---------- souvenirs ---------- */
-async function loadMemories() {
-  try { memories = (await getJSON("/api/memories")).memories; } catch (e) { console.warn(e); }
-  renderMemories();
-}
-
-function renderMemories() {
-  const ul = $("memList");
-  ul.innerHTML = "";
-  for (const m of memories) {
-    const li = document.createElement("li");
-    const src = document.createElement("span");
-    src.className = "src " + m.source;
-    src.textContent = m.source === "auto" ? "auto" : "moi";
-    src.title = m.source === "auto" ? "Retenu automatiquement par Atom" : "Ajouté par toi";
-    const inp = document.createElement("input");
-    inp.className = "field"; inp.value = m.content;
-    inp.onchange = async () => {
-      const v = inp.value.trim();
-      if (!v) return del.onclick();
-      try { await api(`/api/memories/${m.id}`, { method: "PATCH", body: JSON.stringify({ content: v }) }); m.content = v; }
-      catch (e) { toast(esc(e.message)); inp.value = m.content; }
-    };
-    const del = document.createElement("button");
-    del.textContent = "×"; del.title = "Oublier";
-    del.onclick = async () => {
-      try { await api(`/api/memories/${m.id}`, { method: "DELETE" }); } catch (e) { console.warn(e); }
-      loadMemories();
-    };
-    li.append(src, inp, del);
-    ul.appendChild(li);
-  }
-  $("memInfo").textContent = memories.length
-    ? `${memories.length} souvenir(s). Modifie ou supprime ce qui ne te convient pas.`
-    : "Atom n'a encore rien retenu. Il apprendra au fil des conversations.";
-}
-
-$("memAdd").onclick = async () => {
-  const v = $("memNew").value.trim();
-  if (!v) return;
-  try {
-    await api("/api/memories", { method: "POST", body: JSON.stringify({ content: v }) });
-    $("memNew").value = "";
-  } catch (e) { toast(esc(e.message)); }
-  loadMemories();
-};
-$("memNew").onkeydown = (e) => { if (e.key === "Enter") $("memAdd").onclick(); };
-$("clearMem").onclick = async () => {
-  if (!confirm("Effacer tout ce qu'Atom sait de toi ?")) return;
-  try { await api("/api/memories", { method: "DELETE" }); } catch (e) { console.warn(e); }
-  loadMemories();
-};
-
-/* ---------- rappels ---------- */
-async function loadReminders() {
-  let data = { reminders: [], notifications: false };
-  try { data = await getJSON("/api/reminders"); } catch (e) { console.warn(e); }
-  const ul = $("remList");
-  ul.innerHTML = "";
-  for (const r of data.reminders) {
-    const li = document.createElement("li");
-    const w = document.createElement("span"); w.className = "when"; w.textContent = r.when;
-    const t = document.createElement("span"); t.className = "what"; t.textContent = r.text;
-    const del = document.createElement("button"); del.textContent = "×"; del.title = "Annuler";
-    del.onclick = async () => { try { await api(`/api/reminders/${r.id}`, { method: "DELETE" }); } catch {} loadReminders(); };
-    li.append(w, t, del);
-    ul.appendChild(li);
-  }
-  $("remInfo").textContent = (data.reminders.length ? "" : "Aucun rappel. Demande simplement à Atom : « Rappelle-moi demain à 9 h d'appeler le garage ». ")
-    + (data.notifications ? "" : "⚠ Notifications non configurées (ntfy) : les rappels n'apparaîtront que dans la conversation.");
-}
-$("notifTest").onclick = async () => {
-  try { await api("/api/notify/test", { method: "POST" }); toast("<b>Notification envoyée</b> : regarde ton téléphone."); }
-  catch (e) { toast(esc(e.message)); }
-};
-
-for (const e of EMOTIONS) {
-  const b = document.createElement("button");
-  b.textContent = ACTIVITIES[e].label;
-  b.onclick = () => setEmotion(e);
-  $("emos").appendChild(b);
-}
 
 /* ============================================================
-   CONNEXION
+   MESSAGES
    ============================================================ */
-let online = false;
+const chat = $("chat"), scroller = $("scroller"), input = $("input"), sendBtn = $("send"), form = $("form");
 
-async function connect() {
-  let info = "";
-  let h = null;
-  try {
-    h = await getJSON("/api/health");
-    online = h.ollama && h.model_ready;
-    info = h.provider === "mock" ? "mode test (sans modèle)"
-      : !h.ollama ? "Ollama injoignable depuis le serveur"
-      : !h.model_ready ? "aucun modèle installé — téléchargement en cours ?"
-      : h.embeddings ? "Ollama en ligne · mémoire sémantique active"
-      : "Ollama en ligne · mémoire sans recherche sémantique (nomic-embed-text absent)";
-    dot.classList.toggle("wait", h.ollama && !h.model_ready);
-    if (h.ollama) {
-      const m = await getJSON("/api/models");
-      modelSel.innerHTML = "";
-      if (!m.models.length) modelSel.add(new Option("aucun modèle installé", ""));
-      for (const n of m.models) modelSel.add(new Option(n, n));
-      if (!m.models.includes(settings.model)) {
-        settings.model = m.models.includes(m.default) ? m.default : (m.models[0] || "");
-        saveSettings();
-      }
-      modelSel.value = settings.model;
-    }
-  } catch {
-    online = false;
-    info = "serveur Atom injoignable";
-  }
-  if (!modelSel.options.length) modelSel.add(new Option(settings.model || "hors ligne", settings.model));
-  dot.classList.toggle("on", online);
-  dot.title = info;
-  $("srvInfo").textContent = info;
+function greeting() {
+  const h = new Date().getHours();
+  return h < 5 ? "Bonne nuit." : h < 12 ? "Bonjour." : h < 18 ? "Bon après-midi." : "Bonsoir.";
 }
-modelSel.onchange = () => { settings.model = modelSel.value; saveSettings(); };
+const SUGGESTIONS = [
+  { i: "clock", t: "Programmer un rappel", d: "« Rappelle-moi demain à 9 h de… »", fill: "Rappelle-moi demain à 9 h de " },
+  { i: "scale", t: "Comparer deux options", d: "Un tableau clair des avantages", fill: "Compare dans un tableau " },
+  { i: "doc", t: "Rédiger un texte", d: "Mail, message, résumé…", fill: "Rédige un mail court pour " },
+  { i: "user", t: "Ce que tu sais de moi", d: "Voir ce qu'Atom a retenu", send: "Qu'est-ce que tu sais de moi ?" },
+];
+
+function renderEmpty() {
+  chat.innerHTML = `<div id="empty"><h1>${greeting()}</h1><p>Que puis-je faire pour toi ?</p><div class="cards"></div></div>`;
+  const cards = chat.querySelector(".cards");
+  for (const s of SUGGESTIONS) {
+    const b = document.createElement("button");
+    b.className = "card";
+    b.innerHTML = `<b>${icon(s.i)}${esc(s.t)}</b><span>${esc(s.d)}</span>`;
+    b.onclick = () => s.send ? sendMessage(s.send) : fillInput(s.fill);
+    cards.appendChild(b);
+  }
+}
+
+function fillInput(text) { input.value = text; autoGrow(); input.focus(); input.setSelectionRange(text.length, text.length); }
+
+function msgEl(m, idx) {
+  const el = document.createElement("div");
+  const isUser = m.role === "user";
+  el.className = "msg " + (m.error ? "err" : isUser ? "user" : "atom");
+  el.dataset.idx = idx;
+  const body = document.createElement("div");
+  body.className = "body" + (isUser ? "" : " md");
+  if (isUser || m.error) body.textContent = m.content; else body.innerHTML = md(m.content);
+  el.appendChild(body);
+  if (!m.error) el.appendChild(actions(m, idx));
+  return el;
+}
+
+function actions(m, idx) {
+  const a = document.createElement("div");
+  a.className = "acts";
+  const btn = (name, title, fn) => {
+    const b = document.createElement("button");
+    b.className = "iconbtn"; b.title = title; b.innerHTML = icon(name);
+    b.onclick = fn; a.appendChild(b); return b;
+  };
+  if (m.role === "user") {
+    if (m.created_at) { const t = document.createElement("time"); t.textContent = fmtTime(m.created_at); a.appendChild(t); }
+    btn("copy", "Copier", (e) => flashCopy(e.currentTarget, m.content));
+    if (m.id) btn("edit", "Modifier", () => editMessage(idx));
+  } else {
+    btn("copy", "Copier", (e) => flashCopy(e.currentTarget, m.content));
+    if (idx === history.length - 1) btn("refresh", "Régénérer", () => regenerate());
+    if (m.created_at) { const t = document.createElement("time"); t.textContent = fmtTime(m.created_at); a.appendChild(t); }
+  }
+  return a;
+}
+
+function flashCopy(btn, text) {
+  copyText(text);
+  btn.innerHTML = icon("check");
+  setTimeout(() => { btn.innerHTML = icon("copy"); }, 1300);
+}
+
+function renderHistory() {
+  chat.innerHTML = "";
+  if (!history.length) { renderEmpty(); return; }
+  history.forEach((m, i) => chat.appendChild(msgEl(m, i)));
+  markLast();
+  scroller.scrollTop = scroller.scrollHeight;
+}
+function markLast() {
+  chat.querySelectorAll(".msg.last").forEach((x) => x.classList.remove("last"));
+  const lastAtom = [...chat.querySelectorAll(".msg.atom")].pop();
+  if (lastAtom && lastAtom === chat.lastElementChild) lastAtom.classList.add("last");
+}
+
+chat.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-copy]");
+  if (!b) return;
+  copyText(b.closest(".code").querySelector("pre").innerText);
+  const old = b.innerHTML;
+  b.innerHTML = icon("check") + "Copié";
+  setTimeout(() => { b.innerHTML = old; }, 1300);
+});
+
+function editMessage(idx) {
+  if (busy) return;
+  const m = history[idx];
+  const el = chat.querySelector(`.msg[data-idx="${idx}"]`);
+  const box = document.createElement("div");
+  box.className = "edit-box";
+  box.innerHTML = `<textarea></textarea><div class="row"><button class="btn" data-a="cancel">Annuler</button><button class="btn primary" data-a="send">Envoyer</button></div>`;
+  const ta = box.querySelector("textarea");
+  ta.value = m.content;
+  el.innerHTML = ""; el.appendChild(box);
+  ta.style.height = ta.scrollHeight + "px"; ta.focus();
+  box.querySelector('[data-a="cancel"]').onclick = () => renderHistory();
+  box.querySelector('[data-a="send"]').onclick = async () => {
+    const v = ta.value.trim();
+    if (!v) return;
+    await send_(`/api/conversations/${settings.conversationId}/truncate`, "POST", { from_id: m.id });
+    history = history.slice(0, idx);
+    renderHistory();
+    sendMessage(v);
+  };
+  ta.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); box.querySelector('[data-a="send"]').click(); } if (e.key === "Escape") renderHistory(); };
+}
+
+async function regenerate() {
+  if (busy) return;
+  let i = history.length - 1;
+  while (i >= 0 && history[i].role !== "user") i--;
+  if (i < 0 || !history[i].id) return;
+  const text = history[i].content;
+  await send_(`/api/conversations/${settings.conversationId}/truncate`, "POST", { from_id: history[i].id });
+  history = history.slice(0, i);
+  renderHistory();
+  sendMessage(text);
+}
+
+/* scroll */
+function atBottom() { return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 60; }
+scroller.addEventListener("scroll", () => {
+  $("toBottom").classList.toggle("on", !atBottom());
+  $("topbar").classList.toggle("scrolled", scroller.scrollTop > 4);
+});
+$("toBottom").onclick = () => scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
 
 /* ============================================================
-   CHAT (streaming NDJSON)
+   SAISIE ET ENVOI (streaming NDJSON)
    ============================================================ */
-let busy = false, idleTimer = 0, sleepTimer = 0;
+let busy = false, controller = null, idleTimer = 0, sleepTimer = 0, lastSpeed = null;
+
+function autoGrow() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 220) + "px";
+  sendBtn.disabled = !busy && !input.value.trim();
+}
+function setBusy(b) {
+  busy = b;
+  sendBtn.classList.toggle("stop", b);
+  sendBtn.innerHTML = icon(b ? "stop" : "up");
+  sendBtn.title = b ? "Arrêter" : "Envoyer";
+  autoGrow();
+}
+input.addEventListener("input", autoGrow);
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!busy) form.requestSubmit(); }
+  if (e.key === "ArrowUp" && !input.value && !busy) {
+    const i = history.map((m) => m.role).lastIndexOf("user");
+    if (i >= 0 && history[i].id) { e.preventDefault(); editMessage(i); }
+  }
+});
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (busy) { controller?.abort(); return; }
+  const text = input.value.trim();
+  if (text) { input.value = ""; autoGrow(); sendMessage(text); }
+});
+
 function scheduleRest() {
   clearTimeout(idleTimer); clearTimeout(sleepTimer);
-  idleTimer = setTimeout(() => { if (!busy) setEmotion("idle"); }, 9000);
-  sleepTimer = setTimeout(() => { if (!busy) setEmotion("sleep"); }, 180000);
+  idleTimer = setTimeout(() => { if (!busy) { setEmotion("idle"); setEntityState("en attente"); } }, 9000);
+  sleepTimer = setTimeout(() => { if (!busy) { setEmotion("sleep"); setEntityState("au repos"); } }, 180000);
 }
 
-function onMemoryAdded(added) {
-  const list = added.map((m) => esc(m.content.replace(/^L'utilisateur\s+/i, ""))).join(" · ");
-  toast(`<b>Atom a retenu</b> : ${list}`);
-  if (panel.classList.contains("open")) loadMemories();
+async function syncIds() {
+  if (!settings.conversationId) return;
+  try {
+    const msgs = (await getJSON(`/api/conversations/${settings.conversationId}/messages`)).messages;
+    if (busy) return;
+    const keepBottom = atBottom();
+    history = msgs;
+    renderHistory();
+    if (!keepBottom) scroller.scrollTop = scroller.scrollHeight;
+  } catch {}
 }
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = input.value.trim();
-  if (!text || busy) return;
-  busy = true;
-  input.value = ""; autoGrow();
+async function sendMessage(text) {
+  if (busy) return;
+  $("empty")?.remove();
+  setBusy(true);
   clearTimeout(idleTimer); clearTimeout(sleepTimer);
 
-  addMsg("user", text);
-  history.push({ role: "user", content: text });
+  const userMsg = { role: "user", content: text };
+  history.push(userMsg);
+  chat.appendChild(msgEl(userMsg, history.length - 1));
+  markLast();
+  scroller.scrollTop = scroller.scrollHeight;
+
   setEmotion("thinking");
-  const pending = addMsg("atom", "réflexion", "pending");
-  let bubble = null, reply = "", emotion = "talking", renderQueued = false, finished = false;
+  setEntityState("réflexion…");
+  const el = document.createElement("div");
+  el.className = "msg atom";
+  el.innerHTML = '<div class="body md"><span class="thinking"><i></i><i></i><i></i></span></div>';
+  chat.appendChild(el);
+  scroller.scrollTop = scroller.scrollHeight;
+  const body = el.querySelector(".body");
 
+  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0;
   const render = () => {
-    renderQueued = false;
-    if (!bubble) return;
-    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
-    setAtomText(bubble, reply.trimStart());
-    if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
+    queued = false;
+    const stick = atBottom();
+    body.innerHTML = md(reply.trimStart());
+    body.lastElementChild?.classList.add("cursor");
+    if (stick) scroller.scrollTop = scroller.scrollHeight;
   };
-
-  const finish = () => {
+  const finish = (stopped = false) => {
     if (finished) return;
     finished = true;
-    if (!bubble) { pending.remove(); bubble = addMsg("assistant", "…"); }
-    render();
-    history.push({ role: "assistant", content: reply.trim(), emotion });
+    const content = reply.trim() + (stopped && reply.trim() ? " …" : "");
+    history.push({ role: "assistant", content: content || "…", emotion });
+    el.replaceWith(msgEl(history[history.length - 1], history.length - 1));
+    markLast();
+    if (tokens > 3 && t0) { lastSpeed = tokens / ((performance.now() - t0) / 1000); $("speedV").textContent = lastSpeed.toFixed(1) + " tok/s"; }
     setEmotion(emotion);
-    busy = false; autoGrow();
-    updateHistInfo();
+    setEntityState("en attente");
+    setBusy(false);
     scheduleRest();
+    loadConversations();
+    syncIds();
     input.focus();
   };
 
+  controller = new AbortController();
   try {
     const r = await api("/api/chat", {
       method: "POST",
+      signal: controller.signal,
       body: JSON.stringify({
-        message: text,
-        conversation_id: settings.conversationId,
-        model: settings.model || null,
-        persona: settings.persona,
-        auto_memory: settings.autoMemory,
+        message: text, conversation_id: settings.conversationId, model: settings.model || null,
+        persona: settings.persona, auto_memory: settings.autoMemory,
       }),
     });
     const reader = r.body.getReader();
@@ -1026,28 +1243,27 @@ form.addEventListener("submit", async (e) => {
         if (!line) continue;
         const ev = JSON.parse(line);
         if (ev.type === "meta") {
-          if (settings.conversationId !== ev.conversation_id) {
-            settings.conversationId = ev.conversation_id;
-            saveSettings();
-          }
+          if (settings.conversationId !== ev.conversation_id) { settings.conversationId = ev.conversation_id; saveSettings(); loadConversations(); }
         } else if (ev.type === "emotion") {
-          emotion = ev.emotion;
-          setEmotion(emotion);
+          emotion = ev.emotion; setEmotion(emotion); setEntityState("répond…");
         } else if (ev.type === "token") {
-          if (!bubble) { pending.remove(); bubble = addMsg("assistant", ""); }
+          if (!t0) t0 = performance.now();
+          tokens++;
           reply += ev.text;
-          entity.tokenKick = 1; // petite pulsation par token
-          if (!renderQueued) { renderQueued = true; requestAnimationFrame(render); }
-        } else if (ev.type === "done") {
-          emotion = ev.emotion;
-          finish(); // l'utilisateur peut répondre pendant que la mémoire travaille
+          entity.tokenKick = 1;
+          if (!queued) { queued = true; requestAnimationFrame(render); }
         } else if (ev.type === "reminder") {
-          if (ev.action === "created") toast(`<b>⏰ Rappel programmé</b> : ${esc(ev.when)} — ${esc(ev.text)}`);
-          else if (ev.action === "cancelled") toast(`<b>Rappel #${ev.id} annulé</b>`);
-          else toast(`<b>Rappel non programmé</b> : ${esc(ev.message)}`);
-          if (panel.classList.contains("open")) loadReminders();
+          if (ev.action === "created") toast(`<b>Rappel programmé</b> · ${esc(ev.when)} — ${esc(ev.text)}`);
+          else if (ev.action === "cancelled") toast(`<b>Rappel annulé</b>`);
+          else toast(`<b>Rappel non programmé</b> · ${esc(ev.message)}`);
+          refreshPanel();
+        } else if (ev.type === "done") {
+          emotion = ev.emotion; finish();
         } else if (ev.type === "memory") {
-          onMemoryAdded(ev.added);
+          const list = ev.added.map((m) => esc(m.content.replace(/^L'utilisateur\s+/i, ""))).join(" · ");
+          toast(`<b>Retenu</b> · ${list}`);
+          refreshPanel();
+          if ($("settings").classList.contains("open")) loadMemories();
         } else if (ev.type === "error") {
           throw new Error(ev.message);
         }
@@ -1055,29 +1271,229 @@ form.addEventListener("submit", async (e) => {
     }
     finish();
   } catch (err) {
-    if (finished) { console.warn(err); return; }
+    if (finished) return;
+    if (err.name === "AbortError") { finish(true); return; }
     finished = true;
-    pending.remove();
     const msg = err instanceof TypeError ? "Serveur Atom injoignable." : err.message;
-    addMsg("atom", msg, "err");
+    el.replaceWith(msgEl({ role: "assistant", content: msg, error: true }, -1));
     setEmotion("fear");
-    connect();
-    busy = false; autoGrow();
+    setEntityState("erreur");
+    setBusy(false);
     scheduleRest();
+    connect();
+  } finally {
+    controller = null;
   }
+}
+
+/* boutons rapides */
+const QUICK = [
+  { i: "clock", t: "Rappel", fill: "Rappelle-moi " },
+  { i: "list", t: "Mes rappels", send: "Quels sont mes rappels ?" },
+  { i: "memory", t: "Retiens que…", fill: "Retiens que " },
+  { i: "doc", t: "Résumer", send: "Résume notre conversation en quelques points." },
+];
+for (const q of QUICK) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chip"; b.innerHTML = icon(q.i) + esc(q.t);
+  b.onclick = () => q.send ? sendMessage(q.send) : fillInput(q.fill);
+  $("quick").appendChild(b);
+}
+
+/* raccourcis clavier */
+document.addEventListener("keydown", (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); newConversation(); }
+  else if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); if (narrow()) app.classList.add("side-open"); else if (!settings.side) { settings.side = true; applyLayout(); } $("search").focus(); }
+  else if (e.key === "Escape") { closeSettings(); app.classList.remove("side-open", "panel-open"); applyLayout(); }
 });
+
+/* ============================================================
+   PANNEAU : système, rappels, souvenirs
+   ============================================================ */
+async function refreshSystem() {
+  if (!panelVisible()) return;
+  try {
+    const s = await getJSON("/api/system");
+    if (s.cpu != null) { $("cpuV").textContent = `${Math.round(s.cpu)} %${s.cores ? ` · ${s.cores} cœurs` : ""}`; $("cpuB").style.width = Math.min(100, s.cpu) + "%"; }
+    if (s.memory) { $("ramV").textContent = `${fmtBytes(s.memory.used)} / ${fmtBytes(s.memory.total)}`; $("ramB").style.width = (100 * s.memory.used / s.memory.total) + "%"; }
+    $("loadedV").textContent = s.loaded.length ? s.loaded.map((m) => m.name.split(":")[0] + (m.size ? ` · ${fmtBytes(m.size)}` : "")).join(", ") : "aucun (en veille)";
+    $("upV").textContent = fmtDur(s.uptime);
+  } catch {}
+}
+
+async function refreshPanel() {
+  if (!panelVisible()) return;
+  try {
+    const r = (await getJSON("/api/reminders")).reminders.slice(0, 3);
+    $("pRem").innerHTML = r.length
+      ? r.map((x) => `<li><small>${esc(x.when)}</small>${esc(x.text)}</li>`).join("")
+      : '<li class="none">Aucun rappel programmé.</li>';
+  } catch {}
+  try {
+    const m = (await getJSON("/api/memories")).memories.slice(-4).reverse();
+    $("pMem").innerHTML = m.length
+      ? m.map((x) => `<li>${esc(x.content)}</li>`).join("")
+      : '<li class="none">Rien de retenu pour l\'instant.</li>';
+  } catch {}
+}
+document.querySelectorAll("[data-goto]").forEach((b) => { b.onclick = () => openSettings(b.dataset.goto); });
+
+/* ============================================================
+   RÉGLAGES
+   ============================================================ */
+function openSettings(tab = "general") {
+  $("settings").classList.add("open");
+  selectTab(tab);
+}
+function closeSettings() { $("settings").classList.remove("open"); }
+function selectTab(tab) {
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === tab));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === tab));
+  if (tab === "memory") loadMemories();
+  if (tab === "reminders") loadReminders();
+}
+document.querySelectorAll(".tab").forEach((t) => { t.onclick = () => selectTab(t.dataset.tab); });
+$("openSettings").onclick = () => openSettings();
+$("closeSettings").onclick = closeSettings;
+$("settings").addEventListener("click", (e) => { if (e.target.id === "settings") closeSettings(); });
+
+$("persona").value = settings.persona;
+$("persona").oninput = () => { settings.persona = $("persona").value; saveSettings(); };
+$("autoMem").checked = settings.autoMemory;
+$("autoMem").onchange = () => { settings.autoMemory = $("autoMem").checked; saveSettings(); };
+$("reconnect").onclick = () => connect(true);
+
+let memories = [];
+async function loadMemories() {
+  try { memories = (await getJSON("/api/memories")).memories; } catch (e) { console.warn(e); }
+  const box = $("memList");
+  box.innerHTML = "";
+  for (const m of memories) {
+    const row = document.createElement("div");
+    row.className = "mem";
+    const tag = document.createElement("span");
+    tag.className = "tag"; tag.textContent = m.source === "auto" ? "auto" : "manuel";
+    tag.title = m.source === "auto" ? "Retenu automatiquement" : "Ajouté par toi";
+    const inp = document.createElement("input");
+    inp.value = m.content;
+    const del = document.createElement("button");
+    del.className = "iconbtn"; del.title = "Oublier"; del.innerHTML = icon("trash");
+    del.onclick = async () => { try { await send_(`/api/memories/${m.id}`, "DELETE"); } catch {} loadMemories(); refreshPanel(); };
+    inp.onchange = async () => {
+      const v = inp.value.trim();
+      if (!v) return del.onclick();
+      try { await send_(`/api/memories/${m.id}`, "PATCH", { content: v }); m.content = v; refreshPanel(); }
+      catch (e) { toast(esc(e.message)); inp.value = m.content; }
+    };
+    row.append(tag, inp, del);
+    box.appendChild(row);
+  }
+  $("memInfo").textContent = memories.length
+    ? `${memories.length} souvenir(s). Atom retient seul les informations durables ; modifie ou supprime ce qui ne te convient pas.`
+    : "Atom n'a encore rien retenu. Il apprendra au fil des conversations.";
+}
+$("memAdd").onclick = async () => {
+  const v = $("memNew").value.trim();
+  if (!v) return;
+  try { await send_("/api/memories", "POST", { content: v }); $("memNew").value = ""; } catch (e) { toast(esc(e.message)); }
+  loadMemories(); refreshPanel();
+};
+$("memNew").onkeydown = (e) => { if (e.key === "Enter") $("memAdd").onclick(); };
+$("clearMem").onclick = async () => {
+  if (!confirm("Effacer tout ce qu'Atom sait de toi ?")) return;
+  try { await send_("/api/memories", "DELETE"); } catch {}
+  loadMemories(); refreshPanel();
+};
+
+async function loadReminders() {
+  let data = { reminders: [], notifications: false };
+  try { data = await getJSON("/api/reminders"); } catch {}
+  const ul = $("remList");
+  ul.innerHTML = data.reminders.length ? "" : '<li class="none">Aucun rappel programmé.</li>';
+  for (const r of data.reminders) {
+    const li = document.createElement("li");
+    li.style.display = "flex"; li.style.alignItems = "center"; li.style.gap = "10px";
+    li.innerHTML = `<div style="flex:1"><small>${esc(r.when)}</small>${esc(r.text)}</div>`;
+    const del = document.createElement("button");
+    del.className = "iconbtn"; del.title = "Annuler"; del.innerHTML = icon("trash");
+    del.onclick = async () => { try { await send_(`/api/reminders/${r.id}`, "DELETE"); } catch {} loadReminders(); refreshPanel(); };
+    li.appendChild(del);
+    ul.appendChild(li);
+  }
+  $("remInfo").textContent = data.notifications ? "" : "Aucun canal de notification configuré (ntfy ou Telegram) : les rappels n'apparaîtront que dans la conversation.";
+}
+$("notifTest").onclick = async () => {
+  try { await send_("/api/notify/test", "POST"); toast("<b>Notification envoyée</b> · regarde ton téléphone."); }
+  catch (e) { toast(esc(e.message)); }
+};
+
+for (const e of EMOTIONS) {
+  const b = document.createElement("button");
+  b.className = "chip"; b.textContent = ACTIVITIES[e].label;
+  b.onclick = () => setEmotion(e);
+  $("emos").appendChild(b);
+}
+
+/* ============================================================
+   CONNEXION
+   ============================================================ */
+const modelSel = $("model");
+let online = false;
+async function connect(verbose = false) {
+  let info = "", ok = false, err = false;
+  try {
+    const h = await getJSON("/api/health");
+    ok = h.ollama && h.model_ready;
+    info = h.provider === "mock" ? "Mode test"
+      : !h.ollama ? "Ollama injoignable"
+      : !h.model_ready ? "Aucun modèle installé"
+      : "En ligne";
+    err = !h.ollama;
+    const details = [
+      h.provider === "mock" ? "Mode test, sans modèle." : h.ollama ? "Ollama joignable." : "Ollama injoignable depuis le serveur.",
+      h.embeddings ? "Mémoire sémantique active." : "Mémoire sans recherche sémantique (nomic-embed-text absent).",
+      h.telegram ? "Telegram activé." : "Telegram désactivé.",
+    ];
+    $("srvInfo").textContent = details.join(" ");
+    if (h.ollama) {
+      const m = await getJSON("/api/models");
+      const prev = modelSel.value;
+      modelSel.innerHTML = "";
+      if (!m.models.length) modelSel.add(new Option("Aucun modèle", ""));
+      for (const n of m.models) modelSel.add(new Option(n, n));
+      if (!m.models.includes(settings.model)) { settings.model = m.models.includes(m.default) ? m.default : (m.models[0] || ""); saveSettings(); }
+      modelSel.value = settings.model || prev;
+    }
+  } catch {
+    info = "Serveur injoignable"; err = true;
+    $("srvInfo").textContent = "Le serveur Atom ne répond pas.";
+  }
+  if (!modelSel.options.length) modelSel.add(new Option(settings.model || "Hors ligne", settings.model));
+  online = ok;
+  $("dot").className = "dot" + (ok ? " on" : err ? " err" : "");
+  $("statusText").textContent = info + (ok && settings.model ? ` · ${settings.model.split(":")[0]}` : "");
+  if (verbose) toast(esc($("srvInfo").textContent));
+}
+modelSel.onchange = () => { settings.model = modelSel.value; saveSettings(); connect(); };
 
 /* ============================================================
    DÉMARRAGE
    ============================================================ */
+applyLayout();
+setBusy(false);
 (async () => {
   const fromLink = parseInt(new URLSearchParams(location.search).get("c"), 10);
   if (fromLink) { settings.conversationId = fromLink; window.history.replaceState(null, "", "/"); }
+  await loadConversations();
   if (settings.conversationId) await openConversation(settings.conversationId);
   else renderHistory();
-  loadMemories();
 })();
 connect();
+refreshPanel();
+refreshSystem();
+setInterval(refreshSystem, 4000);
+setInterval(refreshPanel, 30000);
 setInterval(async () => {
   if (busy) return;
   connect();
@@ -1085,12 +1501,9 @@ setInterval(async () => {
   try {
     const msgs = (await getJSON(`/api/conversations/${settings.conversationId}/messages`)).messages;
     if (!busy && msgs.length > history.length) {
-      const fresh = msgs.slice(history.length);
-      history = msgs;
-      for (const m of fresh) addMsg(m.role, m.content);
-      const last = fresh[fresh.length - 1];
+      const last = msgs[msgs.length - 1];
+      history = msgs; renderHistory();
       if (last.emotion) { setEmotion(last.emotion); scheduleRest(); }
-      updateHistInfo();
     }
   } catch {}
 }, 15000);
