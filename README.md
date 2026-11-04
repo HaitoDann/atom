@@ -86,6 +86,83 @@ Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 - **Boutons rapides** sous la saisie et suggestions à l'ouverture d'une conversation vide.
 - Thème monochrome : la seule couleur vient de l'émotion de l'entité.
 
+### Nouveautés de l'interface
+
+- **Fichiers joints** : trombone, glisser-déposer ou coller. Texte, code, Markdown, CSV, JSON et PDF (texte extrait sur le serveur). Les 12 000 premiers caractères d'un fichier sont lus. Les images ne sont pas encore prises en charge (le modèle actuel ne voit pas).
+- **Souvenirs utilisés** : sous une réponse, « 2 souvenirs utilisés » se déplie pour voir ce qu'Atom a pris en compte, oublier un souvenir faux d'un clic, ou ouvrir la conversation passée rappelée.
+- **Avis** 👍 / 👎 sur chaque réponse, avec une raison facultative (stockés pour affiner Atom plus tard).
+- **Code coloré** en niveaux de gris, **formules** `$…$` et `$$…$$` (KaTeX, chargé à la demande), **liens** détectés automatiquement.
+- **Brouillons** conservés par conversation.
+- **Modèle par conversation** : chaque conversation garde le modèle avec lequel elle a été menée.
+- **Apparence** : densité (confortable / compacte) et largeur (normale / étroite / large) dans Réglages → Apparence.
+
+### L'entité, un familier
+
+- Elle **te regarde** : son regard suit le curseur ; quand tu écris, elle se tourne vers la saisie et frémit à chaque touche.
+- Elle **ressent le serveur** : plus le processeur travaille, plus elle respire et tourne vite.
+- Elle a un **rythme de vie** : la nuit (23 h – 6 h) elle s'assombrit, ralentit et s'endort plus vite.
+- Elle a une **humeur durable** : ses émotions des dernières heures colorent légèrement son état de repos ; la courbe des 24 h est dans le panneau (joyeuse, sereine, neutre, pensive, morose).
+- Elle a des **petits gestes** : clignements, coups d'œil, et un « souffle » d'absorption quand elle retient un souvenir.
+- **Mode présence** : touche la sphère (ou l'icône dans la barre du haut). Elle quitte son panneau et s'agrandit en plein écran, avec l'heure, la date et son dernier message ; l'écran reste allumé. Touche-la à nouveau (ou `Échap`) : elle se rétracte et reprend sa place pendant que le chat réapparaît. Idéal pour une tablette posée dans la pièce.
+
+### Installer Atom comme une application
+
+Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passer par Tailscale (ci-dessous), qui fournit une adresse `https://…ts.net` avec un vrai certificat. Ensuite :
+- **Android / Chrome / Edge** : Réglages d'Atom → Apparence → « Installer l'application », ou menu du navigateur → « Installer ».
+- **iPhone / iPad (Safari)** : bouton Partager → « Sur l'écran d'accueil ».
+
+## Accéder à Atom hors de chez toi (Tailscale)
+
+[Tailscale](https://tailscale.com) relie tes appareils dans un réseau privé chiffré : rien n'est exposé sur Internet, aucun port à ouvrir sur la box, et il fournit le HTTPS nécessaire à l'appli installable. C'est gratuit pour un usage personnel.
+
+**1. Autoriser le LXC à créer un tunnel** — sur l'hôte Proxmox (remplace `109` par l'ID de ton conteneur), ajoute à `/etc/pve/lxc/109.conf` :
+
+```
+lxc.cgroup2.devices.allow: c 10:200 rwm
+lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+```
+
+puis redémarre le conteneur : `pct reboot 109`. (Inutile si Atom tourne dans une VM.)
+
+**2. Installer Tailscale dans le conteneur** :
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+```bash
+tailscale up --hostname=atom
+```
+
+Ouvre le lien affiché pour connecter la machine à ton compte.
+
+**3. Activer HTTPS** — dans la console d'administration Tailscale → DNS : active **MagicDNS** et **HTTPS Certificates**.
+
+**4. Publier Atom en HTTPS sur ton réseau privé** :
+
+```bash
+tailscale serve --bg 8000
+```
+
+```bash
+tailscale serve --bg --https=8443 http://localhost:8080
+```
+
+Atom est alors joignable sur `https://atom.<ton-tailnet>.ts.net`, et ntfy sur le port 8443.
+
+**5. Sur le téléphone** : installe l'appli Tailscale, connecte-toi avec le même compte, ouvre l'adresse ci-dessus, puis installe Atom.
+
+**6. Mets à jour `.env`** pour que les notifications pointent vers ces adresses, puis `docker compose up -d` :
+
+```
+ATOM_PUBLIC_URL=https://atom.<ton-tailnet>.ts.net
+NTFY_BASE_URL=https://atom.<ton-tailnet>.ts.net:8443
+```
+
+Dans l'appli ntfy, remplace aussi le serveur par `https://atom.<ton-tailnet>.ts.net:8443`.
+
+> Telegram, lui, fonctionne partout même sans Tailscale.
+
 ## Mémoire
 
 Atom retient seul ce qui compte, et tu gardes la main.

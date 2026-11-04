@@ -11,7 +11,7 @@ from typing import AsyncIterator
 import httpx
 import numpy as np
 
-from .config import EMBED_MODEL, MAX_TOKENS, OLLAMA_URL, PROVIDER
+from .config import EMBED_MODEL, MAX_TOKENS, NUM_CTX, OLLAMA_URL, PROVIDER
 
 
 class ModelMissing(RuntimeError):
@@ -38,7 +38,7 @@ async def stream_chat(model: str, messages: list[dict]) -> AsyncIterator[str]:
         "stream": True,
         "think": False,
         # num_predict borne la longueur : un petit modèle qui part en boucle s'arrête.
-        "options": {"temperature": 0.7, "num_predict": MAX_TOKENS, "repeat_penalty": 1.12},
+        "options": {"temperature": 0.7, "num_predict": MAX_TOKENS, "repeat_penalty": 1.12, "num_ctx": NUM_CTX},
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
         async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as r:
@@ -67,7 +67,7 @@ async def json_chat(model: str, messages: list[dict], schema: dict) -> dict:
         "stream": False,
         "think": False,
         "format": schema,
-        "options": {"temperature": 0.1, "num_predict": 400},
+        "options": {"temperature": 0.1, "num_predict": 400, "num_ctx": NUM_CTX},
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
         r = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)

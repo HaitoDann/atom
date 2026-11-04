@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1b1b1b">
 <title>Atom</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atom">
 <style>
   :root {
     --bg: #1e1e1e;
@@ -210,11 +217,11 @@
   .chip svg { width: 14px; height: 14px; }
   form#form {
     background: var(--surface); border: 1px solid var(--border-2); border-radius: 18px;
-    padding: 10px 10px 10px 16px; display: flex; align-items: flex-end; gap: 10px;
+    padding: 10px 10px 10px 8px; display: flex; align-items: flex-end; gap: 10px;
     transition: border-color .15s;
   }
   form#form:focus-within { border-color: #4a4a4a; }
-  #input { flex: 1; border: 0; outline: 0; background: none; resize: none; max-height: 220px; line-height: 1.5; padding: 6px 0; }
+  #input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; resize: none; max-height: 220px; line-height: 1.5; padding: 6px 0; }
   #input::placeholder { color: var(--faint); }
   #send {
     width: 34px; height: 34px; border-radius: 10px; border: 0; flex: none;
@@ -316,6 +323,91 @@
 
   #scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: none; }
 
+  /* ---------------------------------------------------------------- densité / largeur */
+  body.compact { font-size: 13.5px; }
+  body.compact .msg { margin-bottom: 18px; }
+  body.compact .md p { margin-bottom: .6em; }
+  body.wide #chat, body.wide .composer-in { max-width: 980px; }
+  body.narrow #chat, body.narrow .composer-in { max-width: 640px; }
+
+  /* ---------------------------------------------------------------- coloration du code (gris) */
+  .tk-c { color: #6f6f6f; font-style: italic; }
+  .tk-s { color: #b9b9b9; }
+  .tk-k { color: #f2f2f2; font-weight: 600; }
+  .tk-n { color: #d6d6d6; }
+  .tk-f { color: #e2e2e2; text-decoration: underline; text-decoration-color: #444; text-underline-offset: 3px; }
+  pre code { color: #9d9d9d; }
+  .math-block { overflow-x: auto; margin: 0 0 .9em; padding: 4px 0; }
+
+  /* ---------------------------------------------------------------- fichiers joints */
+  .tray { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 8px; }
+  .tray:empty { display: none; }
+  .file {
+    display: inline-flex; align-items: center; gap: 8px; max-width: 260px;
+    padding: 6px 8px 6px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border-2);
+    font-size: 12.5px; color: var(--text-2);
+  }
+  .file svg { width: 15px; height: 15px; color: var(--muted); }
+  .file b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file small { color: var(--faint); font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .file button { background: none; border: 0; color: var(--faint); display: grid; place-items: center; padding: 0; }
+  .file button:hover { color: var(--text); }
+  .file.loading { opacity: .6; }
+  .msg.user .files { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; margin-bottom: 6px; }
+  #attach { width: 34px; height: 34px; border-radius: 10px; flex: none; }
+  #drop {
+    position: fixed; inset: 0; z-index: 70; display: none; place-items: center;
+    background: rgba(20,20,20,.82); border: 2px dashed #4a4a4a; border-radius: 18px; margin: 14px;
+    color: var(--text); font-size: 15px; pointer-events: none;
+  }
+  #drop.on { display: grid; }
+  #drop div { text-align: center; }
+  #drop small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+
+  /* ---------------------------------------------------------------- souvenirs utilisés */
+  .used { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+  .used summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px 2px 6px; border-radius: 6px; user-select: none; }
+  .used summary::-webkit-details-marker { display: none; }
+  .used summary:hover { background: var(--surface); color: var(--text); }
+  .used summary svg { width: 14px; height: 14px; }
+  .used ul { list-style: none; margin: 6px 0 0; padding: 0 0 0 10px; border-left: 1px solid var(--border-2); }
+  .used li { display: flex; gap: 8px; align-items: center; padding: 3px 0 3px 8px; color: var(--text-2); }
+  .used li span { flex: 1; }
+  .used li small { color: var(--faint); }
+  .used li button { background: none; border: 0; color: var(--faint); font-size: 11.5px; padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+  .used li button:hover { color: var(--danger); background: var(--surface); }
+
+  /* avis */
+  .acts .iconbtn.voted { color: var(--strong); }
+  .reason { display: flex; gap: 6px; margin-top: 6px; max-width: 520px; }
+  .reason input { flex: 1; }
+
+  /* ---------------------------------------------------------------- humeur */
+  #moodCv { width: 100%; height: 44px; display: block; }
+  .mood-l { display: flex; justify-content: space-between; font: 10.5px var(--mono); color: var(--faint); margin-top: 3px; }
+
+  /* ---------------------------------------------------------------- mode présence */
+  .stage { cursor: pointer; }
+  .stage.flying { position: fixed !important; z-index: 80; border: 0 !important; background: var(--side); }
+  .stage.flying.full { background: #151515; }
+  .stage-top, .stage-meta { transition: opacity .3s; }
+  .stage.flying .stage-top, .stage.flying .stage-meta { opacity: 0; }
+  #app > * { transition: opacity .45s ease, filter .45s ease; }
+  body.presence #app > * { opacity: 0; filter: blur(6px); pointer-events: none; }
+  #presence {
+    position: fixed; inset: 0; z-index: 81; pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between; padding: 6vh 6vw 7vh;
+    opacity: 0; transition: opacity .6s ease;
+  }
+  body.presence-ui #presence { opacity: 1; }
+  #presence .clock { font-size: clamp(42px, 9vw, 96px); font-weight: 200; letter-spacing: -.02em; color: var(--strong); line-height: 1; }
+  #presence .date { color: var(--muted); font-size: 15px; margin-top: 10px; text-transform: capitalize; }
+  #presence .bottom { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; }
+  #presence .say { max-width: 620px; font-size: 17px; color: var(--text); line-height: 1.5; min-height: 1.5em; transition: opacity .5s; }
+  #presence .say small { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  #presence .emo { font: 12px var(--mono); color: var(--muted); text-align: right; white-space: nowrap; }
+  #presence .hint { font-size: 12px; color: var(--faint); text-align: center; margin-top: 18px; }
+
   /* ---------------------------------------------------------------- responsive */
   @media (max-width: 1180px) {
     #app, #app.no-side, #app.no-panel { grid-template-columns: 264px minmax(0, 1fr) 0; }
@@ -369,6 +461,7 @@
       <select id="model" title="Modèle"></select>
       <button class="iconbtn" id="pinBtn" title="Épingler" data-i="pin"></button>
       <button class="iconbtn" id="exportBtn" title="Exporter en Markdown" data-i="download"></button>
+      <button class="iconbtn" id="presenceBtn" title="Mode présence" data-i="orb"></button>
       <button class="iconbtn" id="panelBtn" title="Panneau de l'entité" data-i="panel"></button>
     </div>
     <div id="scroller"><div id="chat"></div></div>
@@ -377,7 +470,14 @@
         <button id="toBottom" title="Aller en bas" data-i="down"></button>
         <div class="quick" id="quick"></div>
         <form id="form" autocomplete="off">
-          <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
+          <div style="flex:1;min-width:0">
+            <div class="tray" id="tray"></div>
+            <div style="display:flex;align-items:flex-end;gap:6px">
+              <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF)" data-i="clip"></button>
+              <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
+            </div>
+          </div>
+          <input type="file" id="fileIn" multiple hidden>
           <button id="send" type="submit" disabled title="Envoyer" data-i="up"></button>
         </form>
         <div class="fine">Atom fonctionne en local et peut se tromper.</div>
@@ -390,7 +490,7 @@
     <div class="panel-in">
       <div class="stage" id="stage">
         <canvas id="entity"></canvas>
-        <div class="stage-top"><span>Entité</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
+        <div class="stage-top"><span>Entité · touche-la</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
         <div class="stage-meta"><span id="emoName">Veille</span><span id="emoState">en attente</span></div>
       </div>
       <section class="sec">
@@ -400,6 +500,11 @@
         <div class="kv"><span>Modèle chargé</span><span id="loadedV">—</span></div>
         <div class="kv"><span>Vitesse</span><span id="speedV">—</span></div>
         <div class="kv"><span>Serveur actif depuis</span><span id="upV">—</span></div>
+      </section>
+      <section class="sec">
+        <h3>Humeur · 24 h <span id="pEmo" style="font-weight:400">Veille</span></h3>
+        <canvas id="moodCv"></canvas>
+        <div class="mood-l"><span>−24 h</span><span id="moodWord">neutre</span><span>maintenant</span></div>
       </section>
       <section class="sec">
         <h3>Prochains rappels <button data-goto="reminders">Tout voir</button></h3>
@@ -422,6 +527,7 @@
       <button class="tab on" data-tab="general"><span data-i="settings"></span>Général</button>
       <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
       <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
+      <button class="tab" data-tab="look"><span data-i="panel"></span>Apparence</button>
       <button class="tab" data-tab="entity"><span data-i="orb"></span>Entité</button>
     </nav>
     <div class="pane-wrap">
@@ -464,6 +570,24 @@
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
       </section>
 
+      <section class="pane" data-pane="look">
+        <div class="block">
+          <h4>Densité du texte</h4>
+          <p class="desc">Taille du texte et espacement des messages.</p>
+          <div class="row" id="densityRow"></div>
+        </div>
+        <div class="block">
+          <h4>Largeur de la conversation</h4>
+          <p class="desc">Colonne étroite pour lire, large pour les tableaux et le code.</p>
+          <div class="row" id="widthRow"></div>
+        </div>
+        <div class="block">
+          <h4>Installer Atom</h4>
+          <p class="desc" id="installInfo">Ajoute Atom à ton écran d'accueil pour l'ouvrir comme une application.</p>
+          <button class="btn" id="installBtn" style="display:none">Installer l'application</button>
+        </div>
+      </section>
+
       <section class="pane" data-pane="entity">
         <div class="block">
           <h4>Tester une émotion</h4>
@@ -475,6 +599,17 @@
   </div>
 </div>
 <div id="toast"></div>
+<div id="drop"><div>Dépose tes fichiers ici<small>Texte, code, Markdown, CSV, JSON, PDF</small></div></div>
+<div id="presence" aria-hidden="true">
+  <div><div class="clock" id="pClock">--:--</div><div class="date" id="pDate"></div></div>
+  <div>
+    <div class="bottom">
+      <div class="say" id="pSay"></div>
+      <div class="emo" id="pEmoBig">veille</div>
+    </div>
+    <div class="hint">Touche la sphère pour revenir</div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -506,6 +641,10 @@ const ICONS = {
   scale: '<path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
   orb: '<circle cx="12" cy="12" r="7.5"/><ellipse cx="12" cy="12" rx="10" ry="3.2"/>',
   user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  clip: '<path d="M19 11.5l-7.2 7.2a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.2 4.2l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l7-7"/>',
+  up2: '<path d="M7.5 10.5V20H4.5v-9.5zM7.5 10.5l4-7c1.4 0 2.3 1.1 2 2.4l-.8 3.6h5.4a2 2 0 0 1 2 2.3l-1.2 6.5a2 2 0 0 1-2 1.7H7.5"/>',
+  down2: '<path d="M7.5 13.5V4H4.5v9.5zM7.5 13.5l4 7c1.4 0 2.3-1.1 2-2.4l-.8-3.6h5.4a2 2 0 0 0 2-2.3l-1.2-6.5a2 2 0 0 0-2-1.7H7.5"/>',
+  spark: '<path d="M12 3.5l1.8 5 5 1.8-5 1.8-1.8 5-1.8-5-5-1.8 5-1.8z"/><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
 };
 const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 document.querySelectorAll("[data-i]").forEach((el) => { el.insertAdjacentHTML("afterbegin", icon(el.dataset.i)); });
@@ -526,36 +665,41 @@ const ACTIVITIES = {
 };
 const EMOTIONS = Object.keys(ACTIVITIES);
 
-const entity = { activity: "idle", rippleT: 99, tokenKick: 0 };
+/* ============================================================
+   ENTITÉ — sphère de fragments, un « familier » vivant
+   ============================================================ */
+const entity = {
+  activity: "idle", rippleT: 99, tokenKick: 0,
+  typingAt: -1e9, keyKick: 0, absorb: 0, blink: 0,
+  load: 0, mood: 0, night: false, hover: false,
+  presence: 0, presenceTarget: 0,
+};
 function setEmotion(e) {
   if (!ACTIVITIES[e]) e = "talking";
   if (entity.activity === e) return;
   entity.activity = e;
   entity.rippleT = 0;
   $("emoName").textContent = ACTIVITIES[e].label;
+  $("pEmo").textContent = ACTIVITIES[e].label;
 }
 function setEntityState(t) { $("emoState").textContent = t; }
 
-/* ============================================================
-   ENTITÉ — sphère de fragments dans le panneau
-   ============================================================ */
 (function initEntity() {
   const canvas = document.getElementById("entity");
   const stage = document.getElementById("stage");
   const ctx = canvas.getContext("2d");
   const N = 3200, R0 = 100;
-  let W = 0, H = 0, scale = 1, visible = true;
+  let W = 0, H = 0;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+  // Le redimensionnement du canvas l'efface : on le fait en début d'image, juste avant de dessiner.
   function resize() {
     const r = stage.getBoundingClientRect();
+    if (Math.abs(r.width - W) < 0.5 && Math.abs(r.height - H) < 0.5) return;
     W = r.width; H = r.height;
-    visible = W > 10 && H > 10;
     canvas.width = Math.max(1, (W * dpr) | 0); canvas.height = Math.max(1, (H * dpr) | 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    scale = Math.min(W, H - 30) / (R0 * 2 * 1.85);
   }
-  new ResizeObserver(resize).observe(stage);
   resize();
 
   let seed = 42;
@@ -588,45 +732,110 @@ function setEntityState(t) { $("emoState").textContent = t; }
 
   const A0 = ACTIVITIES.idle;
   const cur = { r: A0.color[0], g: A0.color[1], b: A0.color[2], radius: 1, oscAmp: 3, oscFreq: 0.9, pulse: 0, stretchY: 1, spike: 0, dim: 0.8 };
-  const mouse = { x: 0, y: 0, active: false };
-  stage.addEventListener("pointermove", (e) => {
+  const gaze = { x: 0, y: 0, tx: 0, ty: 0 };
+  const mouse = { x: 0, y: 0, active: false };   // en coordonnées sphère (répulsion)
+  const view = { cx: 0, cy: 0, scale: 1 };
+
+  // Le regard suit le curseur partout dans la fenêtre.
+  addEventListener("pointermove", (e) => {
     const r = stage.getBoundingClientRect();
-    mouse.x = (e.clientX - r.left - W / 2) / scale; mouse.y = (e.clientY - r.top - (H - 24) / 2) / scale; mouse.active = true;
+    const cx = r.left + view.cx, cy = r.top + view.cy;
+    const dx = e.clientX - cx, dy = e.clientY - cy, d = Math.hypot(dx, dy) || 1;
+    const k = Math.min(1, d / 600);
+    gaze.tx = (dx / d) * k * 14; gaze.ty = (dy / d) * k * 10;
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    entity.hover = inside;
+    mouse.active = inside;
+    mouse.x = (e.clientX - cx) / view.scale; mouse.y = (e.clientY - cy) / view.scale;
   });
-  stage.addEventListener("pointerleave", () => { mouse.active = false; });
+  document.addEventListener("pointerleave", () => { mouse.active = false; entity.hover = false; gaze.tx = gaze.ty = 0; });
+
+  // Humeur : couleurs vers lesquelles la veille dérive (négatif → bleu froid, positif → chaud)
+  const MOOD_NEG = [130, 150, 205], MOOD_POS = [228, 190, 150];
+  let nextBlink = 6, nextGlance = 9;
 
   let last = performance.now(), t = 0;
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now; t += dt;
     requestAnimationFrame(frame);
-    if (!visible || document.hidden) return;
+    if (document.hidden) return;
+    resize();
+    if (W < 10 || H < 10) return;
+
     const A = ACTIVITIES[entity.activity];
+    const typing = now - entity.typingAt < 1400;
+    const isIdle = entity.activity === "idle" || entity.activity === "sleep";
     entity.rippleT += dt;
+    entity.presence += (entity.presenceTarget - entity.presence) * Math.min(1, dt * 3.2);
+    const P = entity.presence;
+
+    // ---- micro-comportements au repos
+    if (isIdle && !typing) {
+      nextBlink -= dt; nextGlance -= dt;
+      if (nextBlink <= 0) { entity.blink = 1; nextBlink = 7 + Math.random() * 14; }
+      if (nextGlance <= 0 && !entity.hover) {
+        gaze.tx = (Math.random() - 0.5) * 22; gaze.ty = (Math.random() - 0.5) * 12;
+        nextGlance = 6 + Math.random() * 10;
+        setTimeout(() => { if (!entity.hover) { gaze.tx = 0; gaze.ty = 0; } }, 1400 + Math.random() * 1200);
+      }
+    }
+    // Quand tu écris, elle se tourne vers la saisie (à gauche et en bas du panneau).
+    if (typing && P < 0.5) { gaze.tx = -16; gaze.ty = 9; }
+    gaze.x += (gaze.tx - gaze.x) * Math.min(1, dt * 3);
+    gaze.y += (gaze.ty - gaze.y) * Math.min(1, dt * 3);
+    entity.blink = Math.max(0, entity.blink - dt * 6);
+    entity.keyKick *= Math.exp(-dt * 7);
+    entity.absorb *= Math.exp(-dt * 2.2);
+    entity.tokenKick *= Math.exp(-dt * 9);
+
+    // ---- cible émotionnelle, modulée par l'humeur, la nuit, la charge, l'attention
+    let tr = A.color[0], tg = A.color[1], tb = A.color[2];
+    if (isIdle && entity.mood) {
+      const m = Math.max(-1, Math.min(1, entity.mood)), c = m > 0 ? MOOD_POS : MOOD_NEG, w = Math.abs(m) * 0.35;
+      tr += (c[0] - tr) * w; tg += (c[1] - tg) * w; tb += (c[2] - tb) * w;
+    }
+    let dimT = A.dim, radT = A.radius, oscT = A.oscAmp, freqT = A.oscFreq;
+    if (entity.night) { dimT *= 0.72; tr *= 0.86; tg *= 0.9; tb *= 1.0; freqT *= 0.75; }
+    if (typing) { radT *= 1.04; dimT = Math.min(1, dimT + 0.12); }          // attentive
+    if (entity.hover) { dimT = Math.min(1, dimT + 0.08); }
+    freqT *= 1 + entity.load * 0.9; oscT *= 1 + entity.load * 0.5;        // le serveur travaille
+
     const k = Math.min(1, dt * 2.5);
-    for (const key of ["radius", "oscAmp", "oscFreq", "pulse", "stretchY", "spike", "dim"]) cur[key] += (A[key] - cur[key]) * k;
-    cur.r += (A.color[0] - cur.r) * k; cur.g += (A.color[1] - cur.g) * k; cur.b += (A.color[2] - cur.b) * k;
-    const tint = `${cur.r | 0},${cur.g | 0},${cur.b | 0}`;
+    cur.r += (tr - cur.r) * k; cur.g += (tg - cur.g) * k; cur.b += (tb - cur.b) * k;
+    cur.radius += (radT - cur.radius) * k; cur.oscAmp += (oscT - cur.oscAmp) * k; cur.oscFreq += (freqT - cur.oscFreq) * k;
+    cur.dim += (dimT - cur.dim) * k;
+    for (const key of ["pulse", "stretchY", "spike"]) cur[key] += (A[key] - cur[key]) * k;
+    const flash = entity.absorb * 0.35;
+    const tint = `${Math.min(255, cur.r + flash * 60) | 0},${Math.min(255, cur.g + flash * 60) | 0},${Math.min(255, cur.b + flash * 60) | 0}`;
+
+    // ---- cadrage : panneau → plein écran (interpolé pendant l'animation)
+    const divisor = 2 * R0 * (1.85 + P * 1.15);
+    const scale = Math.min(W, H - 30 * (1 - P)) / divisor;
+    view.scale = scale; view.cx = W / 2 + gaze.x * (1 - P * 0.6); view.cy = (H - 24 * (1 - P)) / 2 - P * H * 0.04 + gaze.y * (1 - P * 0.6);
 
     ctx.clearRect(0, 0, W, H);
     ctx.save();
-    ctx.translate(W / 2, (H - 24) / 2);
+    ctx.translate(view.cx, view.cy);
     ctx.scale(scale, scale);
 
-    const hr = R0 * 2 * cur.radius;
+    const hr = R0 * 2.1 * cur.radius;
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, hr);
-    g.addColorStop(0, `rgba(${tint},${0.09 * cur.dim})`);
+    g.addColorStop(0, `rgba(${tint},${(0.09 + flash * 0.25 + P * 0.04) * cur.dim})`);
     g.addColorStop(1, `rgba(${tint},0)`);
     ctx.globalAlpha = 1; ctx.fillStyle = g; ctx.fillRect(-hr, -hr, hr * 2, hr * 2);
     ctx.fillStyle = `rgb(${tint})`;
 
-    const cosR = Math.cos(t * 0.16), sinR = Math.sin(t * 0.16), fov = 460;
-    const rad = cur.radius * (1 + Math.sin(t * 1.1) * 0.015);
+    const spin = 0.16 * (1 + entity.load * 0.6) * (entity.hover ? 1.5 : 1);
+    entity.angle = (entity.angle || 0) + dt * spin;
+    const rotY = entity.angle + gaze.x * 0.012, tilt = gaze.y * 0.01;
+    const cosR = Math.cos(rotY), sinR = Math.sin(rotY), cosT = Math.cos(tilt), sinT = Math.sin(tilt), fov = 460;
+    const breath = entity.night ? 0.7 : 1.1 * (1 + entity.load * 0.8);
+    const rad = cur.radius * (1 + Math.sin(t * breath) * 0.016) * (1 - entity.blink * 0.06) * (1 - entity.absorb * 0.12);
     const oA = cur.oscAmp * 0.75, oF = cur.oscFreq;
-    entity.tokenKick *= Math.exp(-dt * 9);
-    const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse + entity.tokenKick * 0.025;
-    const sY = cur.stretchY, spk = cur.spike, orbMul = 1 + (cur.radius - 1) * 0.5;
-    const mx = mouse.x, my = mouse.y, mAct = mouse.active;
+    const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse + entity.tokenKick * 0.025 + entity.keyKick * 0.02;
+    const sY = cur.stretchY, spk = cur.spike, orbMul = (1 + (cur.radius - 1) * 0.5) * (1 - entity.absorb * 0.25);
+    const mx = mouse.x, my = mouse.y, mAct = mouse.active && P < 0.5;
     const rt = entity.rippleT, rippleOn = rt < 1.6, rippleK = rippleOn ? Math.exp(-rt * 2.2) * 26 : 0, front0 = rt * 1.26;
     const spring = Math.min(1, dt * 4), repel = 160 * dt, RR = 2500;
     const pxSize = 1 / scale;
@@ -650,7 +859,9 @@ function setEntityState(t) { $("emoState").textContent = t; }
         }
       }
       px[i] += (tx - px[i]) * spring; py[i] += (ty - py[i]) * spring; pz[i] += (tz - pz[i]) * spring;
-      const rx = px[i] * cosR - pz[i] * sinR, rz = px[i] * sinR + pz[i] * cosR, sc = fov / (fov + rz);
+      const rx = px[i] * cosR - pz[i] * sinR, rz0 = px[i] * sinR + pz[i] * cosR;
+      const ry = py[i] * cosT - rz0 * sinT, rz = py[i] * sinT + rz0 * cosT;
+      const sc = fov / (fov + rz);
       if (sc <= 0) continue;
       const backFade = rz > 0 ? 1 - Math.min(0.8, rz / 320) : 1;
       let alpha = (sc * 0.9 > 1 ? 1 : sc * 0.9) * 0.85;
@@ -658,8 +869,8 @@ function setEntityState(t) { $("emoState").textContent = t; }
       alpha *= 0.65 + Math.abs(Math.sin(t * 0.9 + phase[i] * 3)) * 0.35;
       const q = (alpha * 32) | 0;
       if (q !== lastQ) { lastQ = q; ctx.globalAlpha = q / 32; }
-      const sz = Math.max(size[i] * sc * pxSize * 1.15, pxSize * 0.8);
-      ctx.fillRect(rx * sc - sz * 0.5, py[i] * sc - sz * 0.5, sz, sz);
+      const sz = Math.max(size[i] * sc * pxSize * (1.15 + P * 0.35), pxSize * 0.8);
+      ctx.fillRect(rx * sc - sz * 0.5, ry * sc - sz * 0.5, sz, sz);
     }
     ctx.restore();
   }
@@ -730,14 +941,80 @@ function inline(t) {
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>")
     .replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, "$1<em>$2</em>")
     .replace(/~~([^~\n]+)~~/g, "<del>$1</del>")
-    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<]*[^\s<.,;:!?)\]'"])/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
   return t.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[+i])}</code>`);
 }
+
+/* coloration syntaxique minimale, en niveaux de gris */
+const KW = new Set(("if else elif for while do return function def class import from export default const let var new " +
+  "try except catch finally raise throw with as in of is not and or async await yield lambda pass break continue " +
+  "switch case public private static void int float str bool true false null none None True False self this fn pub " +
+  "struct impl use match select where insert update delete create table into values echo then fi done").split(" "));
+function highlight(code) {
+  const re = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|--[^\n]*)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\b(\d+(?:\.\d+)?)\b|\b([A-Za-z_]\w*)(?=\s*\()|\b([A-Za-z_]\w*)\b/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const [tok, com, str, num, fn, word] = m;
+    if (com) out += `<span class="tk-c">${esc(com)}</span>`;
+    else if (str) out += `<span class="tk-s">${esc(str)}</span>`;
+    else if (num) out += `<span class="tk-n">${num}</span>`;
+    else if (fn) out += KW.has(fn) ? `<span class="tk-k">${fn}</span>` : `<span class="tk-f">${fn}</span>`;
+    else out += KW.has(word) ? `<span class="tk-k">${word}</span>` : esc(word);
+    last = m.index + tok.length;
+  }
+  return out + esc(code.slice(last));
+}
+
+/* formules : protégées avant le Markdown, rendues ensuite par KaTeX (chargé à la demande) */
+let mathStore = [];
+function protectMath(src) {
+  if (!/\$|\\\(|\\\[/.test(src)) return src;
+  const parts = src.split(/(^\s*```[\s\S]*?^\s*```)/m);
+  return parts.map((seg, i) => i % 2 ? seg : seg
+    .replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]/g, (_, a, b) => { mathStore.push({ tex: a ?? b, block: true }); return `\u0001${mathStore.length - 1}\u0001`; })
+    .replace(/\\\((.+?)\\\)|\$(?!\s)([^$\n]*?[A-Za-z\\^_{}][^$\n]*?)(?<!\s)\$/g, (_, a, b) => { mathStore.push({ tex: a ?? b, block: false }); return `\u0001${mathStore.length - 1}\u0001`; })
+  ).join("");
+}
+function restoreMath(html) {
+  return html.replace(/\u0001(\d+)\u0001/g, (_, i) => {
+    const m = mathStore[+i];
+    return m ? `<span class="math${m.block ? " math-block" : ""}" data-tex="${esc(m.tex)}">${esc(m.tex)}</span>` : "";
+  });
+}
+let katexLoading = null;
+function loadKatex() {
+  if (window.katex) return Promise.resolve();
+  if (katexLoading) return katexLoading;
+  katexLoading = new Promise((res, rej) => {
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css";
+    document.head.appendChild(l);
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js";
+    sc.onload = res; sc.onerror = rej;
+    document.head.appendChild(sc);
+  });
+  return katexLoading;
+}
+function renderMath(el) {
+  const nodes = el.querySelectorAll(".math[data-tex]");
+  if (!nodes.length) return;
+  loadKatex().then(() => nodes.forEach((n) => {
+    try { window.katex.render(n.dataset.tex, n, { displayMode: n.classList.contains("math-block"), throwOnError: false }); n.removeAttribute("data-tex"); } catch {}
+  })).catch(() => {});
+}
+function setMd(el, text) { el.innerHTML = md(text); renderMath(el); }
 const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
 const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
 const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
 
 function md(src) {
+  mathStore = [];
+  return restoreMath(mdRaw(protectMath(src)));
+}
+function mdRaw(src) {
   const lines = src.replace(/\r/g, "").split("\n");
   let out = "", i = 0, para = [];
   const flush = () => { if (para.length) { out += `<p>${para.map(inline).join("<br>")}</p>`; para = []; } };
@@ -750,7 +1027,7 @@ function md(src) {
       i++;
       while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
       i++;
-      out += `<div class="code"><div class="code-h"><span>${esc(m[1] || "code")}</span><button data-copy>${icon("copy")}Copier</button></div><pre><code>${esc(buf.join("\n"))}</code></pre></div>`;
+      out += `<div class="code"><div class="code-h"><span>${esc(m[1] || "code")}</span><button data-copy>${icon("copy")}Copier</button></div><pre><code>${highlight(buf.join("\n"))}</code></pre></div>`;
       continue;
     }
     if (isRow(l) && i + 1 < lines.length && isSep(lines[i + 1])) {
@@ -768,7 +1045,7 @@ function md(src) {
       flush();
       const buf = [];
       while (i < lines.length && /^\s*>/.test(lines[i])) buf.push(lines[i++].replace(/^\s*>\s?/, ""));
-      out += `<blockquote>${md(buf.join("\n"))}</blockquote>`;
+      out += `<blockquote>${mdRaw(buf.join("\n"))}</blockquote>`;
       continue;
     }
     if ((m = l.match(/^\s*([-*+]|\d+[.)])\s+/))) {
@@ -969,6 +1246,10 @@ async function openConversation(id) {
     settings.conversationId = id;
   } catch { history = []; settings.conversationId = null; }
   saveSettings();
+  restoreDraft();
+  const c = conversations.find((x) => x.id === id);
+  if (c?.model && [...modelSel.options].some((o) => o.value === c.model)) modelSel.value = c.model;
+  else modelSel.value = settings.model;
   renderHistory();
   renderConversations(conversations);
   updateTitle();
@@ -980,6 +1261,8 @@ function newConversation() {
   settings.conversationId = null;
   saveSettings();
   history = [];
+  restoreDraft();
+  modelSel.value = settings.model;
   renderHistory();
   renderConversations(conversations);
   updateTitle();
@@ -1024,12 +1307,71 @@ function msgEl(m, idx) {
   const isUser = m.role === "user";
   el.className = "msg " + (m.error ? "err" : isUser ? "user" : "atom");
   el.dataset.idx = idx;
+  const files = m.meta?.attachments;
+  if (isUser && files?.length) {
+    const f = document.createElement("div");
+    f.className = "files";
+    for (const a of files) f.appendChild(fileChip(a));
+    el.appendChild(f);
+  }
   const body = document.createElement("div");
   body.className = "body" + (isUser ? "" : " md");
-  if (isUser || m.error) body.textContent = m.content; else body.innerHTML = md(m.content);
+  if (isUser || m.error) body.textContent = m.content; else setMd(body, m.content);
+  if (isUser && !m.content) body.style.display = "none";
   el.appendChild(body);
+  if (!isUser && m.meta?.used) el.appendChild(usedEl(m.meta.used));
   if (!m.error) el.appendChild(actions(m, idx));
   return el;
+}
+
+function fileChip(a, onRemove) {
+  const c = document.createElement("span");
+  c.className = "file" + (a.loading ? " loading" : "");
+  const size = a.loading ? "lecture…" : a.pages ? `${a.pages} p.` : `${Math.max(1, Math.round((a.chars ?? a.text?.length ?? 0) / 1000))} k car.`;
+  c.innerHTML = `${icon("doc")}<b>${esc(a.name)}</b><small>${size}</small>`;
+  if (onRemove) {
+    const x = document.createElement("button");
+    x.type = "button"; x.title = "Retirer"; x.innerHTML = icon("x");
+    x.onclick = onRemove;
+    c.appendChild(x);
+  }
+  return c;
+}
+
+/* « 2 souvenirs utilisés » : ce qu'Atom a pris en compte pour répondre */
+function usedEl(used) {
+  const facts = used.facts || [], recall = used.recall || [];
+  const d = document.createElement("details");
+  d.className = "used";
+  const parts = [];
+  if (facts.length) parts.push(`${facts.length} souvenir${facts.length > 1 ? "s" : ""}`);
+  if (recall.length) parts.push(`${recall.length} ancienne${recall.length > 1 ? "s" : ""} conversation${recall.length > 1 ? "s" : ""}`);
+  d.innerHTML = `<summary>${icon("memory")}${parts.join(" · ")} utilisé${facts.length + recall.length > 1 ? "s" : ""}</summary><ul></ul>`;
+  const ul = d.querySelector("ul");
+  for (const f of facts) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${esc(f.content)}</span>`;
+    const b = document.createElement("button");
+    b.textContent = "Oublier"; b.title = "Supprimer ce souvenir";
+    b.onclick = async () => {
+      try { await send_(`/api/memories/${f.id}`, "DELETE"); li.style.opacity = ".4"; li.querySelector("span").style.textDecoration = "line-through"; b.remove(); refreshPanel(); }
+      catch { toast("Souvenir déjà supprimé."); }
+    };
+    li.appendChild(b);
+    ul.appendChild(li);
+  }
+  for (const r of recall) {
+    const li = document.createElement("li");
+    li.innerHTML = `<span><small>Conversation passée · </small>${esc(r.text.slice(0, 160))}${r.text.length > 160 ? "…" : ""}</span>`;
+    if (r.conversation_id) {
+      const b = document.createElement("button");
+      b.textContent = "Ouvrir";
+      b.onclick = () => openConversation(r.conversation_id);
+      li.appendChild(b);
+    }
+    ul.appendChild(li);
+  }
+  return d;
 }
 
 function actions(m, idx) {
@@ -1047,9 +1389,32 @@ function actions(m, idx) {
   } else {
     btn("copy", "Copier", (e) => flashCopy(e.currentTarget, m.content));
     if (idx === history.length - 1) btn("refresh", "Régénérer", () => regenerate());
+    if (m.id) {
+      const up = btn("up2", "Bonne réponse", () => vote(m, 1, up, dn, a));
+      const dn = btn("down2", "Mauvaise réponse", () => vote(m, -1, up, dn, a));
+      up.classList.toggle("voted", m.feedback === 1); dn.classList.toggle("voted", m.feedback === -1);
+    }
     if (m.created_at) { const t = document.createElement("time"); t.textContent = fmtTime(m.created_at); a.appendChild(t); }
   }
   return a;
+}
+
+async function vote(m, value, up, dn, bar) {
+  const v = m.feedback === value ? null : value;
+  try { await send_(`/api/messages/${m.id}`, "PATCH", { value: v }); } catch { return; }
+  m.feedback = v;
+  up.classList.toggle("voted", v === 1); dn.classList.toggle("voted", v === -1);
+  bar.parentElement.querySelector(".reason")?.remove();
+  if (v === -1) {
+    const r = document.createElement("div");
+    r.className = "reason";
+    r.innerHTML = '<input class="field" placeholder="Qu\'est-ce qui n\'allait pas ? (facultatif)"><button class="btn">Envoyer</button>';
+    const inp = r.querySelector("input");
+    const go = async () => { if (inp.value.trim()) await send_(`/api/messages/${m.id}`, "PATCH", { value: -1, reason: inp.value.trim() }); r.remove(); toast("Merci, c'est noté."); };
+    r.querySelector("button").onclick = go;
+    inp.onkeydown = (e) => { if (e.key === "Enter") go(); if (e.key === "Escape") r.remove(); };
+    bar.after(r); inp.focus();
+  } else if (v === 1) toast("Merci !");
 }
 
 function flashCopy(btn, text) {
@@ -1131,7 +1496,7 @@ let busy = false, controller = null, idleTimer = 0, sleepTimer = 0, lastSpeed = 
 function autoGrow() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 220) + "px";
-  sendBtn.disabled = !busy && !input.value.trim();
+  sendBtn.disabled = !busy && !input.value.trim() && !pending.length;
 }
 function setBusy(b) {
   busy = b;
@@ -1140,7 +1505,7 @@ function setBusy(b) {
   sendBtn.title = b ? "Arrêter" : "Envoyer";
   autoGrow();
 }
-input.addEventListener("input", autoGrow);
+input.addEventListener("input", () => { autoGrow(); saveDraft(); entity.typingAt = performance.now(); entity.keyKick = 1; });
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!busy) form.requestSubmit(); }
   if (e.key === "ArrowUp" && !input.value && !busy) {
@@ -1152,13 +1517,19 @@ form.addEventListener("submit", (e) => {
   e.preventDefault();
   if (busy) { controller?.abort(); return; }
   const text = input.value.trim();
-  if (text) { input.value = ""; autoGrow(); sendMessage(text); }
+  if (pending.some((f) => f.loading)) { toast("Lecture du fichier en cours…"); return; }
+  if (text || pending.length) {
+    const files = pending.slice();
+    pending = []; renderTray();
+    input.value = ""; clearDraft(); autoGrow();
+    sendMessage(text, files);
+  }
 });
 
 function scheduleRest() {
   clearTimeout(idleTimer); clearTimeout(sleepTimer);
   idleTimer = setTimeout(() => { if (!busy) { setEmotion("idle"); setEntityState("en attente"); } }, 9000);
-  sleepTimer = setTimeout(() => { if (!busy) { setEmotion("sleep"); setEntityState("au repos"); } }, 180000);
+  sleepTimer = setTimeout(() => { if (!busy) { setEmotion("sleep"); setEntityState("au repos"); } }, entity.night ? 60000 : 180000);
 }
 
 async function syncIds() {
@@ -1173,13 +1544,14 @@ async function syncIds() {
   } catch {}
 }
 
-async function sendMessage(text) {
+async function sendMessage(text, files = []) {
   if (busy) return;
+  if (!text && !files.length) return;
   $("empty")?.remove();
   setBusy(true);
   clearTimeout(idleTimer); clearTimeout(sleepTimer);
 
-  const userMsg = { role: "user", content: text };
+  const userMsg = { role: "user", content: text, meta: files.length ? { attachments: files.map((f) => ({ name: f.name, chars: f.text.length, pages: f.pages })) } : {} };
   history.push(userMsg);
   chat.appendChild(msgEl(userMsg, history.length - 1));
   markLast();
@@ -1194,7 +1566,7 @@ async function sendMessage(text) {
   scroller.scrollTop = scroller.scrollHeight;
   const body = el.querySelector(".body");
 
-  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0;
+  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0, used = null, asstId = null;
   const render = () => {
     queued = false;
     const stick = atBottom();
@@ -1206,7 +1578,7 @@ async function sendMessage(text) {
     if (finished) return;
     finished = true;
     const content = reply.trim() + (stopped && reply.trim() ? " …" : "");
-    history.push({ role: "assistant", content: content || "…", emotion });
+    history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: used ? { used } : {} });
     el.replaceWith(msgEl(history[history.length - 1], history.length - 1));
     markLast();
     if (tokens > 3 && t0) { lastSpeed = tokens / ((performance.now() - t0) / 1000); $("speedV").textContent = lastSpeed.toFixed(1) + " tok/s"; }
@@ -1215,7 +1587,9 @@ async function sendMessage(text) {
     setBusy(false);
     scheduleRest();
     loadConversations();
-    syncIds();
+    if (stopped) syncIds();
+    presenceSay(content);
+    setTimeout(refreshMood, 500);
     input.focus();
   };
 
@@ -1225,8 +1599,9 @@ async function sendMessage(text) {
       method: "POST",
       signal: controller.signal,
       body: JSON.stringify({
-        message: text, conversation_id: settings.conversationId, model: settings.model || null,
+        message: text, conversation_id: settings.conversationId, model: modelSel.value || settings.model || null,
         persona: settings.persona, auto_memory: settings.autoMemory,
+        attachments: files.map((f) => ({ name: f.name, text: f.text })),
       }),
     });
     const reader = r.body.getReader();
@@ -1244,6 +1619,10 @@ async function sendMessage(text) {
         const ev = JSON.parse(line);
         if (ev.type === "meta") {
           if (settings.conversationId !== ev.conversation_id) { settings.conversationId = ev.conversation_id; saveSettings(); loadConversations(); }
+        } else if (ev.type === "ids") {
+          userMsg.id = ev.user_id; userMsg.created_at = Date.now() / 1000;
+        } else if (ev.type === "context") {
+          used = ev.used;
         } else if (ev.type === "emotion") {
           emotion = ev.emotion; setEmotion(emotion); setEntityState("répond…");
         } else if (ev.type === "token") {
@@ -1258,10 +1637,11 @@ async function sendMessage(text) {
           else toast(`<b>Rappel non programmé</b> · ${esc(ev.message)}`);
           refreshPanel();
         } else if (ev.type === "done") {
-          emotion = ev.emotion; finish();
+          emotion = ev.emotion; asstId = ev.id; finish();
         } else if (ev.type === "memory") {
           const list = ev.added.map((m) => esc(m.content.replace(/^L'utilisateur\s+/i, ""))).join(" · ");
           toast(`<b>Retenu</b> · ${list}`);
+          entity.absorb = 1;
           refreshPanel();
           if ($("settings").classList.contains("open")) loadMemories();
         } else if (ev.type === "error") {
@@ -1305,6 +1685,7 @@ document.addEventListener("keydown", (e) => {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); newConversation(); }
   else if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); if (narrow()) app.classList.add("side-open"); else if (!settings.side) { settings.side = true; applyLayout(); } $("search").focus(); }
+  else if (e.key === "Escape" && presenceOn) { exitPresence(); }
   else if (e.key === "Escape") { closeSettings(); app.classList.remove("side-open", "panel-open"); applyLayout(); }
 });
 
@@ -1315,6 +1696,7 @@ async function refreshSystem() {
   if (!panelVisible()) return;
   try {
     const s = await getJSON("/api/system");
+    if (s.cpu != null) entity.load = Math.max(0, Math.min(1, (s.cpu - 10) / 80));
     if (s.cpu != null) { $("cpuV").textContent = `${Math.round(s.cpu)} %${s.cores ? ` · ${s.cores} cœurs` : ""}`; $("cpuB").style.width = Math.min(100, s.cpu) + "%"; }
     if (s.memory) { $("ramV").textContent = `${fmtBytes(s.memory.used)} / ${fmtBytes(s.memory.total)}`; $("ramB").style.width = (100 * s.memory.used / s.memory.total) + "%"; }
     $("loadedV").textContent = s.loaded.length ? s.loaded.map((m) => m.name.split(":")[0] + (m.size ? ` · ${fmtBytes(m.size)}` : "")).join(", ") : "aucun (en veille)";
@@ -1463,7 +1845,8 @@ async function connect(verbose = false) {
       if (!m.models.length) modelSel.add(new Option("Aucun modèle", ""));
       for (const n of m.models) modelSel.add(new Option(n, n));
       if (!m.models.includes(settings.model)) { settings.model = m.models.includes(m.default) ? m.default : (m.models[0] || ""); saveSettings(); }
-      modelSel.value = settings.model || prev;
+      const c = currentConv();
+      modelSel.value = (c?.model && m.models.includes(c.model)) ? c.model : (settings.model || prev);
     }
   } catch {
     info = "Serveur injoignable"; err = true;
@@ -1472,10 +1855,259 @@ async function connect(verbose = false) {
   if (!modelSel.options.length) modelSel.add(new Option(settings.model || "Hors ligne", settings.model));
   online = ok;
   $("dot").className = "dot" + (ok ? " on" : err ? " err" : "");
-  $("statusText").textContent = info + (ok && settings.model ? ` · ${settings.model.split(":")[0]}` : "");
+  $("statusText").textContent = info;
   if (verbose) toast(esc($("srvInfo").textContent));
 }
-modelSel.onchange = () => { settings.model = modelSel.value; saveSettings(); connect(); };
+modelSel.onchange = () => {
+  settings.model = modelSel.value; saveSettings();
+  const c = currentConv();
+  toast(c ? `Modèle de cette conversation : <b>${esc(modelSel.value)}</b>` : `Modèle : <b>${esc(modelSel.value)}</b>`);
+};
+
+/* ============================================================
+   FICHIERS JOINTS (glisser-déposer, coller, bouton trombone)
+   ============================================================ */
+let pending = [];   // [{name, text, pages, loading}]
+function renderTray() {
+  const tray = $("tray");
+  tray.innerHTML = "";
+  pending.forEach((f, i) => tray.appendChild(fileChip(f, () => { pending.splice(i, 1); renderTray(); })));
+  autoGrow();
+}
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(",")[1] || "");
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+async function addFiles(list) {
+  for (const file of list) {
+    if (pending.length >= 5) { toast("5 fichiers maximum par message."); break; }
+    if (file.size > 15 * 1024 * 1024) { toast(`<b>${esc(file.name)}</b> · trop gros (15 Mo max).`); continue; }
+    const item = { name: file.name, text: "", loading: true };
+    pending.push(item); renderTray();
+    try {
+      const r = await (await api("/api/extract", { method: "POST", body: JSON.stringify({ name: file.name, data: await toBase64(file) }) })).json();
+      Object.assign(item, { text: r.text, pages: r.pages, loading: false });
+      if (r.text.length > 12000) toast(`<b>${esc(file.name)}</b> · long fichier : seuls les 12 000 premiers caractères seront lus.`);
+    } catch (e) {
+      pending.splice(pending.indexOf(item), 1);
+      toast(`<b>${esc(file.name)}</b> · ${esc(e.message)}`);
+    }
+    renderTray();
+  }
+  input.focus();
+}
+$("attach").onclick = () => $("fileIn").click();
+$("fileIn").onchange = (e) => { addFiles([...e.target.files]); e.target.value = ""; };
+let dragDepth = 0;
+addEventListener("dragenter", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { dragDepth++; $("drop").classList.add("on"); } });
+addEventListener("dragleave", () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) $("drop").classList.remove("on"); });
+addEventListener("dragover", (e) => e.preventDefault());
+addEventListener("drop", (e) => {
+  e.preventDefault(); dragDepth = 0; $("drop").classList.remove("on");
+  if (e.dataTransfer?.files?.length) addFiles([...e.dataTransfer.files]);
+});
+input.addEventListener("paste", (e) => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+
+/* ============================================================
+   BROUILLONS (un par conversation)
+   ============================================================ */
+const draftKey = () => "draft." + (settings.conversationId || "new");
+let draftTimer = 0;
+function saveDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(() => {
+    try { input.value ? localStorage.setItem("atom." + draftKey(), input.value) : localStorage.removeItem("atom." + draftKey()); } catch {}
+  }, 250);
+}
+function clearDraft() { clearTimeout(draftTimer); try { localStorage.removeItem("atom." + draftKey()); } catch {} }
+function restoreDraft() {
+  let v = "";
+  try { v = localStorage.getItem("atom." + draftKey()) || ""; } catch {}
+  input.value = v; autoGrow();
+}
+
+/* ============================================================
+   APPARENCE (densité, largeur)
+   ============================================================ */
+function applyLook() {
+  document.body.classList.toggle("compact", settings.density === "compact");
+  document.body.classList.toggle("wide", settings.width === "wide");
+  document.body.classList.toggle("narrow", settings.width === "narrow");
+}
+function choiceRow(id, key, options) {
+  const row = $(id);
+  row.innerHTML = "";
+  for (const [val, label] of options) {
+    const b = document.createElement("button");
+    b.className = "btn" + ((settings[key] || options[0][0]) === val ? " primary" : "");
+    b.textContent = label;
+    b.onclick = () => { settings[key] = val; saveSettings(); applyLook(); choiceRow(id, key, options); };
+    row.appendChild(b);
+  }
+}
+choiceRow("densityRow", "density", [["comfort", "Confortable"], ["compact", "Compacte"]]);
+choiceRow("widthRow", "width", [["normal", "Normale"], ["narrow", "Étroite"], ["wide", "Large"]]);
+
+/* ============================================================
+   HUMEUR (courbe des dernières 24 h) et rythme jour / nuit
+   ============================================================ */
+const VALENCE = { joy: 1, surprise: 0.35, talking: 0.15, idle: 0.1, thinking: 0, sleep: -0.05, fear: -0.6, angry: -0.8, sad: -1 };
+async function refreshMood() {
+  let data;
+  try { data = await getJSON("/api/mood?hours=24"); } catch { return; }
+  const now = data.now, evs = data.events;
+  // Valeur courante : moyenne pondérée, les émotions récentes comptent plus (demi-vie 3 h).
+  let w = 0, v = 0;
+  for (const e of evs) { const k = Math.pow(0.5, (now - e.created_at) / 10800); w += k; v += k * (VALENCE[e.emotion] ?? 0); }
+  entity.mood = w ? v / w * Math.min(1, w) : 0;
+  $("moodWord").textContent = entity.mood > 0.35 ? "joyeuse" : entity.mood > 0.1 ? "sereine" : entity.mood < -0.35 ? "morose" : entity.mood < -0.1 ? "pensive" : "neutre";
+  // Courbe : 48 points de 30 min, lissée.
+  const cv = $("moodCv"), r = cv.getBoundingClientRect();
+  if (r.width < 10) return;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  const c = cv.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = 48, pts = [];
+  let val = 0;
+  for (let i = 0; i < n; i++) {
+    const t1 = now - 86400 + (i + 1) * 1800;
+    let ww = 0, vv = 0;
+    for (const e of evs) { if (e.created_at > t1) break; const k = Math.pow(0.5, (t1 - e.created_at) / 10800); ww += k; vv += k * (VALENCE[e.emotion] ?? 0); }
+    val = ww ? vv / ww * Math.min(1, ww) : 0;
+    pts.push(val);
+  }
+  const W = r.width, H = r.height, mid = H / 2;
+  c.clearRect(0, 0, W, H);
+  c.strokeStyle = "#2e2e2e"; c.lineWidth = 1; c.setLineDash([2, 3]);
+  c.beginPath(); c.moveTo(0, mid); c.lineTo(W, mid); c.stroke(); c.setLineDash([]);
+  const grad = c.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, "rgba(220,220,220,.15)"); grad.addColorStop(1, "rgba(235,235,235,.95)");
+  c.strokeStyle = grad; c.lineWidth = 1.5; c.lineJoin = "round";
+  c.beginPath();
+  pts.forEach((p, i) => { const x = (i / (n - 1)) * W, y = mid - p * (H / 2 - 4); i ? c.lineTo(x, y) : c.moveTo(x, y); });
+  c.stroke();
+  const lx = W, ly = mid - pts[n - 1] * (H / 2 - 4);
+  c.fillStyle = "#eaeaea"; c.beginPath(); c.arc(lx - 2, ly, 2.5, 0, Math.PI * 2); c.fill();
+}
+function checkNight() {
+  const h = new Date().getHours();
+  entity.night = h >= 23 || h < 6;
+}
+
+/* ============================================================
+   MODE PRÉSENCE — la sphère quitte son panneau et occupe l'écran
+   ============================================================ */
+const stageEl = $("stage");
+let presenceOn = false, presenceAnimating = false, placeholder = null, wakeLock = null, clockTimer = 0, flyFrom = null;
+
+function rectOf(el) { const r = el.getBoundingClientRect(); return { top: r.top, left: r.left, width: r.width, height: r.height }; }
+function place(el, r) { Object.assign(el.style, { top: r.top + "px", left: r.left + "px", width: r.width + "px", height: r.height + "px" }); }
+
+function tickClock() {
+  const d = new Date();
+  $("pClock").textContent = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  $("pDate").textContent = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  $("pEmoBig").textContent = ACTIVITIES[entity.activity].label.toLowerCase() + " · " + $("moodWord").textContent;
+}
+function presenceSay(text, label = "Atom") {
+  if (!text) return;
+  const plain = text.replace(/```[\s\S]*?```/g, "[code]").replace(/[#*_`>|]/g, "").replace(/\s+/g, " ").trim();
+  $("pSay").innerHTML = `<small>${esc(label)}</small>${esc(plain.length > 220 ? plain.slice(0, 217) + "…" : plain)}`;
+}
+
+async function enterPresence() {
+  if (presenceOn || presenceAnimating) return;
+  presenceAnimating = true;
+  const panelShown = panelVisible() && stageEl.getBoundingClientRect().width > 10;
+  // Point de départ : la sphère dans le panneau, ou le bouton si le panneau est fermé.
+  flyFrom = panelShown ? rectOf(stageEl) : (() => { const b = rectOf($("presenceBtn")); return { top: b.top - 40, left: b.left - 40, width: b.width + 80, height: b.height + 80 }; })();
+  placeholder = document.createElement("div");
+  placeholder.style.height = stageEl.offsetHeight + "px";
+  placeholder.style.flex = "none";
+  stageEl.after(placeholder);
+  document.body.appendChild(stageEl);
+  stageEl.classList.add("flying");
+  stageEl.style.transition = "none";
+  place(stageEl, flyFrom);
+  stageEl.getBoundingClientRect();
+  document.body.classList.add("presence");
+  stageEl.style.transition = "top .75s cubic-bezier(.2,.8,.2,1), left .75s cubic-bezier(.2,.8,.2,1), width .75s cubic-bezier(.2,.8,.2,1), height .75s cubic-bezier(.2,.8,.2,1), background .75s";
+  requestAnimationFrame(() => {
+    stageEl.classList.add("full");
+    place(stageEl, { top: 0, left: 0, width: innerWidth, height: innerHeight });
+    entity.presenceTarget = 1;
+    entity.rippleT = 0;
+  });
+  setTimeout(() => {
+    document.body.classList.add("presence-ui");
+    presenceOn = true; presenceAnimating = false;
+    stageEl.style.transition = "none";
+    Object.assign(stageEl.style, { top: "0", left: "0", width: "100vw", height: "100vh" });
+  }, 780);
+  tickClock(); clockTimer = setInterval(tickClock, 10000);
+  try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+  try { await document.documentElement.requestFullscreen?.({ navigationUI: "hide" }); } catch {}
+}
+
+function exitPresence() {
+  if (!presenceOn || presenceAnimating) return;
+  presenceAnimating = true;
+  document.body.classList.remove("presence-ui");
+  clearInterval(clockTimer);
+  try { wakeLock?.release(); } catch {}
+  wakeLock = null;
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  setTimeout(() => {
+    const panelShown = panelVisible() && placeholder && placeholder.getBoundingClientRect().width > 10;
+    const target = panelShown ? rectOf(placeholder) : (() => { const b = rectOf($("presenceBtn")); return { top: b.top - 40, left: b.left - 40, width: b.width + 80, height: b.height + 80 }; })();
+    place(stageEl, { top: 0, left: 0, width: innerWidth, height: innerHeight });
+    stageEl.getBoundingClientRect();
+    stageEl.style.transition = "top .7s cubic-bezier(.5,0,.2,1), left .7s cubic-bezier(.5,0,.2,1), width .7s cubic-bezier(.5,0,.2,1), height .7s cubic-bezier(.5,0,.2,1), background .7s, opacity .7s";
+    stageEl.classList.remove("full");
+    place(stageEl, target);
+    entity.presenceTarget = 0;
+    entity.rippleT = 0;
+    if (!panelShown) stageEl.style.opacity = "0";
+    document.body.classList.remove("presence");
+    setTimeout(() => {
+      stageEl.classList.remove("flying");
+      stageEl.removeAttribute("style");
+      placeholder.replaceWith(stageEl);
+      placeholder = null;
+      presenceOn = false; presenceAnimating = false;
+      entity.presence = 0;
+    }, 720);
+  }, 180);
+}
+stageEl.addEventListener("click", (e) => {
+  if (e.target.closest("button")) return;
+  presenceOn ? exitPresence() : enterPresence();
+});
+$("presenceBtn").onclick = enterPresence;
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && presenceOn) exitPresence(); });
+
+/* ============================================================
+   APPLICATION INSTALLABLE (PWA)
+   ============================================================ */
+let installEvt = null;
+if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("installBtn").style.display = ""; });
+$("installBtn").onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("installBtn").style.display = "none"; };
+(function installHint() {
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+  $("installInfo").textContent = standalone ? "Atom est installé sur cet appareil."
+    : !isSecureContext ? "L'installation demande une connexion HTTPS. Avec Tailscale (voir le README), ouvre Atom via son adresse https://…ts.net : le bouton d'installation apparaîtra ici."
+    : /iphone|ipad/i.test(navigator.userAgent) ? "Sur iPhone : bouton Partager → « Sur l'écran d'accueil »."
+    : "Utilise le bouton ci-dessous, ou le menu du navigateur → « Installer l'application ».";
+})();
 
 /* ============================================================
    DÉMARRAGE
@@ -1487,11 +2119,16 @@ setBusy(false);
   if (fromLink) { settings.conversationId = fromLink; window.history.replaceState(null, "", "/"); }
   await loadConversations();
   if (settings.conversationId) await openConversation(settings.conversationId);
-  else renderHistory();
+  else { renderHistory(); restoreDraft(); }
 })();
 connect();
+applyLook();
+checkNight();
+setInterval(checkNight, 60000);
 refreshPanel();
 refreshSystem();
+refreshMood();
+setInterval(refreshMood, 120000);
 setInterval(refreshSystem, 4000);
 setInterval(refreshPanel, 30000);
 setInterval(async () => {
@@ -1504,6 +2141,7 @@ setInterval(async () => {
       const last = msgs[msgs.length - 1];
       history = msgs; renderHistory();
       if (last.emotion) { setEmotion(last.emotion); scheduleRest(); }
+      if (last.role === "assistant") presenceSay(last.content, "Nouveau message");
     }
   } catch {}
 }, 15000);

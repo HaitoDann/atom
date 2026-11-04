@@ -12,7 +12,7 @@ from typing import AsyncIterator
 import httpx
 
 from . import db, llm, memory, reminders
-from .config import CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
+from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
 _background: set[asyncio.Task] = set()
@@ -45,6 +45,18 @@ def make_title(text: str) -> str:
     return t if len(t) <= 48 else t[:46].rstrip() + "…"
 
 
+def with_attachments(text: str, attachments: list[dict] | None) -> str:
+    """Contenu envoyé au modèle : le message, précédé des fichiers joints."""
+    if not attachments:
+        return text
+    parts = []
+    for a in attachments:
+        body = (a.get("text") or "")[:ATTACH_MAX_CHARS]
+        cut = " (tronqué)" if len(a.get("text") or "") > ATTACH_MAX_CHARS else ""
+        parts.append(f"[Fichier joint : {a.get('name', 'fichier')}{cut}]\n```\n{body}\n```")
+    return "\n\n".join(parts) + "\n\n" + (text or "Que peux-tu me dire de ce fichier ?")
+
+
 async def chat_events(
     message: str,
     conversation_id: int | None,
@@ -52,20 +64,31 @@ async def chat_events(
     persona: str,
     auto_memory: bool,
     title_prefix: str = "",
+    attachments: list[dict] | None = None,
 ) -> AsyncIterator[dict]:
-    """Événements : meta, emotion, token…, reminder…, done, memory — ou error."""
+    """Événements : meta, context, emotion, token…, reminder…, done, memory — ou error."""
+    title_src = message or (attachments[0]["name"] if attachments else "Fichier")
     if conversation_id is None or not db.conversation_exists(conversation_id):
-        conversation_id = db.create_conversation(title_prefix + make_title(message))
+        conversation_id = db.create_conversation(title_prefix + make_title(title_src))
     elif not db.messages(conversation_id, 1):
-        db.rename_conversation(conversation_id, title_prefix + make_title(message))
+        db.rename_conversation(conversation_id, title_prefix + make_title(title_src))
+    db.set_conversation_model(conversation_id, model)
     yield dict(type="meta", conversation_id=conversation_id)
 
     history = db.messages(conversation_id, CONTEXT_TURNS * 2)
-    mem_block = await memory.context_for(message, conversation_id)
+    mem_block, used = await memory.context_for(message or title_src, conversation_id)
+    if used["facts"] or used["recall"]:
+        yield dict(type="context", used=used)
     msgs = [{"role": "system", "content": system_prompt(persona, mem_block)}]
-    msgs += [{"role": m["role"], "content": m["content"]} for m in history]
-    msgs.append({"role": "user", "content": message})
-    db.add_message(conversation_id, "user", message)
+    msgs += [
+        {"role": m["role"], "content": with_attachments(m["content"], m["meta"].get("attachments"))}
+        for m in history
+    ]
+    msgs.append({"role": "user", "content": with_attachments(message, attachments)})
+    user_meta = {"attachments": attachments} if attachments else None
+    user_id = db.add_message(conversation_id, "user", message, meta=user_meta)
+    yield dict(type="ids", user_id=user_id)
+    asst_meta = {"used": used} if (used["facts"] or used["recall"]) else None
 
     emotion: str | None = None
     saved = False
@@ -109,13 +132,13 @@ async def chat_events(
         for cmd, arg in cmds.commands:
             yield reminders.execute(cmd, arg, conversation_id)
         text = text.strip() or "…"
-        db.add_message(conversation_id, "assistant", text, emotion)
+        asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
-        yield dict(type="done", emotion=emotion)
+        yield dict(type="done", emotion=emotion, id=asst_id)
     except GeneratorExit:
         # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
         if not saved and text.strip():
-            db.add_message(conversation_id, "assistant", text.strip() + " …", emotion or "talking")
+            db.add_message(conversation_id, "assistant", text.strip() + " …", emotion or "talking", meta=asst_meta)
         raise
     except Exception as e:  # noqa: BLE001 — on renvoie l'erreur à l'interface
         msg = str(e) or e.__class__.__name__

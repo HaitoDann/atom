@@ -42,3 +42,8 @@ TELEGRAM_TOKEN = os.getenv("ATOM_TELEGRAM_TOKEN", "")
 TELEGRAM_ALLOWED = {
     int(x) for x in os.getenv("ATOM_TELEGRAM_ALLOWED", "").replace(" ", "").split(",") if x.isdigit()
 }
+
+# Fenêtre de contexte du modèle (tokens). 8192 laisse la place aux fichiers joints.
+NUM_CTX = int(os.getenv("ATOM_NUM_CTX", "8192"))
+# Taille max d'un fichier joint injecté dans le prompt (caractères)
+ATTACH_MAX_CHARS = int(os.getenv("ATOM_ATTACH_MAX_CHARS", "12000"))

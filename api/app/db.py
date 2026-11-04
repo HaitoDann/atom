@@ -6,6 +6,7 @@ Les embeddings sont stockés en BLOB float32 et comparés en mémoire (numpy).
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from contextlib import closing, contextmanager
@@ -85,8 +86,15 @@ def init() -> None:
                     ("Première conversation", now, now),
                 ).lastrowid
                 c.execute("UPDATE messages SET conversation_id = ?", (cid,))
-        if "pinned" not in _columns(c, "conversations"):
+        conv_cols = _columns(c, "conversations")
+        if "pinned" not in conv_cols:
             c.execute("ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+        if "model" not in conv_cols:
+            c.execute("ALTER TABLE conversations ADD COLUMN model TEXT")
+        msg_cols = _columns(c, "messages")
+        for col, ddl in [("meta", "TEXT"), ("feedback", "INTEGER"), ("feedback_reason", "TEXT")]:
+            if col not in msg_cols:
+                c.execute(f"ALTER TABLE messages ADD COLUMN {col} {ddl}")
         mem_cols = _columns(c, "memories")
         for col, ddl in [
             ("source", "TEXT NOT NULL DEFAULT 'manuel'"),
@@ -113,7 +121,7 @@ def create_conversation(title: str = "Nouvelle conversation") -> int:
 def list_conversations() -> list[dict]:
     with conn() as c:
         rows = c.execute(
-            "SELECT id, title, pinned, updated_at FROM conversations ORDER BY updated_at DESC"
+            "SELECT id, title, pinned, model, updated_at FROM conversations ORDER BY updated_at DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -171,25 +179,55 @@ def delete_conversation(cid: int) -> None:
 # ---------------------------------------------------------------- messages
 
 
-def add_message(cid: int, role: str, content: str, emotion: str | None = None) -> None:
+def add_message(
+    cid: int, role: str, content: str, emotion: str | None = None, meta: dict | None = None
+) -> int:
     now = time.time()
     with conn() as c:
-        c.execute(
-            "INSERT INTO messages (conversation_id, role, content, emotion, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (cid, role, content, emotion, now),
-        )
+        mid = c.execute(
+            "INSERT INTO messages (conversation_id, role, content, emotion, created_at, meta) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (cid, role, content, emotion, now, json.dumps(meta, ensure_ascii=False) if meta else None),
+        ).lastrowid
         c.execute("UPDATE conversations SET updated_at = ? WHERE id = ?", (now, cid))
+    return mid
+
+
+def set_feedback(mid: int, value: int | None, reason: str | None) -> bool:
+    with conn() as c:
+        return c.execute(
+            "UPDATE messages SET feedback = ?, feedback_reason = ? WHERE id = ?", (value, reason, mid)
+        ).rowcount > 0
+
+
+def set_conversation_model(cid: int, model: str) -> None:
+    with conn() as c:
+        c.execute("UPDATE conversations SET model = ? WHERE id = ?", (model, cid))
+
+
+def emotions_since(ts: float) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            "SELECT emotion, created_at FROM messages WHERE role = 'assistant' AND emotion IS NOT NULL "
+            "AND created_at >= ? ORDER BY created_at",
+            (ts,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def messages(cid: int, limit: int) -> list[dict]:
     with conn() as c:
         rows = c.execute(
-            "SELECT id, role, content, emotion, created_at FROM messages WHERE conversation_id = ? "
-            "ORDER BY id DESC LIMIT ?",
+            "SELECT id, role, content, emotion, created_at, meta, feedback FROM messages "
+            "WHERE conversation_id = ? ORDER BY id DESC LIMIT ?",
             (cid, limit),
         ).fetchall()
-    return [dict(r) for r in reversed(rows)]
+    out = []
+    for r in reversed(rows):
+        d = dict(r)
+        d["meta"] = json.loads(d["meta"]) if d["meta"] else {}
+        out.append(d)
+    return out
 
 
 # ---------------------------------------------------------------- souvenirs

@@ -59,21 +59,23 @@ def _top(query: np.ndarray, items: list[dict], k: int, min_score: float) -> list
     return [s for s in scored[:k] if s[0] >= min_score]
 
 
-async def context_for(message: str, conversation_id: int) -> str:
-    """Bloc de mémoire à ajouter au prompt système pour ce message."""
+async def context_for(message: str, conversation_id: int) -> tuple[str, dict]:
+    """Bloc de mémoire pour le prompt système, et ce qui a été utilisé (affiché à l'utilisateur)."""
+    used: dict = {"facts": [], "recall": []}
     facts = db.list_memories()
     recall = db.list_recall()
     if not facts and not recall:
-        return ""
+        return "", used
 
     q = await llm.embed([message], kind="query")
     parts: list[str] = []
     if q is None:
         # Pas d'embeddings : on donne les faits les plus récents.
-        chosen = [f["content"] for f in facts[-FACTS_IN_PROMPT * 2:]]
+        chosen = facts[-FACTS_IN_PROMPT * 2:]
         if chosen:
-            parts.append("Ce que tu sais de l'utilisateur :\n" + "\n".join(f"- {c}" for c in chosen))
-        return "\n\n".join(parts)
+            parts.append("Ce que tu sais de l'utilisateur :\n" + "\n".join(f"- {c['content']}" for c in chosen))
+            used["facts"] = [{"id": f["id"], "content": f["content"]} for f in chosen]
+        return "\n\n".join(parts), used
 
     qv = q[0]
     await _backfill(facts)
@@ -89,6 +91,7 @@ async def context_for(message: str, conversation_id: int) -> str:
             "Ce que tu sais de l'utilisateur (utilise-le naturellement, sans le réciter) :\n"
             + "\n".join(f"- {f['content']}" for f in best)
         )
+        used["facts"] = [{"id": f["id"], "content": f["content"]} for f in best]
 
     others = [r for r in recall if r["conversation_id"] != conversation_id]
     hits = _top(qv, others, RECALL_IN_PROMPT, RECALL_MIN_SCORE)
@@ -97,7 +100,8 @@ async def context_for(message: str, conversation_id: int) -> str:
             "Extraits d'anciennes conversations qui pourraient être utiles :\n"
             + "\n".join(f"- {h['text'][:500]}" for _, h in hits)
         )
-    return "\n\n".join(parts)
+        used["recall"] = [{"conversation_id": h["conversation_id"], "text": h["text"][:300]} for _, h in hits]
+    return "\n\n".join(parts), used
 
 
 async def _backfill(facts: list[dict]) -> None:

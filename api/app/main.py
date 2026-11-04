@@ -9,7 +9,10 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import io
 import json
+import time
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -17,6 +20,7 @@ from typing import AsyncIterator
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import agent, db, llm, memory, notify, reminders, system, telegram
@@ -50,8 +54,14 @@ db.init()
 app = FastAPI(title="Atom", lifespan=lifespan)
 
 
+class Attachment(BaseModel):
+    name: str = Field(max_length=200)
+    text: str = Field(max_length=200_000)
+
+
 class ChatIn(BaseModel):
-    message: str = Field(min_length=1, max_length=8000)
+    message: str = Field(default="", max_length=8000)
+    attachments: list[Attachment] = Field(default_factory=list, max_length=5)
     conversation_id: int | None = None
     model: str | None = None
     persona: str | None = None
@@ -108,6 +118,8 @@ async def models():
 
 @app.post("/api/chat")
 async def chat(body: ChatIn):
+    if not body.message.strip() and not body.attachments:
+        raise HTTPException(422, "Message vide")
     # Mémorisés pour que Telegram parle avec la même personnalité et le même modèle.
     if body.persona:
         db.kv_set("persona", body.persona)
@@ -120,9 +132,82 @@ async def chat(body: ChatIn):
             body.model or DEFAULT_MODEL,
             body.persona or DEFAULT_PERSONA,
             body.auto_memory,
+            "",
+            [a.model_dump() for a in body.attachments] or None,
         ),
         media_type="application/x-ndjson",
     )
+
+
+# ---- fichiers joints
+
+
+class ExtractIn(BaseModel):
+    name: str = Field(max_length=200)
+    data: str  # base64
+
+
+TEXT_EXT = {"txt", "md", "markdown", "csv", "tsv", "json", "yaml", "yml", "toml", "ini", "cfg", "conf",
+            "log", "xml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "py", "sh", "bash", "sql",
+            "c", "h", "cpp", "hpp", "rs", "go", "java", "kt", "rb", "php", "lua", "env", "dockerfile"}
+
+
+@app.post("/api/extract")
+def extract(body: ExtractIn):
+    """Renvoie le texte d'un fichier (texte brut, code, PDF)."""
+    try:
+        raw = base64.b64decode(body.data, validate=False)
+    except ValueError as e:
+        raise HTTPException(400, "Fichier illisible") from e
+    if len(raw) > 15 * 1024 * 1024:
+        raise HTTPException(413, "Fichier trop gros (15 Mo max)")
+    ext = body.name.rsplit(".", 1)[-1].lower() if "." in body.name else body.name.lower()
+    if ext == "pdf" or raw[:5] == b"%PDF-":
+        try:
+            from pypdf import PdfReader
+
+            reader = PdfReader(io.BytesIO(raw))
+            pages = [p.extract_text() or "" for p in reader.pages[:200]]
+            text = "\n\n".join(f"--- page {i + 1} ---\n{t.strip()}" for i, t in enumerate(pages) if t.strip())
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(400, f"PDF illisible : {e}") from e
+        if not text.strip():
+            raise HTTPException(400, "Ce PDF ne contient pas de texte (document scanné ?).")
+        return {"name": body.name, "text": text[:200_000], "pages": len(reader.pages)}
+    if ext in {"png", "jpg", "jpeg", "gif", "webp", "heic", "bmp"}:
+        raise HTTPException(415, "Les images ne sont pas encore lues : le modèle actuel ne voit pas.")
+    for enc in ("utf-8", "utf-16", "latin-1"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if "\x00" in text[:2000]:
+        raise HTTPException(415, "Format non pris en charge (fichier binaire).")
+    return {"name": body.name, "text": text[:200_000]}
+
+
+# ---- avis sur les réponses
+
+
+class FeedbackIn(BaseModel):
+    value: int | None = Field(default=None, ge=-1, le=1)  # 1 = 👍, -1 = 👎, None = retirer
+    reason: str | None = Field(default=None, max_length=500)
+
+
+@app.patch("/api/messages/{mid}")
+def feedback(mid: int, body: FeedbackIn):
+    if not db.set_feedback(mid, body.value, body.reason):
+        raise HTTPException(404, "Message introuvable")
+    return {"ok": True}
+
+
+# ---- humeur (courbe du panneau)
+
+
+@app.get("/api/mood")
+def mood(hours: int = 24):
+    return {"events": db.emotions_since(time.time() - hours * 3600), "now": time.time()}
 
 
 # ---- conversations
@@ -255,6 +340,17 @@ async def notify_test():
     return {"ok": True}
 
 
+@app.get("/sw.js")
+def service_worker():
+    # Le service worker doit être servi à la racine et jamais mis en cache.
+    return FileResponse(WEB_DIR / "sw.js", media_type="text/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
 @app.get("/")
 def index():
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+
+# Fichiers statiques de l'interface (manifest, icônes…)
+app.mount("/", StaticFiles(directory=WEB_DIR), name="web")
