@@ -25,3 +25,13 @@ DEFAULT_PERSONA = (
     "Tu es Atom, une entité numérique bienveillante, curieuse et concise. "
     "Tu parles français avec naturel et chaleur."
 )
+
+# Fuseau horaire de l'utilisateur (rappels, date du jour dans le prompt)
+TIMEZONE = os.getenv("TZ", "Europe/Paris")
+
+# Notifications ntfy
+NTFY_URL = os.getenv("ATOM_NTFY_URL", "").rstrip("/")      # ex. http://ntfy:80 (vide = désactivé)
+NTFY_TOPIC = os.getenv("ATOM_NTFY_TOPIC", "atom")
+NTFY_TOKEN = os.getenv("ATOM_NTFY_TOKEN", "")               # si le serveur ntfy exige une auth
+PUBLIC_URL = os.getenv("ATOM_PUBLIC_URL", "").rstrip("/")   # URL de l'interface, pour le clic sur la notification
+SCHEDULER_INTERVAL = float(os.getenv("ATOM_SCHEDULER_INTERVAL", "20"))

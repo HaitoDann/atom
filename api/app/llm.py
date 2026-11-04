@@ -127,6 +127,13 @@ async def _mock_stream(messages: list[dict]) -> AsyncIterator[str]:
         f"[{emotion}] (mode test) Tu m'as dit : **« {user} »**.\n\n"
         "| Élément | État |\n|---|---|\n| Streaming | ✅ |\n| Markdown | ✅ |\n"
     )
+    if "rappel" in user.lower():
+        from datetime import timedelta
+
+        from .reminders import now_local
+
+        due = (now_local() + timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")
+        reply = f"[joy] C'est noté, je te le rappelle dans une minute. [[rappel {due} | {user[:60]}]]"
     for word in re.findall(r"\S+\s*", reply):
         await asyncio.sleep(0.04)
         yield word

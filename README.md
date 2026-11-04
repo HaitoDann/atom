@@ -6,7 +6,8 @@ Assistant IA auto-hébergé : une interface web minimaliste avec un avatar vivan
 Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
                                    ├─ atom    : FastAPI, port 8000 (sert l'interface + API)
                                    │    └─ SQLite (conversations, souvenirs, index de rappel) — volume atom-data
-                                   └─ ollama  : qwen3:4b-instruct-2507 (chat) + nomic-embed-text (mémoire), sur CPU
+                                   ├─ ollama  : qwen3:4b-instruct-2507 (chat) + nomic-embed-text (mémoire), sur CPU
+                                   └─ ntfy    : notifications push vers le téléphone, port 8080
 ```
 
 ## Arborescence
@@ -17,6 +18,8 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/main.py` | Routes HTTP et boucle de chat en streaming |
 | `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
 | `api/app/llm.py` | Accès à Ollama : chat, JSON contraint, embeddings |
+| `api/app/reminders.py` | Rappels : commandes du modèle, planificateur |
+| `api/app/notify.py` | Canaux sortants (ntfy) |
 | `api/app/db.py` | Stockage SQLite et migrations |
 | `docker-compose.yml` | Ollama + téléchargement du modèle + backend |
 
@@ -84,6 +87,32 @@ Atom retient seul ce qui compte, et tu gardes la main.
 
 Sans `nomic-embed-text`, la mémoire fonctionne quand même en mode simple (faits les plus récents, pas de rappel des anciennes conversations).
 
+## Rappels et notifications
+
+Demande simplement : « Rappelle-moi demain à 9 h d'appeler le garage ». Atom confirme, le rappel apparaît dans les réglages (puce en bas à droite → Rappels), et à l'heure dite :
+- une **notification** arrive sur ton téléphone via ntfy ; un clic ouvre Atom sur la bonne conversation ;
+- le rappel s'ajoute aussi dans la conversation.
+
+Atom connaît la date et l'heure, et la liste des rappels programmés : « Quels sont mes rappels ? » ou « Annule le rappel du garage » fonctionnent.
+
+### Configurer ntfy
+
+1. Dans `.env` (voir `.env.example`), remplace l'IP par celle de ta VM et choisis un sujet difficile à deviner :
+
+   ```
+   ATOM_PUBLIC_URL=http://192.168.1.28:8000
+   NTFY_BASE_URL=http://192.168.1.28:8080
+   ATOM_NTFY_TOPIC=atom-un-nom-secret
+   ```
+
+2. Relance : `docker compose up -d --build`.
+3. Sur le téléphone, installe l'appli **ntfy** (Android ou iOS), puis : **＋ → S'abonner à un sujet → Utiliser un autre serveur** : `http://192.168.1.28:8080`, sujet : celui de `ATOM_NTFY_TOPIC`.
+4. Dans Atom : réglages → **Tester la notification**.
+
+> **Android** : dans l'appli ntfy, autorise-la à fonctionner en arrière-plan (désactive l'optimisation de batterie pour elle).
+> **iPhone** : iOS n'autorise le push instantané que via les serveurs d'Apple. Décommente `NTFY_UPSTREAM_BASE_URL=https://ntfy.sh` : ton serveur envoie alors seulement un signal anonyme à ntfy.sh (pas le contenu), qui réveille l'appli.
+> Pour l'instant, les notifications n'arrivent que quand le téléphone est sur ton réseau local ; ce sera réglé avec l'accès distant (Tailscale).
+
 ## Comportement de l'agent
 
 - Atom **adapte la longueur** : court pour discuter, complet et structuré en Markdown (titres, listes, tableaux, code) pour une demande de travail.
@@ -120,7 +149,7 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 
 1. ✅ Backend + Docker Compose + streaming
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
-3. Atom qui écrit : ntfy auto-hébergé, rappels, brief du matin
+3. ✅ Atom qui écrit : ntfy auto-hébergé, rappels — prochain : brief du matin, relances, messagerie bidirectionnelle
 4. Documents : import de notes et de PDF, puis recherche dedans
 5. Outils : Proxmox, recherche web, domotique
 6. Accès distant via Tailscale ; plus tard, API externes en secours

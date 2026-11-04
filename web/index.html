@@ -240,6 +240,14 @@
   .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); cursor: pointer; margin-bottom: 10px; }
   .toggle input { accent-color: var(--accent); }
 
+  /* ---------- rappels ---------- */
+  .remlist { list-style: none; padding: 0; margin: 0 0 6px; display: flex; flex-direction: column; gap: 6px; }
+  .remlist li { display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; background: rgba(255,255,255,.04); border: 1px solid var(--glass-border); border-radius: 10px; padding: 7px 10px; }
+  .remlist .when { font: 11px var(--mono); color: rgb(var(--tint)); flex: none; }
+  .remlist .what { flex: 1; }
+  .remlist button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 16px; }
+  .remlist button:hover { color: #d98a7a; }
+
   /* ---------- toast ---------- */
   #toast {
     position: fixed; left: 50%; bottom: 112px; z-index: 4; transform: translate(-50%, 10px);
@@ -324,6 +332,11 @@
   </div>
   <p class="small" id="memInfo">Atom retient seul les faits durables sur toi. Modifie ou supprime ce qui ne te convient pas.</p>
   <button class="btn danger" id="clearMem" style="margin-top:8px">Tout oublier</button>
+
+  <h3>Rappels</h3>
+  <ul id="remList" class="remlist"></ul>
+  <p class="small" id="remInfo">Demande simplement à Atom : « Rappelle-moi demain à 9 h d'appeler le garage ».</p>
+  <button class="btn" id="notifTest" style="margin-top:8px">Tester la notification</button>
 
   <h3>Conversation</h3>
   <p class="small" id="histInfo" style="margin-bottom:8px"></p>
@@ -729,7 +742,7 @@ input.addEventListener("keydown", (e) => {
 function openPanel(open) {
   panel.classList.toggle("open", open);
   panel.setAttribute("aria-hidden", String(!open));
-  if (open) { openConvs(false); loadMemories(); }
+  if (open) { openConvs(false); loadMemories(); loadReminders(); }
   scrim.classList.toggle("on", open || convs.classList.contains("open"));
 }
 function openConvs(open) {
@@ -866,6 +879,29 @@ $("clearMem").onclick = async () => {
   if (!confirm("Effacer tout ce qu'Atom sait de toi ?")) return;
   try { await api("/api/memories", { method: "DELETE" }); } catch (e) { console.warn(e); }
   loadMemories();
+};
+
+/* ---------- rappels ---------- */
+async function loadReminders() {
+  let data = { reminders: [], notifications: false };
+  try { data = await getJSON("/api/reminders"); } catch (e) { console.warn(e); }
+  const ul = $("remList");
+  ul.innerHTML = "";
+  for (const r of data.reminders) {
+    const li = document.createElement("li");
+    const w = document.createElement("span"); w.className = "when"; w.textContent = r.when;
+    const t = document.createElement("span"); t.className = "what"; t.textContent = r.text;
+    const del = document.createElement("button"); del.textContent = "×"; del.title = "Annuler";
+    del.onclick = async () => { try { await api(`/api/reminders/${r.id}`, { method: "DELETE" }); } catch {} loadReminders(); };
+    li.append(w, t, del);
+    ul.appendChild(li);
+  }
+  $("remInfo").textContent = (data.reminders.length ? "" : "Aucun rappel. Demande simplement à Atom : « Rappelle-moi demain à 9 h d'appeler le garage ». ")
+    + (data.notifications ? "" : "⚠ Notifications non configurées (ntfy) : les rappels n'apparaîtront que dans la conversation.");
+}
+$("notifTest").onclick = async () => {
+  try { await api("/api/notify/test", { method: "POST" }); toast("<b>Notification envoyée</b> : regarde ton téléphone."); }
+  catch (e) { toast(esc(e.message)); }
 };
 
 for (const e of EMOTIONS) {
@@ -1005,6 +1041,11 @@ form.addEventListener("submit", async (e) => {
         } else if (ev.type === "done") {
           emotion = ev.emotion;
           finish(); // l'utilisateur peut répondre pendant que la mémoire travaille
+        } else if (ev.type === "reminder") {
+          if (ev.action === "created") toast(`<b>⏰ Rappel programmé</b> : ${esc(ev.when)} — ${esc(ev.text)}`);
+          else if (ev.action === "cancelled") toast(`<b>Rappel #${ev.id} annulé</b>`);
+          else toast(`<b>Rappel non programmé</b> : ${esc(ev.message)}`);
+          if (panel.classList.contains("open")) loadReminders();
         } else if (ev.type === "memory") {
           onMemoryAdded(ev.added);
         } else if (ev.type === "error") {
@@ -1030,12 +1071,29 @@ form.addEventListener("submit", async (e) => {
    DÉMARRAGE
    ============================================================ */
 (async () => {
+  const fromLink = parseInt(new URLSearchParams(location.search).get("c"), 10);
+  if (fromLink) { settings.conversationId = fromLink; window.history.replaceState(null, "", "/"); }
   if (settings.conversationId) await openConversation(settings.conversationId);
   else renderHistory();
   loadMemories();
 })();
 connect();
-setInterval(() => { if (!busy) connect(); }, 15000);
+setInterval(async () => {
+  if (busy) return;
+  connect();
+  if (!settings.conversationId) return;
+  try {
+    const msgs = (await getJSON(`/api/conversations/${settings.conversationId}/messages`)).messages;
+    if (!busy && msgs.length > history.length) {
+      const fresh = msgs.slice(history.length);
+      history = msgs;
+      for (const m of fresh) addMsg(m.role, m.content);
+      const last = fresh[fresh.length - 1];
+      if (last.emotion) { setEmotion(last.emotion); scheduleRest(); }
+      updateHistInfo();
+    }
+  } catch {}
+}, 15000);
 scheduleRest();
 input.focus();
 </script>

@@ -23,6 +23,23 @@ services:
     entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M} && ollama pull ${ATOM_EMBED_MODEL:-nomic-embed-text}"]
     restart: "no"
 
+  # Serveur de notifications push (appli ntfy sur le téléphone)
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    command: serve
+    restart: unless-stopped
+    ports:
+      - "${NTFY_PORT:-8080}:80"
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - NTFY_BASE_URL=${NTFY_BASE_URL:-http://localhost:8080}
+      - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
+      - NTFY_CACHE_DURATION=72h
+      # Nécessaire pour les notifications instantanées sur iPhone (voir README)
+      - NTFY_UPSTREAM_BASE_URL=${NTFY_UPSTREAM_BASE_URL:-}
+    volumes:
+      - ntfy-cache:/var/cache/ntfy
+
   atom:
     build:
       context: .
@@ -30,6 +47,7 @@ services:
     restart: unless-stopped
     depends_on:
       - ollama
+      - ntfy
     ports:
       - "${ATOM_PORT:-8000}:8000"
     environment:
@@ -37,9 +55,14 @@ services:
       - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
       - ATOM_EMBED_MODEL=${ATOM_EMBED_MODEL:-nomic-embed-text}
       - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
+      - TZ=${TZ:-Europe/Paris}
+      - ATOM_NTFY_URL=http://ntfy:80
+      - ATOM_NTFY_TOPIC=${ATOM_NTFY_TOPIC:-atom}
+      - ATOM_PUBLIC_URL=${ATOM_PUBLIC_URL:-}
     volumes:
       - atom-data:/data
 
 volumes:
+  ntfy-cache:
   ollama:
   atom-data:

@@ -52,6 +52,15 @@ def init() -> None:
                 content TEXT NOT NULL,
                 created_at REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS reminders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER,
+                text TEXT NOT NULL,
+                due_at REAL NOT NULL,          -- timestamp UTC
+                status TEXT NOT NULL DEFAULT 'pending',  -- pending | sent | failed
+                created_at REAL NOT NULL,
+                sent_at REAL
+            );
             -- Échanges passés indexés pour le rappel sémantique
             CREATE TABLE IF NOT EXISTS recall (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -216,3 +225,49 @@ def list_recall() -> list[dict]:
     with conn() as c:
         rows = c.execute("SELECT conversation_id, text, embedding, created_at FROM recall").fetchall()
     return [{**dict(r), "embedding": from_blob(r["embedding"])} for r in rows]
+
+
+# ---------------------------------------------------------------- rappels (tâches)
+
+
+def add_reminder(cid: int | None, text: str, due_at: float) -> int:
+    with conn() as c:
+        return c.execute(
+            "INSERT INTO reminders (conversation_id, text, due_at, created_at) VALUES (?, ?, ?, ?)",
+            (cid, text, due_at, time.time()),
+        ).lastrowid
+
+
+def list_reminders(status: str | None = "pending", limit: int = 200) -> list[dict]:
+    with conn() as c:
+        if status:
+            rows = c.execute(
+                "SELECT * FROM reminders WHERE status = ? ORDER BY due_at LIMIT ?", (status, limit)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM reminders ORDER BY due_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def due_reminders(now: float) -> list[dict]:
+    with conn() as c:
+        rows = c.execute(
+            "SELECT * FROM reminders WHERE status = 'pending' AND due_at <= ? ORDER BY due_at", (now,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_reminder(rid: int, status: str) -> None:
+    with conn() as c:
+        c.execute(
+            "UPDATE reminders SET status = ?, sent_at = ? WHERE id = ?", (status, time.time(), rid)
+        )
+
+
+def delete_reminder(rid: int) -> bool:
+    with conn() as c:
+        return c.execute(
+            "DELETE FROM reminders WHERE id = ? AND status = 'pending'", (rid,)
+        ).rowcount > 0

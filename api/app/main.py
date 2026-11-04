@@ -19,7 +19,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import db, llm, memory
+from contextlib import asynccontextmanager
+
+from . import db, llm, memory, notify, reminders
 from .config import (
     CONTEXT_TURNS,
     DEFAULT_MODEL,
@@ -54,7 +56,8 @@ def system_prompt(persona: str, memory_block: str) -> str:
         "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme)\n"
         "Exemple : [joy] Ravi de te revoir !\n"
         "Ne réfléchis pas à voix haute, ne décris pas ton raisonnement : réponds directement.\n"
-        "/no_think"
+        "/no_think\n\n"
+        + reminders.prompt_block()
     )
     if memory_block:
         s += "\n\n" + memory_block
@@ -87,6 +90,7 @@ async def run_chat(
     db.add_message(conversation_id, "user", message)
 
     emotion: str | None = None
+    cmds = reminders.CommandFilter()
     head = ""  # tampon tant que le tag d'émotion n'est pas résolu
     text = ""
     try:
@@ -111,14 +115,20 @@ async def run_chat(
                     emotion = "talking"
                     tok = stripped
                 yield event(type="emotion", emotion=emotion)
+            tok = cmds.feed(tok)
             if tok:
                 text += tok
                 yield event(type="token", text=tok)
         if emotion is None:  # réponse vide ou tag seul
             emotion = "talking"
-            text = "" if head.lstrip().startswith("<think>") else TAG_RE.sub("", head).strip()
-            if text:
-                yield event(type="token", text=text)
+            rest = "" if head.lstrip().startswith("<think>") else TAG_RE.sub("", head).strip()
+            cmds.feed(rest)
+        rest = cmds.flush()
+        if rest:
+            text += rest
+            yield event(type="token", text=rest)
+        for cmd, arg in cmds.commands:
+            yield event(**reminders.execute(cmd, arg, conversation_id))
         text = text.strip() or "…"
         db.add_message(conversation_id, "assistant", text, emotion)
         yield event(type="done", emotion=emotion)
@@ -147,8 +157,15 @@ async def run_chat(
 # API
 # --------------------------------------------------------------------------
 
-app = FastAPI(title="Atom")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    task = asyncio.create_task(reminders.scheduler())
+    yield
+    task.cancel()
+
+
 db.init()
+app = FastAPI(title="Atom", lifespan=lifespan)
 
 
 class ChatIn(BaseModel):
@@ -280,6 +297,48 @@ def remove_memory(mid: int):
 @app.delete("/api/memories")
 def remove_all_memories():
     db.clear_memories()
+    return {"ok": True}
+
+
+# ---- rappels et notifications
+
+
+class ReminderIn(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+    due: str  # "AAAA-MM-JJTHH:MM", heure locale
+
+
+def _reminder_out(r: dict) -> dict:
+    return {**r, "when": reminders.human(r["due_at"])}
+
+
+@app.get("/api/reminders")
+def get_reminders(status: str = "pending"):
+    rows = db.list_reminders(None if status == "all" else status)
+    return {"reminders": [_reminder_out(r) for r in rows], "notifications": notify.enabled()}
+
+
+@app.post("/api/reminders")
+def post_reminder(body: ReminderIn):
+    ev = reminders.execute("rappel", f"{body.due} | {body.text}", None)
+    if ev["action"] != "created":
+        raise HTTPException(400, ev["message"])
+    return ev
+
+
+@app.delete("/api/reminders/{rid}")
+def remove_reminder(rid: int):
+    if not db.delete_reminder(rid):
+        raise HTTPException(404, "Rappel introuvable ou déjà envoyé")
+    return {"ok": True}
+
+
+@app.post("/api/notify/test")
+async def notify_test():
+    if not notify.enabled():
+        raise HTTPException(400, "ntfy n'est pas configuré (ATOM_NTFY_URL).")
+    if not await notify.send("Atom", "Ceci est une notification de test. Tout fonctionne ✨", tags="sparkles"):
+        raise HTTPException(502, "Échec de l'envoi : regarde les logs du conteneur atom.")
     return {"ok": True}
 
 
