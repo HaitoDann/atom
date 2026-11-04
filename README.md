@@ -6,7 +6,7 @@ Assistant IA auto-hébergé : une interface web minimaliste avec un avatar vivan
 Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
                                    ├─ atom    : FastAPI, port 8000 (sert l'interface + API)
                                    │    └─ SQLite (historique, souvenirs) dans le volume atom-data
-                                   └─ ollama  : qwen3:4b, sur CPU
+                                   └─ ollama  : qwen3:4b-instruct-2507 (sans mode réflexion), sur CPU
 ```
 
 ## Arborescence
@@ -23,7 +23,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 
 Une **VM Debian 12** est le plus simple pour Docker. Comme le modèle tourne sur CPU, prévois :
 - **4 cœurs ou plus** (type de CPU `host`, pour profiter des instructions AVX) ;
-- **8 Go de RAM** (qwen3:4b en occupe environ 3 à 4) ;
+- **8 Go de RAM** (le modèle en occupe environ 3 à 4) ;
 - **20 Go de disque**.
 
 Un LXC fonctionne aussi, à condition de cocher les options *nesting* et *keyctl* pour Docker.
@@ -48,7 +48,7 @@ cd atom && cp .env.example .env
 sudo docker compose up -d --build
 ```
 
-Le premier lancement télécharge `qwen3:4b` (environ 2,5 Go). Pour suivre le téléchargement :
+Le premier lancement télécharge `qwen3:4b-instruct-2507-q4_K_M` (environ 2,5 Go). Pour suivre le téléchargement :
 
 ```bash
 sudo docker compose logs -f ollama-pull

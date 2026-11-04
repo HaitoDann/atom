@@ -25,7 +25,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
-DEFAULT_MODEL = os.getenv("ATOM_MODEL", "qwen3:4b")
+DEFAULT_MODEL = os.getenv("ATOM_MODEL", "qwen3:4b-instruct-2507-q4_K_M")
 PROVIDER = os.getenv("ATOM_PROVIDER", "ollama")  # "ollama" | "mock"
 DB_PATH = Path(os.getenv("ATOM_DB", "data/atom.db"))
 WEB_DIR = Path(os.getenv("ATOM_WEB", Path(__file__).resolve().parents[2] / "web"))
@@ -105,11 +105,13 @@ def system_prompt(persona: str) -> str:
         "Réponds en une à trois phrases courtes, simplement.\n"
         "Commence TOUJOURS ta réponse par ton émotion entre crochets, puis ton message. "
         f"Émotions possibles : {', '.join(EMOTIONS)}.\n"
+        "Ne réfléchis pas à voix haute, ne décris pas ton raisonnement : réponds directement.\n"
         "Exemple : [joy] Ravi de te revoir !\n"
         "(talking = neutre, joy = content, sad = triste, angry = agacé, surprise = étonné, "
         "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme)"
     )
     mems = list_memories()
+    s += "\n/no_think"
     if mems:
         s += "\n\nCe que tu sais durablement de l'utilisateur :\n" + "\n".join(f"- {m}" for m in mems)
     return s
@@ -125,7 +127,8 @@ async def ollama_tokens(model: str, messages: list[dict]) -> AsyncIterator[str]:
         "messages": messages,
         "stream": True,
         "think": False,
-        "options": {"temperature": 0.7},
+        # num_predict borne la longueur : un petit modèle qui part en boucle s'arrête vite.
+        "options": {"temperature": 0.7, "num_predict": 300, "repeat_penalty": 1.15},
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
         async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as r:
@@ -174,7 +177,14 @@ async def run_chat(message: str, model: str, persona: str) -> AsyncIterator[byte
         async for tok in source(model, msgs):
             if emotion is None:
                 head += tok
-                stripped = re.sub(r"<think>[\s\S]*?</think>", "", head).lstrip()
+                # Raisonnement interne (modèles "thinking") : on l'écarte entièrement.
+                if "</think>" in head:
+                    head = head.split("</think>")[-1]
+                elif head.lstrip().startswith("<think>") or "<think>".startswith(head.lstrip()[:7] or "x"):
+                    continue
+                stripped = head.lstrip()
+                if not stripped:
+                    continue
                 if stripped.startswith("[") and "]" not in stripped and len(stripped) < 20:
                     continue  # le tag arrive encore
                 m = TAG_RE.match(stripped)
@@ -190,7 +200,7 @@ async def run_chat(message: str, model: str, persona: str) -> AsyncIterator[byte
                 yield event(type="token", text=tok)
         if emotion is None:  # réponse vide ou tag seul
             emotion = "talking"
-            text = TAG_RE.sub("", head).strip()
+            text = "" if head.lstrip().startswith("<think>") else TAG_RE.sub("", head).strip()
             if text:
                 yield event(type="token", text=text)
         text = text.strip() or "…"

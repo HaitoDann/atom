@@ -20,7 +20,7 @@ services:
         condition: service_healthy
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b}"]
+    entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}"]
     restart: "no"
 
   atom:
@@ -34,7 +34,7 @@ services:
       - "${ATOM_PORT:-8000}:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434
-      - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b}
+      - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
       - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
     volumes:
       - atom-data:/data
