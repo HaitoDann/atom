@@ -115,40 +115,34 @@ Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passe
 
 [Tailscale](https://tailscale.com) relie tes appareils dans un réseau privé chiffré : rien n'est exposé sur Internet, aucun port à ouvrir sur la box, et il fournit le HTTPS nécessaire à l'appli installable. C'est gratuit pour un usage personnel.
 
-**1. Autoriser le LXC à créer un tunnel** — sur l'hôte Proxmox (remplace `109` par l'ID de ton conteneur), ajoute à `/etc/pve/lxc/109.conf` :
+Tailscale tourne comme un conteneur de plus, en **mode espace utilisateur** : il fonctionne dans un LXC sans réglage côté Proxmox et sans VM.
+
+**1. Activer HTTPS** — dans la [console d'administration Tailscale](https://login.tailscale.com/admin/dns) → DNS : active **MagicDNS** et **HTTPS Certificates**.
+
+**2. Activer le service** — dans `.env` :
 
 ```
-lxc.cgroup2.devices.allow: c 10:200 rwm
-lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
+COMPOSE_PROFILES=tailscale
+TS_HOSTNAME=atom
 ```
 
-puis redémarre le conteneur : `pct reboot 109`. (Inutile si Atom tourne dans une VM.)
+Facultatif : une clé d'authentification (console → Settings → Keys → *Generate auth key*) dans `TS_AUTHKEY=`. Sans clé, tu te connectes via un lien affiché dans les logs.
 
-**2. Installer Tailscale dans le conteneur** :
+**3. Lancer** :
 
 ```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-```
-
-```bash
-tailscale up --hostname=atom
-```
-
-Ouvre le lien affiché pour connecter la machine à ton compte.
-
-**3. Activer HTTPS** — dans la console d'administration Tailscale → DNS : active **MagicDNS** et **HTTPS Certificates**.
-
-**4. Publier Atom en HTTPS sur ton réseau privé** :
-
-```bash
-tailscale serve --bg 8000
+docker compose up -d
 ```
 
 ```bash
-tailscale serve --bg --https=8443 http://localhost:8080
+docker compose logs -f tailscale
 ```
 
-Atom est alors joignable sur `https://atom.<ton-tailnet>.ts.net`, et ntfy sur le port 8443.
+Sans clé, ouvre le lien « To authenticate, visit… » affiché dans les logs et valide. Atom apparaît dans la console Tailscale sous le nom `atom`.
+
+**4. Vérifier** : depuis un appareil connecté à Tailscale, ouvre `https://atom.<ton-tailnet>.ts.net` (le nom exact est dans la console Tailscale, onglet Machines). Le premier chargement prend quelques secondes, le temps d'obtenir le certificat. ntfy est sur `https://atom.<ton-tailnet>.ts.net:8443`.
+
+> Les adresses servies sont réglées dans `tailscale/serve.json`.
 
 **5. Sur le téléphone** : installe l'appli Tailscale, connecte-toi avec le même compte, ouvre l'adresse ci-dessus, puis installe Atom.
 
