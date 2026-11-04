@@ -226,12 +226,11 @@
   <button class="close" id="closePanel" aria-label="Fermer">×</button>
   <h2>Réglages</h2>
 
-  <h3>Serveur Ollama</h3>
+  <h3>Serveur</h3>
   <div class="row">
-    <input id="url" class="field" spellcheck="false">
+    <p class="small" id="srvInfo" style="flex:1;margin:0;align-self:center">…</p>
     <button class="btn" id="reconnect">Tester</button>
   </div>
-  <p class="small">Si la pastille reste rouge : <code>OLLAMA_ORIGINS=* ollama serve</code></p>
 
   <h3>Personnalité</h3>
   <textarea id="persona" class="field"></textarea>
@@ -271,7 +270,7 @@ const ACTIVITIES = {
 };
 const EMOTIONS = Object.keys(ACTIVITIES);
 
-const entity = { activity: "idle", rippleT: 99 };
+const entity = { activity: "idle", rippleT: 99, tokenKick: 0 };
 function setEmotion(e) {
   if (!ACTIVITIES[e]) e = "talking";
   if (entity.activity === e) return;
@@ -391,7 +390,8 @@ function setEmotion(e) {
     const fov = 560;
     const rad = cur.radius * (1 + Math.sin(t * 1.1) * 0.015);
     const oA = cur.oscAmp, oF = cur.oscFreq;
-    const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse;
+    entity.tokenKick *= Math.exp(-dt * 9);
+    const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse + entity.tokenKick * 0.025;
     const sY = cur.stretchY, spk = cur.spike;
     const orbMul = 1 + (cur.radius - 1) * 0.6;
     const mx = mouse.x, my = mouse.y, mAct = mouse.active;
@@ -464,7 +464,7 @@ function setEmotion(e) {
 })();
 
 /* ============================================================
-   STOCKAGE
+   RÉGLAGES LOCAUX (le reste vit sur le serveur Atom)
    ============================================================ */
 const store = {
   get(k, d) { try { const v = localStorage.getItem("atom." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -473,17 +473,24 @@ const store = {
 
 const DEFAULT_PERSONA =
   "Tu es Atom, une entité numérique bienveillante, curieuse et concise. " +
-  "Tu parles français avec naturel et chaleur, sans emphase inutile.";
+  "Tu parles français avec naturel et chaleur.";
 
-const settings = Object.assign(
-  { url: "http://localhost:11434", model: "", persona: DEFAULT_PERSONA },
-  store.get("settings", {})
-);
-let history = store.get("history", []);   // [{role, content, emotion?}]
-let memories = store.get("memories", []); // [string]
+const settings = Object.assign({ model: "", persona: DEFAULT_PERSONA }, store.get("settings", {}));
 const saveSettings = () => store.set("settings", settings);
-const saveHistory = () => store.set("history", history);
-const saveMemories = () => store.set("memories", memories);
+let history = [];   // [{role, content, emotion}] — copie de l'historique serveur
+let memories = [];  // [string] — stockés côté serveur
+
+/* ============================================================
+   API Atom (même origine que la page)
+   ============================================================ */
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+  });
+  if (!r.ok) throw new Error(`${path} → ${r.status} ${(await r.text()).slice(0, 200)}`);
+  return r;
+}
 
 /* ============================================================
    UI
@@ -502,13 +509,26 @@ function addMsg(role, text, cls) {
   return el;
 }
 
+function updateHistInfo() {
+  $("histInfo").textContent = `${Math.floor(history.length / 2)} échange(s) enregistré(s) sur le serveur · 20 derniers envoyés au modèle`;
+}
+
 function renderHistory() {
   chat.innerHTML = "";
   if (!history.length) {
     chat.innerHTML = '<div id="empty"><b>Atom est là.</b>Écrivez-lui quelque chose.</div>';
   }
   for (const m of history) addMsg(m.role, m.content);
-  $("histInfo").textContent = `${Math.floor(history.length / 2)} échange(s) enregistré(s) · 20 derniers envoyés au modèle`;
+  updateHistInfo();
+}
+
+async function loadServerState() {
+  try {
+    history = (await (await api("/api/history")).json()).messages;
+    memories = (await (await api("/api/memories")).json()).memories;
+  } catch (e) { console.warn(e); }
+  renderHistory();
+  renderMemories();
 }
 
 function autoGrow() {
@@ -530,11 +550,16 @@ chip.onclick = () => openPanel(!panel.classList.contains("open"));
 $("closePanel").onclick = () => openPanel(false);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") openPanel(false); });
 
-$("url").value = settings.url;
-$("url").onchange = () => { settings.url = $("url").value.trim().replace(/\/+$/, ""); saveSettings(); connect(); };
-$("reconnect").onclick = () => $("url").onchange();
+$("reconnect").onclick = () => connect();
 $("persona").value = settings.persona;
 $("persona").oninput = () => { settings.persona = $("persona").value; saveSettings(); };
+
+async function saveMemories() {
+  try {
+    memories = (await (await api("/api/memories", { method: "PUT", body: JSON.stringify({ memories }) })).json()).memories;
+  } catch (e) { console.warn(e); }
+  renderMemories();
+}
 
 function renderMemories() {
   const ul = $("memList");
@@ -543,10 +568,10 @@ function renderMemories() {
     const li = document.createElement("li");
     const inp = document.createElement("input");
     inp.className = "field"; inp.value = m;
-    inp.onchange = () => { memories[i] = inp.value.trim(); memories = memories.filter(Boolean); saveMemories(); renderMemories(); };
+    inp.onchange = () => { memories[i] = inp.value.trim(); memories = memories.filter(Boolean); saveMemories(); };
     const del = document.createElement("button");
     del.textContent = "×"; del.title = "Oublier";
-    del.onclick = () => { memories.splice(i, 1); saveMemories(); renderMemories(); };
+    del.onclick = () => { memories.splice(i, 1); saveMemories(); };
     li.append(inp, del);
     ul.appendChild(li);
   });
@@ -554,13 +579,14 @@ function renderMemories() {
 $("memAdd").onclick = () => {
   const v = $("memNew").value.trim();
   if (!v) return;
-  memories.push(v); saveMemories(); renderMemories(); $("memNew").value = "";
+  memories.push(v); saveMemories(); $("memNew").value = "";
 };
 $("memNew").onkeydown = (e) => { if (e.key === "Enter") $("memAdd").onclick(); };
 
-$("clearHist").onclick = () => {
+$("clearHist").onclick = async () => {
   if (!confirm("Effacer toute la conversation ?")) return;
-  history = []; saveHistory(); renderHistory(); setEmotion("idle");
+  try { await api("/api/history", { method: "DELETE" }); } catch (e) { console.warn(e); }
+  history = []; renderHistory(); setEmotion("idle");
 };
 
 for (const e of EMOTIONS) {
@@ -571,68 +597,41 @@ for (const e of EMOTIONS) {
 }
 
 /* ============================================================
-   OLLAMA
+   CONNEXION
    ============================================================ */
 let online = false;
 
 async function connect() {
+  let info = "";
   try {
-    const r = await fetch(settings.url + "/api/tags");
-    if (!r.ok) throw new Error(r.status);
-    const data = await r.json();
-    const names = (data.models || []).map((m) => m.name);
-    modelSel.innerHTML = "";
-    if (!names.length) modelSel.add(new Option("aucun modèle — ollama pull qwen3:4b", ""));
-    for (const n of names) modelSel.add(new Option(n, n));
-    if (!names.includes(settings.model)) {
-      settings.model = names.find((n) => n.startsWith("qwen3")) || names[0] || "";
-      saveSettings();
+    const h = await (await api("/api/health")).json();
+    online = h.ollama;
+    info = h.provider === "mock" ? "mode test (sans modèle)" : online ? "Ollama en ligne" : "Ollama injoignable depuis le serveur";
+    if (online) {
+      const m = await (await api("/api/models")).json();
+      modelSel.innerHTML = "";
+      if (!m.models.length) modelSel.add(new Option("aucun modèle — ollama pull qwen3:4b", ""));
+      for (const n of m.models) modelSel.add(new Option(n, n));
+      if (!m.models.includes(settings.model)) {
+        settings.model = m.models.includes(m.default) ? m.default : (m.models[0] || "");
+        saveSettings();
+      }
+      modelSel.value = settings.model;
     }
-    modelSel.value = settings.model;
-    online = true;
   } catch {
     online = false;
-    if (!modelSel.options.length) modelSel.add(new Option(settings.model || "hors ligne", settings.model));
+    info = "serveur Atom injoignable";
   }
+  if (!modelSel.options.length) modelSel.add(new Option(settings.model || "hors ligne", settings.model));
   dot.classList.toggle("on", online);
-  dot.title = online ? "Ollama en ligne" : "Ollama hors ligne";
+  dot.title = info;
+  $("srvInfo").textContent = info;
 }
 modelSel.onchange = () => { settings.model = modelSel.value; saveSettings(); };
 
-const SCHEMA = {
-  type: "object",
-  properties: {
-    reponse: { type: "string" },
-    emotion: { type: "string", enum: EMOTIONS },
-  },
-  required: ["reponse", "emotion"],
-};
-
-function systemPrompt() {
-  let s = settings.persona.trim() + "\n\n" +
-    "Tu possèdes un corps : une sphère de fragments lumineux qui exprime ton état émotionnel.\n" +
-    "Réponds TOUJOURS par un objet JSON strict, sans texte autour :\n" +
-    '{"reponse": "ton message", "emotion": "<une de : ' + EMOTIONS.join(", ") + '>"}\n' +
-    "Choisis l'émotion qui correspond sincèrement à ta réponse " +
-    "(talking = neutre, joy = content, sad = triste, angry = agacé, surprise = étonné, " +
-    "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme).";
-  if (memories.length) {
-    s += "\n\nCe que tu sais durablement de l'utilisateur et du contexte :\n" +
-      memories.map((m) => "- " + m).join("\n");
-  }
-  return s;
-}
-
-function parseReply(raw) {
-  raw = (raw || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-  try {
-    const m = raw.match(/\{[\s\S]*\}/);
-    const o = JSON.parse(m ? m[0] : raw);
-    if (typeof o.reponse === "string") return { text: o.reponse.trim(), emotion: o.emotion };
-  } catch {}
-  return { text: raw, emotion: "talking" };
-}
-
+/* ============================================================
+   CHAT (streaming NDJSON)
+   ============================================================ */
 let busy = false, idleTimer = 0, sleepTimer = 0;
 function scheduleRest() {
   clearTimeout(idleTimer); clearTimeout(sleepTimer);
@@ -650,51 +649,56 @@ form.addEventListener("submit", async (e) => {
 
   addMsg("user", text);
   history.push({ role: "user", content: text });
-  saveHistory();
-
   setEmotion("thinking");
   const pending = addMsg("atom", "réflexion", "pending");
-
-  const context = history.slice(-40).map((m) =>
-    m.role === "assistant"
-      ? { role: "assistant", content: JSON.stringify({ reponse: m.content, emotion: m.emotion || "talking" }) }
-      : { role: "user", content: m.content });
+  let bubble = null, reply = "", emotion = "talking";
 
   try {
-    if (!settings.model && !online) throw new TypeError("offline");
-    if (!settings.model) throw new Error("Aucun modèle sélectionné. Lancez `ollama pull qwen3:4b`.");
-    const r = await fetch(settings.url + "/api/chat", {
+    const r = await api("/api/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: settings.model,
-        messages: [{ role: "system", content: systemPrompt() }, ...context],
-        format: SCHEMA,
-        stream: false,
-        think: false,
-        options: { temperature: 0.7 },
-      }),
+      body: JSON.stringify({ message: text, model: settings.model || null, persona: settings.persona }),
     });
-    if (!r.ok) throw new Error(`Ollama a répondu ${r.status} — ${(await r.text()).slice(0, 200)}`);
-    const data = await r.json();
-    const { text: reply, emotion } = parseReply(data.message?.content);
-    pending.remove();
-    addMsg("assistant", reply || "…");
-    history.push({ role: "assistant", content: reply, emotion: ACTIVITIES[emotion] ? emotion : "talking" });
-    saveHistory();
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "emotion") {
+          emotion = ev.emotion;
+          setEmotion(emotion);
+        } else if (ev.type === "token") {
+          if (!bubble) { pending.remove(); bubble = addMsg("assistant", ""); }
+          reply += ev.text;
+          bubble.textContent = reply.trimStart();
+          entity.tokenKick = 1; // petite pulsation par token
+          scroller.scrollTop = scroller.scrollHeight;
+        } else if (ev.type === "done") {
+          emotion = ev.emotion;
+        } else if (ev.type === "error") {
+          throw new Error(ev.message);
+        }
+      }
+    }
+    if (!bubble) { pending.remove(); bubble = addMsg("assistant", "…"); }
+    history.push({ role: "assistant", content: reply.trim(), emotion });
     setEmotion(emotion);
-    if (!online) connect();
   } catch (err) {
     pending.remove();
-    const msg = err instanceof TypeError
-      ? "Impossible de joindre Ollama sur " + settings.url + ". Vérifiez qu'il tourne avec OLLAMA_ORIGINS=* ollama serve."
-      : err.message;
+    const msg = err instanceof TypeError ? "Serveur Atom injoignable." : err.message;
     addMsg("atom", msg, "err");
     setEmotion("fear");
-    online = false; dot.classList.remove("on");
+    connect();
   } finally {
     busy = false; autoGrow();
-    $("histInfo").textContent = `${Math.floor(history.length / 2)} échange(s) enregistré(s) · 20 derniers envoyés au modèle`;
+    updateHistInfo();
     scheduleRest();
     input.focus();
   }
@@ -703,8 +707,7 @@ form.addEventListener("submit", async (e) => {
 /* ============================================================
    DÉMARRAGE
    ============================================================ */
-renderHistory();
-renderMemories();
+loadServerState();
 connect();
 setInterval(() => { if (!busy) connect(); }, 15000);
 scheduleRest();

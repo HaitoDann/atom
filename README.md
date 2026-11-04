@@ -1,43 +1,106 @@
 # Atom
 
-Console web autonome pour un assistant IA auto-hébergé : un seul fichier `index.html`, aucune dépendance, aucun build.
-Atom s'incarne dans une sphère de ~3 200 fragments qui se désassemble quand elle réfléchit et se reconstitue avec l'émotion de sa réponse.
+Assistant IA auto-hébergé : une interface web minimaliste avec un avatar vivant, une sphère de ~3 200 fragments qui se désassemble quand Atom réfléchit et se reconstitue avec l'émotion de sa réponse.
 
-## Démarrage
+```
+Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
+                                   ├─ atom    : FastAPI, port 8000 (sert l'interface + API)
+                                   │    └─ SQLite (historique, souvenirs) dans le volume atom-data
+                                   └─ ollama  : qwen3:4b, sur CPU
+```
 
-1. Installer Ollama : <https://ollama.com>
-2. Télécharger le modèle :
+## Arborescence
 
-   ```bash
-   ollama pull qwen3:4b
-   ```
+| Chemin | Rôle |
+|---|---|
+| `web/index.html` | L'interface (un seul fichier, sans build) |
+| `api/app/main.py` | Le backend : relais Ollama en streaming, historique, souvenirs |
+| `docker-compose.yml` | Ollama + téléchargement du modèle + backend |
 
-3. Lancer Ollama en autorisant le navigateur à l'appeler (nécessaire si la pastille reste rouge) :
+## Premier essai sur Proxmox (réseau local)
 
-   ```bash
-   OLLAMA_ORIGINS=* ollama serve
-   ```
+### 1. Créer la machine
 
-4. Ouvrir `index.html` dans le navigateur. La pastille passe au vert quand Ollama répond.
+Une **VM Debian 12** est le plus simple pour Docker. Comme le modèle tourne sur CPU, prévois :
+- **4 cœurs ou plus** (type de CPU `host`, pour profiter des instructions AVX) ;
+- **8 Go de RAM** (qwen3:4b en occupe environ 3 à 4) ;
+- **20 Go de disque**.
 
-> Sur macOS/Windows avec l'app Ollama déjà lancée, quittez-la avant l'étape 3, ou définissez `OLLAMA_ORIGINS` comme variable d'environnement système puis relancez-la.
+Un LXC fonctionne aussi, à condition de cocher les options *nesting* et *keyctl* pour Docker.
 
-## Utilisation
+### 2. Installer Docker dans la VM
 
-- **Entrée** pour envoyer, **Maj+Entrée** pour un saut de ligne.
-- La **puce en bas à droite** affiche l'état de l'entité et ouvre les réglages : URL du serveur, personnalité, souvenirs durables, effacement de l'historique, test des émotions.
-- Le **sélecteur de modèle** (en-tête) liste les modèles installés via `/api/tags`.
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+```
 
-## Fonctionnement
+### 3. Récupérer et lancer Atom
 
-- Le modèle répond en JSON contraint (schéma passé dans `format`) : `{"reponse": "...", "emotion": "..."}`.
-- Émotions : `idle`, `thinking`, `talking`, `joy`, `angry`, `sad`, `surprise`, `fear`, `sleep`.
-- Dès l'envoi, l'entité passe en `thinking` (dilatée, relâchée) puis adopte l'émotion renvoyée ; elle revient en veille après quelques secondes, et s'endort après 3 minutes d'inactivité.
-- **Mémoire** (localStorage) : l'historique est conservé et les 20 derniers tours sont envoyés au modèle ; les souvenirs durables sont injectés dans le prompt système.
+```bash
+git clone -b claude/new-session-q4ozge https://github.com/HaitoDann/atom.git
+```
+
+```bash
+cd atom && cp .env.example .env
+```
+
+```bash
+sudo docker compose up -d --build
+```
+
+Le premier lancement télécharge `qwen3:4b` (environ 2,5 Go). Pour suivre le téléchargement :
+
+```bash
+sudo docker compose logs -f ollama-pull
+```
+
+### 4. Ouvrir l'interface
+
+Depuis ton PC : `http://<IP-de-la-VM>:8000`. Pour trouver l'IP, lance `ip -4 a` dans la VM.
+
+La pastille en haut à droite passe au **vert** quand le backend joint Ollama.
+
+### Tester l'interface sans modèle
+
+Pour vérifier toute la chaîne avant de télécharger le modèle, mets `ATOM_PROVIDER=mock` dans `.env`, puis :
+
+```bash
+sudo docker compose up -d --build atom
+```
+
+Atom répète alors ton message, mot par mot, avec une émotion au hasard.
+
+## Comportement de l'agent
+
+- Atom répond en **une à trois phrases courtes**, avec un modèle local uniquement.
+- Les réponses arrivent **en streaming**, et la sphère pulse légèrement à chaque token.
+- Le modèle commence sa réponse par un tag d'émotion, par exemple `[joy] Salut !`. Le backend le retire et pilote la sphère avec ; sans tag, l'émotion par défaut est `talking`.
+- **L'historique et les souvenirs sont stockés sur le serveur**, en SQLite : on retrouve la conversation depuis n'importe quel navigateur. Les 20 derniers échanges sont envoyés au modèle.
+- La personnalité et le choix du modèle restent propres à chaque navigateur.
+
+## Développement sans Docker
+
+```bash
+pip install -r api/requirements.txt
+```
+
+```bash
+cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port 8000
+```
+
+## API
+
+| Méthode | Route | Rôle |
+|---|---|---|
+| GET | `/api/health` | État du backend et d'Ollama |
+| GET | `/api/models` | Modèles installés |
+| POST | `/api/chat` | `{message, model?, persona?}` → flux NDJSON : `emotion`, `token`…, `done` ou `error` |
+| GET / DELETE | `/api/history` | Lire ou effacer l'historique |
+| GET / PUT | `/api/memories` | Lire ou remplacer les souvenirs |
 
 ## Feuille de route
 
-1. Streaming token par token, avec pulsation de la sphère à chaque token
-2. Mémoire sémantique (RAG `sqlite-vec` + `nomic-embed-text`)
-3. Backend FastAPI avec routeur hybride (local → API Mistral)
-4. TTS/STT (Whisper + Piper), rendu WebGL au-delà de ~10 000 fragments
+1. ✅ Backend + Docker Compose + streaming
+2. Mémoire automatique : extraction de faits, recherche dans les anciennes conversations (`sqlite-vec` + `nomic-embed-text`), panneau de contrôle
+3. Documents : import de notes et de PDF, puis recherche dedans
+4. Accès distant via Tailscale ; plus tard, API externes en secours et voix

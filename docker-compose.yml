@@ -1,0 +1,44 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=30m   # garde le modèle chargé en RAM entre deux messages
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Télécharge le modèle au premier démarrage, puis s'arrête.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b}"]
+    restart: "no"
+
+  atom:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    ports:
+      - "${ATOM_PORT:-8000}:8000"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b}
+      - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
+    volumes:
+      - atom-data:/data
+
+volumes:
+  ollama:
+  atom-data:
