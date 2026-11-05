@@ -18,12 +18,12 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import agent, companion, db, llm, memory, notify, reminders, search, system, telegram
+from . import agent, backup, companion, db, llm, memory, notify, reminders, search, system, telegram
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -44,7 +44,8 @@ async def run_chat(*args) -> AsyncIterator[bytes]:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run())]
+    tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
+             asyncio.create_task(backup.scheduler())]
     yield
     for t in tasks:
         t.cancel()
@@ -266,7 +267,7 @@ def search_conversations(q: str):
 
 @app.get("/api/system")
 async def system_info():
-    return await system.snapshot()
+    return {**await system.snapshot(), "last": dict(llm.last_stats)}
 
 
 @app.delete("/api/conversations/{cid}")
@@ -356,6 +357,81 @@ async def notify_test():
     if not await notify.send("Atom", "Ceci est une notification de test. Tout fonctionne ✨", tags="sparkles"):
         raise HTTPException(502, "Échec de l'envoi : regarde les logs du conteneur atom.")
     return {"ok": True}
+
+
+# ---- sauvegardes
+
+
+@app.get("/api/backups")
+def get_backups():
+    from .config import BACKUP_DIR, BACKUP_KEEP, BACKUP_TIME
+    return {"backups": backup.list_all(), "dir": str(BACKUP_DIR), "keep": BACKUP_KEEP, "time": BACKUP_TIME}
+
+
+@app.post("/api/backups")
+def make_backup():
+    return backup.create("manual")
+
+
+@app.get("/api/backups/{name}/download")
+def download_backup(name: str):
+    try:
+        p = backup.path_of(name)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(404, "Sauvegarde introuvable") from e
+    return FileResponse(p, filename=name, media_type="application/octet-stream")
+
+
+@app.post("/api/backups/{name}/restore")
+def restore_backup(name: str):
+    try:
+        return backup.restore_file(backup.path_of(name))
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Sauvegarde introuvable") from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.get("/api/export")
+def export_db():
+    """Télécharge une copie fraîche de toute la mémoire d'Atom."""
+    info = backup.create("export")
+    return FileResponse(backup.path_of(info["name"]), filename=info["name"].replace("-export", ""),
+                        media_type="application/octet-stream")
+
+
+@app.post("/api/import")
+async def import_db(request: Request):
+    data = await request.body()
+    if len(data) > 500 * 1024 * 1024:
+        raise HTTPException(413, "Fichier trop gros")
+    if not data.startswith(b"SQLite format 3"):
+        raise HTTPException(400, "Ce fichier n'est pas une sauvegarde Atom (.db).")
+    tmp = backup._dir() / f"import-{int(time.time())}.tmp"
+    tmp.write_bytes(data)
+    try:
+        return backup.restore_file(tmp)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+# ---- vitesse
+
+
+@app.post("/api/benchmark")
+async def benchmark(model: str | None = None):
+    """Génère un court texte et renvoie la vitesse mesurée par Ollama."""
+    m = model or db.kv_get("model") or DEFAULT_MODEL
+    t0 = time.time()
+    n = 0
+    try:
+        async for _ in llm.stream_chat(m, [{"role": "user", "content": "Écris une phrase de 40 mots sur la mer. /no_think"}]):
+            n += 1
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, str(e)) from e
+    return {"model": m, "wall_s": round(time.time() - t0, 2), **llm.last_stats}
 
 
 @app.get("/sw.js")

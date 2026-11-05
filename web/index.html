@@ -593,6 +593,7 @@
       <button class="tab on" data-tab="general"><span data-i="settings"></span>Général</button>
       <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
       <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
+      <button class="tab" data-tab="backup"><span data-i="download"></span>Sauvegarde</button>
       <button class="tab" data-tab="look"><span data-i="panel"></span>Apparence</button>
       <button class="tab" data-tab="entity"><span data-i="orb"></span>Entité</button>
     </nav>
@@ -614,7 +615,8 @@
         <div class="block">
           <h4>Serveur</h4>
           <p class="desc" id="srvInfo">…</p>
-          <button class="btn" id="reconnect">Tester la connexion</button>
+          <div class="row"><button class="btn" id="reconnect">Tester la connexion</button><button class="btn" id="benchBtn">Mesurer la vitesse</button></div>
+          <p class="note" id="benchInfo"></p>
         </div>
       </section>
 
@@ -640,6 +642,21 @@
           <p class="note" id="remInfo"></p>
         </div>
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
+      </section>
+
+      <section class="pane" data-pane="backup">
+        <div class="block">
+          <h4>Sauvegardes automatiques</h4>
+          <p class="desc" id="bkInfo">Atom copie toute sa mémoire chaque nuit.</p>
+          <div class="row" style="flex-wrap:wrap">
+            <button class="btn primary" id="bkNow">Sauvegarder maintenant</button>
+            <button class="btn" id="bkExport">Télécharger une copie</button>
+            <button class="btn" id="bkImport">Restaurer depuis un fichier…</button>
+            <input type="file" id="bkFile" accept=".db" hidden>
+          </div>
+          <ul class="list" id="bkList" style="margin-top:14px"></ul>
+          <p class="note">Avant toute restauration, l'état actuel est sauvegardé automatiquement : rien n'est perdu par erreur. Garde de temps en temps une copie téléchargée hors du serveur.</p>
+        </div>
       </section>
 
       <section class="pane" data-pane="look">
@@ -1725,6 +1742,7 @@ $("toBottom").onclick = () => scroller.scrollTo({ top: scroller.scrollHeight, be
 /* ============================================================
    SAISIE ET ENVOI (streaming NDJSON)
    ============================================================ */
+let serverSpeed = 0;
 let busy = false, controller = null, idleTimer = 0, sleepTimer = 0, lastSpeed = null;
 
 function autoGrow() {
@@ -1817,7 +1835,8 @@ async function sendMessage(text, files = []) {
     history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: { ...(used ? { used } : {}), ...(sources ? { sources } : {}) } });
     el.replaceWith(msgEl(history[history.length - 1], history.length - 1));
     markLast();
-    if (tokens > 3 && t0) { lastSpeed = tokens / ((performance.now() - t0) / 1000); $("speedV").textContent = lastSpeed.toFixed(1) + " tok/s"; }
+    if (serverSpeed) { $("speedV").textContent = serverSpeed.toFixed(1) + " tok/s"; serverSpeed = 0; }
+    else if (tokens > 3 && t0) { lastSpeed = tokens / ((performance.now() - t0) / 1000); $("speedV").textContent = lastSpeed.toFixed(1) + " tok/s"; }
     setEmotion(emotion);
     setEntityState("en attente");
     setBusy(false);
@@ -1890,7 +1909,9 @@ async function sendMessage(text, files = []) {
           else toast(`<b>Rappel non programmé</b> · ${esc(ev.message)}`);
           refreshPanel();
         } else if (ev.type === "done") {
-          emotion = ev.emotion; asstId = ev.id; finish();
+          emotion = ev.emotion; asstId = ev.id;
+          if (ev.stats?.tok_s) { serverSpeed = ev.stats.tok_s; }
+          finish();
         } else if (ev.type === "memory") {
           const list = ev.added.map((m) => esc(m.content.replace(/^L'utilisateur\s+/i, ""))).join(" · ");
           toast(`<b>Retenu</b> · ${list}`);
@@ -1989,6 +2010,7 @@ function selectTab(tab) {
   document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === tab));
   if (tab === "memory") loadMemories();
   if (tab === "reminders") loadReminders();
+  if (tab === "backup") loadBackups();
 }
 document.querySelectorAll(".tab").forEach((t) => { t.onclick = () => selectTab(t.dataset.tab); });
 $("openSettings").onclick = () => openSettings();
@@ -2378,6 +2400,55 @@ async function refreshCounts() {
   try { const m = (await getJSON("/api/memories")).memories.length; $("navMem").textContent = m || ""; } catch {}
   try { const r = (await getJSON("/api/reminders")).reminders.length; $("navRem").textContent = r || ""; } catch {}
 }
+
+/* ============================================================
+   SAUVEGARDE ET VITESSE
+   ============================================================ */
+async function loadBackups() {
+  let d;
+  try { d = await getJSON("/api/backups"); } catch { return; }
+  $("bkInfo").textContent = `Atom copie toute sa mémoire (conversations, souvenirs, rappels, lien) chaque nuit à ${d.time}, et garde les ${d.keep} dernières copies dans le dossier « backups » du serveur.`;
+  const label = { auto: "automatique", manual: "manuelle", export: "téléchargée", prerestore: "avant restauration", "": "" };
+  $("bkList").innerHTML = d.backups.length ? "" : '<li class="none">Aucune sauvegarde pour l\'instant.</li>';
+  for (const b of d.backups) {
+    const li = document.createElement("li");
+    li.style.cssText = "display:flex;align-items:center;gap:8px";
+    li.innerHTML = `<div style="flex:1"><small>${esc(new Date(b.created_at * 1000).toLocaleString("fr-FR"))} · ${fmtBytes(b.size)}</small>${esc(label[b.tag] ?? b.tag)}</div>`;
+    const dl = document.createElement("a");
+    dl.className = "iconbtn"; dl.title = "Télécharger"; dl.href = `/api/backups/${encodeURIComponent(b.name)}/download`; dl.innerHTML = icon("download");
+    const rs = document.createElement("button");
+    rs.className = "btn"; rs.textContent = "Restaurer";
+    rs.onclick = async () => {
+      if (!confirm("Restaurer cette sauvegarde ? L'état actuel sera sauvegardé avant.")) return;
+      try { await send_(`/api/backups/${encodeURIComponent(b.name)}/restore`, "POST"); toast("<b>Mémoire restaurée</b> · rechargement…"); setTimeout(() => location.reload(), 900); }
+      catch (e) { toast(esc(e.message)); }
+    };
+    li.append(dl, rs);
+    $("bkList").appendChild(li);
+  }
+}
+$("bkNow").onclick = async () => { try { await send_("/api/backups", "POST"); toast("<b>Sauvegarde créée</b>"); } catch (e) { toast(esc(e.message)); } loadBackups(); };
+$("bkExport").onclick = () => { location.href = "/api/export"; setTimeout(loadBackups, 1500); };
+$("bkImport").onclick = () => $("bkFile").click();
+$("bkFile").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f || !confirm(`Restaurer « ${f.name} » ? L'état actuel sera sauvegardé avant.`)) return;
+  try {
+    const r = await fetch("/api/import", { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream" } });
+    if (!r.ok) throw new Error((await r.json()).detail || "Échec");
+    toast("<b>Mémoire restaurée</b> · rechargement…"); setTimeout(() => location.reload(), 900);
+  } catch (err) { toast(esc(err.message)); }
+};
+$("benchBtn").onclick = async () => {
+  $("benchInfo").textContent = "Mesure en cours (le modèle écrit une phrase)…";
+  try {
+    const r = await (await api("/api/benchmark", { method: "POST" })).json();
+    const tips = r.tok_s == null ? "" : r.tok_s < 3 ? " · Lent : voir « Vitesse » dans le README." : r.tok_s < 7 ? " · Correct pour un CPU." : " · Bonne vitesse.";
+    $("benchInfo").textContent = r.tok_s == null ? `Terminé en ${r.wall_s} s.`
+      : `Écriture : ${r.tok_s} tok/s · lecture du contexte : ${r.prompt_tok_s ?? "—"} tok/s · chargement du modèle : ${r.load_s} s${tips}`;
+    if (r.tok_s) $("speedV").textContent = r.tok_s.toFixed(1) + " tok/s";
+  } catch (e) { $("benchInfo").textContent = e.message; }
+};
 
 /* ============================================================
    DÉMARRAGE

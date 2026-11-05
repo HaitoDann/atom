@@ -193,7 +193,7 @@ async def chat_events(
             asst_meta = {**(asst_meta or {}), "sources": sources}
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
-        yield dict(type="done", emotion=emotion, id=asst_id)
+        yield dict(type="done", emotion=emotion, id=asst_id, stats=dict(llm.last_stats))
     except GeneratorExit:
         # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
         partial = (locals().get("state") or {}).get("text", "")

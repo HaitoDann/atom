@@ -111,6 +111,44 @@ Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passe
 - **Android / Chrome / Edge** : Réglages d'Atom → Apparence → « Installer l'application », ou menu du navigateur → « Installer ».
 - **iPhone / iPad (Safari)** : bouton Partager → « Sur l'écran d'accueil ».
 
+## Vitesse
+
+Atom affiche la vitesse réelle mesurée par Ollama (panneau → Système → Vitesse). Réglages → Général → **Mesurer la vitesse** fait un test rapide. Sur CPU, un modèle 4B devrait écrire entre **6 et 12 tokens/s** ; sous 3 tok/s, quelque chose freine.
+
+Réglages déjà appliqués dans `docker-compose.yml` :
+- `OLLAMA_NUM_PARALLEL=1` : Ollama ne réserve plus 4 contextes d'avance (la mémoire nécessaire est divisée par 4) ;
+- `OLLAMA_KV_CACHE_TYPE=q8_0` + `OLLAMA_FLASH_ATTENTION=1` : contexte compressé, deux fois moins de RAM ;
+- `OLLAMA_KEEP_ALIVE=24h` : le modèle reste chargé, pas de rechargement entre deux messages ;
+- la mémoire automatique ne relance le modèle que si tu parles de toi (plus pour « 2+2 » ou « merci »).
+
+Si c'est encore lent, vérifie :
+
+1. **La vitesse brute d'Ollama**, sans Atom :
+
+   ```bash
+   docker compose exec ollama ollama run qwen3:4b-instruct-2507-q4_K_M --verbose "Bonjour"
+   ```
+
+   Regarde la ligne `eval rate` (tokens/s).
+
+2. **Les ressources du conteneur LXC** dans Proxmox (Ressources) : au moins **4 cœurs** et **8 Go de RAM**, et le **swap** pas sollicité :
+
+   ```bash
+   free -h
+   ```
+
+   Si `Swap used` grimpe pendant une réponse, la RAM manque : augmente-la, ou réduis `ATOM_NUM_CTX=4096` dans `.env`.
+
+3. **Le nombre de threads** : mets `ATOM_NUM_THREADS` au nombre de cœurs donnés au LXC (par ex. `4`), puis `docker compose up -d atom`.
+
+## Sauvegarde
+
+- **Chaque nuit à 3 h 30**, Atom copie toute sa mémoire (conversations, souvenirs, rappels, lien) dans le dossier `backups/` à côté du `docker-compose.yml`, et garde les **7 dernières**. Si le serveur était éteint, une copie est faite au démarrage.
+- Réglages → **Sauvegarde** : sauvegarder maintenant, télécharger une copie sur ton PC, restaurer une sauvegarde du serveur ou un fichier `.db`.
+- Avant toute restauration, l'état actuel est sauvegardé automatiquement.
+- Réglables dans `.env` : `ATOM_BACKUP_TIME`, `ATOM_BACKUP_KEEP`.
+- Le dossier `backups/` est sur le même disque que le serveur : télécharge une copie de temps en temps, ou inclus le conteneur dans les sauvegardes Proxmox.
+
 ## Recherche sur Internet
 
 Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans port exposé) : il interroge plusieurs moteurs sans traçage. Atom lit ensuite les meilleures pages et répond en citant ses sources, affichées sous la réponse.

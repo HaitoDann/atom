@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import numpy as np
 
@@ -135,6 +136,19 @@ async def remember(text: str, source: str = "manuel") -> dict | None:
     return {"id": mid, "content": text, "source": source}
 
 
+PERSONAL = re.compile(
+    r"\b(je|j'|j’|moi|mon|ma|mes|m'appelle|suis|ai|aime|adore|déteste|préfère|habite|travaille|"
+    r"femme|mari|copine|copain|enfant|fils|fille|chien|chat|projet|retiens|souviens|note)\b",
+    re.I,
+)
+
+
+def worth_extracting(user: str) -> bool:
+    """Évite de relancer le modèle pour « 2+2 » ou « merci » : il ne sert que si tu parles de toi."""
+    u = user.strip()
+    return len(u) >= 12 and bool(PERSONAL.search(u))
+
+
 async def after_exchange(model: str, conversation_id: int, user: str, assistant: str) -> list[dict]:
     """Indexe l'échange et en extrait les nouveaux faits. Renvoie les faits ajoutés."""
     added: list[dict] = []
@@ -143,6 +157,8 @@ async def after_exchange(model: str, conversation_id: int, user: str, assistant:
         if vec:
             db.add_recall(conversation_id, f"Utilisateur : {user[:400]} — Atom : {assistant[:400]}", vec[0])
 
+        if not worth_extracting(user):
+            return added
         known = db.list_memories()
         known_txt = "\n".join(f"- {f['content']}" for f in known[-40:]) or "(aucun)"
         prompt = EXTRACT_PROMPT.format(known=known_txt, user=user[:2000], assistant=assistant[:1500])

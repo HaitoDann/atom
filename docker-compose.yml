@@ -5,7 +5,14 @@ services:
     volumes:
       - ollama:/root/.ollama
     environment:
-      - OLLAMA_KEEP_ALIVE=30m   # garde le modèle chargé en RAM entre deux messages
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-24h}   # garde le modèle chargé en RAM
+      # Une seule conversation à la fois : sinon Ollama réserve 4 contextes et peut faire swapper.
+      - OLLAMA_NUM_PARALLEL=1
+      # Le modèle de discussion et celui de la mémoire restent chargés ensemble.
+      - OLLAMA_MAX_LOADED_MODELS=2
+      # Contexte compressé : deux fois moins de RAM pour la même longueur.
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KV_CACHE_TYPE=q8_0
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -66,6 +73,10 @@ services:
       - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
       - ATOM_EMBED_MODEL=${ATOM_EMBED_MODEL:-nomic-embed-text}
       - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
+      - ATOM_NUM_THREADS=${ATOM_NUM_THREADS:-0}
+      - ATOM_BACKUP_DIR=/backups
+      - ATOM_BACKUP_KEEP=${ATOM_BACKUP_KEEP:-7}
+      - ATOM_BACKUP_TIME=${ATOM_BACKUP_TIME:-03:30}
       - TZ=${TZ:-Europe/Paris}
       - ATOM_NTFY_URL=http://ntfy:80
       - ATOM_NTFY_TOPIC=${ATOM_NTFY_TOPIC:-atom}
@@ -75,6 +86,8 @@ services:
       - ATOM_TELEGRAM_ALLOWED=${ATOM_TELEGRAM_ALLOWED:-}
     volumes:
       - atom-data:/data
+      # Sauvegardes visibles sur l'hôte (dossier ./backups) : faciles à copier ailleurs.
+      - ./backups:/backups
 
   # Accès distant en HTTPS via Tailscale, sans VM ni /dev/net/tun (mode espace utilisateur).
   # Activé seulement avec le profil « tailscale » (COMPOSE_PROFILES=tailscale dans .env).

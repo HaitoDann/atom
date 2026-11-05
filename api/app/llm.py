@@ -11,7 +11,17 @@ from typing import AsyncIterator
 import httpx
 import numpy as np
 
-from .config import EMBED_MODEL, MAX_TOKENS, NUM_CTX, OLLAMA_URL, PROVIDER
+from .config import EMBED_MODEL, MAX_TOKENS, NUM_CTX, NUM_THREADS, OLLAMA_URL, PROVIDER
+
+# Dernière mesure de vitesse renvoyée par Ollama (tokens/s, durée de lecture du prompt…)
+last_stats: dict = {}
+
+
+def _opts(**kw) -> dict:
+    o = {"num_ctx": NUM_CTX, **kw}
+    if NUM_THREADS > 0:
+        o["num_thread"] = NUM_THREADS
+    return o
 
 
 class ModelMissing(RuntimeError):
@@ -38,7 +48,7 @@ async def stream_chat(model: str, messages: list[dict]) -> AsyncIterator[str]:
         "stream": True,
         "think": False,
         # num_predict borne la longueur : un petit modèle qui part en boucle s'arrête.
-        "options": {"temperature": 0.7, "num_predict": MAX_TOKENS, "repeat_penalty": 1.12, "num_ctx": NUM_CTX},
+        "options": _opts(temperature=0.7, num_predict=MAX_TOKENS, repeat_penalty=1.12),
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
         async with client.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as r:
@@ -54,6 +64,15 @@ async def stream_chat(model: str, messages: list[dict]) -> AsyncIterator[str]:
                 if text:
                     yield text
                 if chunk.get("done"):
+                    ev, ed = chunk.get("eval_count", 0), chunk.get("eval_duration", 0)
+                    pc, pd = chunk.get("prompt_eval_count", 0), chunk.get("prompt_eval_duration", 0)
+                    last_stats.clear()
+                    last_stats.update(
+                        tokens=ev, tok_s=round(ev / (ed / 1e9), 2) if ed else None,
+                        prompt_tokens=pc, prompt_tok_s=round(pc / (pd / 1e9), 1) if pd else None,
+                        load_s=round(chunk.get("load_duration", 0) / 1e9, 2),
+                        total_s=round(chunk.get("total_duration", 0) / 1e9, 2),
+                    )
                     break
 
 
@@ -67,7 +86,7 @@ async def json_chat(model: str, messages: list[dict], schema: dict) -> dict:
         "stream": False,
         "think": False,
         "format": schema,
-        "options": {"temperature": 0.1, "num_predict": 400, "num_ctx": NUM_CTX},
+        "options": _opts(temperature=0.1, num_predict=400),
     }
     async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
         r = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)

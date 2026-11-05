@@ -52,3 +52,11 @@ ATTACH_MAX_CHARS = int(os.getenv("ATOM_ATTACH_MAX_CHARS", "12000"))
 SEARXNG_URL = os.getenv("ATOM_SEARXNG_URL", "").rstrip("/")
 SEARCH_RESULTS = int(os.getenv("ATOM_SEARCH_RESULTS", "5"))
 SEARCH_PAGES = int(os.getenv("ATOM_SEARCH_PAGES", "3"))
+
+# Threads CPU donnés au modèle (0 = laisser Ollama choisir)
+NUM_THREADS = int(os.getenv("ATOM_NUM_THREADS", "0"))
+
+# Sauvegardes
+BACKUP_DIR = Path(os.getenv("ATOM_BACKUP_DIR", "data/backups"))
+BACKUP_KEEP = int(os.getenv("ATOM_BACKUP_KEEP", "7"))
+BACKUP_TIME = os.getenv("ATOM_BACKUP_TIME", "03:30")
