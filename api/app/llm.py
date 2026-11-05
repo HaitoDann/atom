@@ -111,10 +111,11 @@ async def embed(texts: list[str], kind: str = "document") -> list[np.ndarray] | 
         return [_mock_vec(t) for t in texts]
     prefix = "search_query: " if kind == "query" else "search_document: "
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=120)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
             r = await client.post(
                 f"{OLLAMA_URL}/api/embed",
-                json={"model": EMBED_MODEL, "input": [prefix + t for t in texts]},
+                json={"model": EMBED_MODEL, "input": [prefix + t for t in texts], "keep_alive": "24h",
+                      "options": {k: v for k, v in _opts().items() if k == "num_thread"}},
             )
         if r.status_code != 200:
             return None

@@ -513,6 +513,8 @@
   .cv-bar, .cv-selbar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); min-height: 42px; }
   .cv-bar[hidden], .cv-selbar[hidden] { display: none; }
   .cv-selbar { background: rgba(255,214,102,.05); font-size: 12.5px; color: var(--text-2); }
+  .idxbar { display: block; height: 2px; margin-top: 6px; border-radius: 2px; background: var(--border); overflow: hidden; max-width: 320px; }
+  .idxbar i { display: block; height: 100%; background: var(--text-2); transition: width .8s var(--ease-out); }
   .cv-editbox { padding: 10px 12px; border-bottom: 1px solid var(--border); display: grid; gap: 8px; }
   .cv-editbox[hidden], .cv-diffbar[hidden], .cv-changes[hidden] { display: none; }
   .cv-editbox textarea { resize: vertical; min-height: 54px; font-size: 13px; }
@@ -3447,8 +3449,8 @@ function showView(v) {
   if (v !== "chat") exitHero();
   else if (!history.length) requestAnimationFrame(() => enterHero());
   if (v === "library") { $("title").textContent = "Bibliothèque"; loadLibrary(); }
-  else if (v === "code") { $("title").textContent = "Code"; loadCodeProjects(); clearTimeout(libTimer); }
-  else { updateTitle(); clearTimeout(libTimer); }
+  else if (v === "code") { $("title").textContent = "Code"; loadCodeProjects(); }
+  else { updateTitle(); if (!library.collections.some((c) => c.status === "indexing")) clearTimeout(libTimer); }
   if (typeof syncTabbar === "function") syncTabbar();
 }
 $("navLib").onclick = () => showView(currentView === "library" ? "chat" : "library");
@@ -3464,8 +3466,61 @@ async function loadLibrary() {
   const busyIdx = library.collections.some((c) => c.status === "indexing");
   entity.feedColor = busyIdx ? [235, 235, 240] : [110, 170, 255];
   if (!$("libView").hidden || !$("codeView").hidden) entity.feeding = busyIdx;
+  watchIndexing();
   clearTimeout(libTimer);
-  if (!$("libView").hidden) libTimer = setTimeout(loadLibrary, busyIdx ? 2500 : 15000);
+  // Pendant une indexation, on suit la progression quelle que soit la vue (et on prévient à la fin).
+  if (busyIdx || !$("libView").hidden) libTimer = setTimeout(loadLibrary, busyIdx ? 2000 : 15000);
+}
+
+// ---- suivi des indexations : progression lisible + notification de fin
+const idxSeen = new Map();   // id → { status, phase, done, t }
+function idxText(c) {
+  const p = c.progress;
+  if (c.status !== "indexing") return c.message || "";
+  if (!p) return c.message || "Indexation…";
+  if (p.phase === "clone") return "Téléchargement du dépôt…";
+  if (p.phase === "read") return `Lecture de ${p.total} fichiers…`;
+  if (p.phase === "embed") {
+    if (!p.total) return "Finalisation…";
+    const pct = Math.floor((100 * p.done) / p.total);
+    const s = idxSeen.get(c.id), rate = s?.rate;
+    const left = rate > 0 ? Math.max(1, Math.round((p.total - p.done) / rate)) : 0;
+    return `Indexation : ${p.done} / ${p.total} passages · ${pct} %` + (left ? ` · ~${left < 90 ? left + " s" : Math.round(left / 60) + " min"}` : "");
+  }
+  return c.message || "Indexation…";
+}
+function idxPct(c) {
+  const p = c.progress;
+  if (c.status !== "indexing" || !p) return null;
+  return p.phase === "embed" && p.total ? p.done / p.total : p.phase === "read" ? 0.02 : 0;
+}
+function watchIndexing() {
+  const now = performance.now() / 1000;
+  for (const c of library.collections) {
+    const prev = idxSeen.get(c.id), p = c.progress || {};
+    const cur = { status: c.status, phase: p.phase, done: p.done || 0, t: now, rate: prev?.rate || 0 };
+    if (prev && prev.phase === "embed" && p.phase === "embed" && cur.done > prev.done) {
+      const r = (cur.done - prev.done) / Math.max(0.5, now - prev.t);
+      cur.rate = prev.rate ? prev.rate * 0.6 + r * 0.4 : r;
+    }
+    if (prev && prev.status === "indexing" && c.status !== "indexing") {
+      if (c.status === "ready") toast(`<b>${esc(c.name)}</b> · prêt : ${c.documents} fichiers, ${c.chunks} passages indexés.`);
+      else if (c.status === "error") toast(`<b>${esc(c.name)}</b> · ${esc(c.message || "indexation impossible")}`);
+    }
+    // le projet ouvert dans la vue Code : la liste des fichiers arrive dès la fin de la lecture
+    if (!$("codeView").hidden && c.id === code.project && prev
+        && (prev.status !== c.status || (prev.phase !== p.phase && p.phase === "embed"))) loadCodeFiles();
+    else if (!$("codeView").hidden && c.id === code.project) renderCodeInfo(c);
+    idxSeen.set(c.id, cur);
+  }
+}
+// lancée depuis l'interface : la fin sera signalée même si elle survient avant le premier relevé
+function markIndexing(id) { idxSeen.set(id, { status: "indexing", phase: "clone", done: 0, t: performance.now() / 1000, rate: 0 }); }
+function renderCodeInfo(c) {
+  const pct = idxPct(c);
+  $("cvInfo").innerHTML = c.status === "indexing"
+    ? `${esc(idxText(c))}<span class="idxbar"><i style="width:${Math.round((pct || 0) * 100)}%"></i></span>`
+    : esc(c.status === "error" ? c.message || "Erreur" : `${code.files.length} fichiers · ${c.source || ""}`);
 }
 
 function renderLibrary() {
@@ -3493,7 +3548,7 @@ async function renderCollection() {
     <div class="lib-head">
       <div><h2>${esc(c.name)}</h2>
         <p>${isCode ? `Projet de code · ${esc(c.source || "")}` : "Documents"} · ${d.documents.length} fichier${d.documents.length > 1 ? "s" : ""} · ${c.chunks} passage${c.chunks > 1 ? "s" : ""} indexé${c.chunks > 1 ? "s" : ""}</p>
-        ${c.message ? `<p class="${c.status === "error" ? "lib-err" : ""}">${esc(c.message)}</p>` : ""}
+        ${c.message || c.status === "indexing" ? `<p class="${c.status === "error" ? "lib-err" : ""}">${esc(idxText(c))}${c.status === "indexing" ? `<span class="idxbar"><i style="width:${Math.round((idxPct(c) || 0) * 100)}%"></i></span>` : ""}</p>` : ""}
       </div>
       <div class="row">
         ${isCode ? `<button class="btn" data-a="sync">${icon("refresh")} Mettre à jour</button>` : ""}
@@ -3532,7 +3587,7 @@ async function renderCollection() {
     await send_(`/api/library/collections/${c.id}`, "PATCH", { name: n.trim(), kind: c.kind }); loadLibrary();
   };
   box.querySelector('[data-a="ask"]').onclick = () => { setScope(String(c.id)); showView("chat"); newConversation(); fillInput(isCode ? "Explique-moi l'architecture de ce projet." : "Que contiennent ces documents ? "); };
-  box.querySelector('[data-a="sync"]')?.addEventListener("click", async () => { await send_(`/api/library/collections/${c.id}/sync`, "POST"); toast("Mise à jour du projet lancée."); loadLibrary(); });
+  box.querySelector('[data-a="sync"]')?.addEventListener("click", async () => { await send_(`/api/library/collections/${c.id}/sync`, "POST"); markIndexing(c.id); toast("Mise à jour du projet lancée."); loadLibrary(); });
   const drop = $("libDrop");
   if (drop) {
     $("libFile").onchange = (e) => { uploadDocs(c.id, [...e.target.files]); e.target.value = ""; };
@@ -3576,7 +3631,7 @@ $("codeOk").onclick = async () => {
   const name = $("codeName").value.trim() || source.replace(/\.git$/, "").split("/").filter(Boolean).pop();
   try {
     const c = await (await send_("/api/library/collections", "POST", { name, kind: "code", source })).json();
-    $("codeDlg").classList.remove("open"); libSel = c.id; toast("Projet ajouté · Atom lit le code…"); loadLibrary();
+    $("codeDlg").classList.remove("open"); libSel = c.id; markIndexing(c.id); toast("Projet ajouté · téléchargement puis indexation, je te préviens quand c'est prêt."); loadLibrary();
   } catch (e) { toast(esc(e.message)); }
 };
 
@@ -3783,6 +3838,7 @@ async function loadCodeProjects() {
   if (!projects.some((p) => p.id === code.project)) code.project = projects[0].id;
   sel.value = code.project;
   await loadCodeFiles();
+  if (projects.some((p) => p.status === "indexing")) { clearTimeout(libTimer); libTimer = setTimeout(loadLibrary, 2000); }
 }
 $("cvProject").onchange = async () => { code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
 
@@ -3791,7 +3847,7 @@ async function loadCodeFiles() {
   loadChanges();
   code.files = d.documents.map((x) => ({ path: x.path, size: x.size })).sort((a, b) => a.path.localeCompare(b.path));
   const c = d.collection;
-  $("cvInfo").textContent = c.status === "indexing" ? (c.message || "Indexation…") : `${code.files.length} fichiers · ${c.source || ""}`;
+  renderCodeInfo({ ...c, progress: library.collections.find((x) => x.id === c.id)?.progress });
   renderTree();
 }
 
@@ -3951,7 +4007,7 @@ $("cvAsk").onclick = () => askAtom("Explique-moi ce fichier : son rôle dans le 
 $("cvCopy").onclick = (e) => flashCopy(e.currentTarget, code.open.find((x) => x.path === code.active)?.content || "");
 $("cvCopyPath").onclick = () => { copyText(code.active || ""); toast("Chemin copié."); };
 $("cvMd").onclick = () => { const f = code.open.find((x) => x.path === code.active); if (f) { f.md = !f.md; renderEditor(); } };
-$("cvSync").onclick = async () => { await send_(`/api/library/collections/${code.project}/sync`, "POST"); toast("Mise à jour du projet lancée."); setTimeout(loadCodeFiles, 2500); };
+$("cvSync").onclick = async () => { await send_(`/api/library/collections/${code.project}/sync`, "POST"); markIndexing(code.project); toast("Mise à jour du projet lancée."); loadLibrary(); };
 $("cvAdd").onclick = () => { library.server_projects ||= []; $("libNewCode").onclick(); };
 $("cvAdd2").onclick = () => $("cvAdd").onclick();
 

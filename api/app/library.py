@@ -280,7 +280,11 @@ def list_collections() -> list[dict]:
             "SELECT co.*, (SELECT COUNT(*) FROM documents d WHERE d.collection_id = co.id) AS documents, "
             "(SELECT COUNT(*) FROM chunks ch WHERE ch.collection_id = co.id) AS chunks "
             "FROM collections co ORDER BY co.kind DESC, co.name").fetchall()
-    return [dict(r) for r in rows]
+    out = [dict(r) for r in rows]
+    for c in out:
+        if c["id"] in PROGRESS:
+            c["progress"] = {k: v for k, v in PROGRESS[c["id"]].items()}
+    return out
 
 
 def create_collection(name: str, kind: str = "docs", source: str | None = None) -> int:
@@ -356,8 +360,8 @@ def delete_document(did: int) -> None:
 
 async def _embed_chunks(chunks: list[dict]) -> list[np.ndarray | None]:
     out: list[np.ndarray | None] = []
-    for i in range(0, len(chunks), 16):
-        vecs = await llm.embed([c["text"][:2000] for c in chunks[i:i + 16]])
+    for i in range(0, len(chunks), EMBED_BATCH):
+        vecs = await llm.embed([c["text"][:2000] for c in chunks[i:i + EMBED_BATCH]])
         if vecs is None:
             raise RuntimeError("Le modèle d'embedding (nomic-embed-text) est indisponible.")
         out.extend(vecs)
@@ -497,34 +501,50 @@ def tree(cid: int, max_lines: int = 120) -> str:
     return "\n".join(lines[:max_lines]) + ("\n…" if len(lines) > max_lines else "")
 
 
+PROGRESS: dict[int, dict] = {}   # cid → {phase, done, total, started}
+EMBED_BATCH = int(os.getenv("ATOM_EMBED_BATCH", "64"))
+
+
+def _progress(cid: int, phase: str, done: int = 0, total: int = 0) -> None:
+    p = PROGRESS.setdefault(cid, {"started": time.time()})
+    p.update(phase=phase, done=done, total=total)
+
+
 async def index_project(cid: int) -> None:
+    """Deux temps : 1) les fichiers sont enregistrés (le projet est tout de suite consultable),
+    2) les passages sont vectorisés par gros lots, avec progression (c'est la partie lente sur CPU)."""
     col = get_collection(cid)
     if not col:
         return
+    PROGRESS.pop(cid, None)
+    _progress(cid, "clone")
     set_collection(cid, status="indexing", message="Récupération du code…")
     try:
+        t0 = time.time()
         root = await asyncio.to_thread(_sync_repo, col)
         files = await asyncio.to_thread(_code_files, root)
         if not files:
             raise RuntimeError("Aucun fichier de code lisible trouvé.")
+        log.info("projet %s récupéré en %.1f s (%d fichiers)", col["name"], time.time() - t0, len(files))
+        _progress(cid, "read", 0, len(files))
+        set_collection(cid, message=f"Lecture de {len(files)} fichiers…")
         with db.conn() as c:
             known = {r["path"]: dict(r) for r in c.execute("SELECT id, path, hash FROM documents WHERE collection_id = ?", (cid,))}
-        seen = set()
-        done = 0
-        for f in files:
-            rel = str(f.relative_to(root))
-            seen.add(rel)
-            try:
-                raw = f.read_bytes()
-            except OSError:
-                continue
-            h = hashlib.sha1(raw).hexdigest()
-            if rel in known and known[rel]["hash"] == h:
-                continue   # inchangé
-            text = raw.decode("utf-8", "ignore")
-            if "\x00" in text[:2000]:
-                continue
-            with db.conn() as c:
+        seen, todo = set(), []   # todo : [(did, chunks)]
+        with db.conn() as c:
+            for f in files:
+                rel = str(f.relative_to(root))
+                seen.add(rel)
+                try:
+                    raw = f.read_bytes()
+                except OSError:
+                    continue
+                h = hashlib.sha1(raw).hexdigest()
+                if rel in known and known[rel]["hash"] == h:
+                    continue   # inchangé
+                text = raw.decode("utf-8", "ignore")
+                if "\x00" in text[:2000]:
+                    continue
                 if rel in known:
                     did = known[rel]["id"]
                     c.execute("UPDATE documents SET hash = ?, size = ?, chars = ?, status = 'ready' WHERE id = ?",
@@ -533,24 +553,48 @@ async def index_project(cid: int) -> None:
                     did = c.execute("INSERT INTO documents (collection_id, name, path, size, chars, hash, status, created_at) "
                                     "VALUES (?, ?, ?, ?, ?, ?, 'ready', ?)",
                                     (cid, f.name, rel, len(raw), len(text), h, time.time())).lastrowid
-            chunks = chunk_code(rel, text)
-            if chunks:
-                await _store_chunks(did, cid, chunks)
-            done += 1
-            if done % 20 == 0:
-                set_collection(cid, message=f"Indexation : {done} fichiers…")
-        # fichiers supprimés du projet
-        with db.conn() as c:
-            for rel, d in known.items():
+                chunks = chunk_code(rel, text)
+                if chunks:
+                    todo.append((did, chunks))
+            for rel, d in known.items():   # fichiers supprimés du projet
                 if rel not in seen:
                     c.execute("DELETE FROM chunks WHERE document_id = ?", (d["id"],))
                     c.execute("DELETE FROM documents WHERE id = ?", (d["id"],))
         _bump()
+        # Vectorisation : tous les passages à la suite, par lots de EMBED_BATCH (moins d'allers-retours).
+        flat = [(did, ch) for did, chunks in todo for ch in chunks]
+        total = len(flat)
+        _progress(cid, "embed", 0, total)
+        t1 = time.time()
+        vecs: list = []
+        for i in range(0, total, EMBED_BATCH):
+            batch = flat[i:i + EMBED_BATCH]
+            v = await llm.embed([ch["text"][:2000] for _, ch in batch])
+            if v is None:
+                raise RuntimeError("Le modèle d'embedding (nomic-embed-text) est indisponible.")
+            vecs.extend(v)
+            _progress(cid, "embed", len(vecs), total)
+            set_collection(cid, message=f"Indexation : {len(vecs)}/{total} passages")
+        pos = 0
+        with db.conn() as c:
+            for did, chunks in todo:
+                c.execute("DELETE FROM chunks WHERE document_id = ?", (did,))
+                c.executemany(
+                    "INSERT INTO chunks (document_id, collection_id, ord, page, line_start, line_end, text, embedding) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [(did, cid, k, ch.get("page"), ch.get("line_start"), ch.get("line_end"), ch["text"], db.to_blob(vecs[pos + k]))
+                     for k, ch in enumerate(chunks)])
+                pos += len(chunks)
+        _bump()
+        dt = time.time() - t1
         set_collection(cid, status="ready", message=f"{len(files)} fichiers indexés.")
-        log.info("projet %s indexé : %d fichiers (%d mis à jour)", col["name"], len(files), done)
+        log.info("projet %s indexé : %d fichiers (%d mis à jour), %d passages en %.1f s (%.0f/s)",
+                 col["name"], len(files), len(todo), total, dt, total / dt if dt else 0)
     except Exception as e:  # noqa: BLE001
         log.warning("indexation du projet %s impossible : %s", col["name"], e)
         set_collection(cid, status="error", message=str(e)[:300])
+    finally:
+        PROGRESS.pop(cid, None)
 
 
 def read_file(cid: int, rel: str) -> str:
