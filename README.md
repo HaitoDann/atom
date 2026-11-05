@@ -222,12 +222,15 @@ Atom répond **en local par défaut**. Il peut s'appuyer sur un modèle Mistral,
 
 ## Mode Code
 
-Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub ou dossier du serveur), en lecture seule.
+Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub ou dossier du serveur), et faire proposer des modifications.
 
 - **Arborescence** repliable, **filtre** par nom de fichier, et **recherche dans le contenu** (loupe) avec les lignes trouvées — un clic ouvre le fichier à la bonne ligne.
 - **Onglets** (8 fichiers ouverts au plus), **numéros de ligne**, **coloration syntaxique** par langage (Python, JS/TS, Go, Rust, C/C++, Java, PHP, Shell, SQL, YAML, TOML, JSON, HTML, CSS…), **aperçu** des fichiers Markdown.
 - **Demander à Atom** : clique sur un numéro de ligne (Maj+clic pour une plage), puis **Expliquer**, **Relire** (bugs, cas oubliés) ou **Demander…** — le passage est joint à une nouvelle conversation ciblée sur le projet. « Expliquer le fichier » fait de même pour tout le fichier.
-- **Mettre à jour** récupère les derniers changements du dépôt.
+- **Modifier…** (sur le fichier, ou sur une sélection de lignes) : écris la consigne (« gère le cas où la liste est vide »), Atom propose une version réécrite et le serveur affiche le **diff** (lignes ajoutées / retirées). Rien n'est écrit tant que tu n'as pas cliqué **Appliquer**. Fichier entier jusqu'à 400 lignes ; au-delà, sélectionne la partie à changer. Avec le mode hybride et « fichiers et bibliothèque » autorisés, tu peux cocher l'API distante pour cette proposition.
+- **Appliquer** n'est possible que sur les **dépôts GitHub clonés par Atom** (`data/repos`). Les dossiers du serveur (`/projects`) sont montés en **lecture seule** : télécharge le **patch** et applique-le chez toi (`git apply fichier.patch`).
+- **Modifications locales** (en haut de l'arborescence) : liste des fichiers changés, **Patch** pour tout télécharger, **Annuler** pour revenir à la version du dépôt. Atom ne fait jamais de commit ni de push.
+- **Mettre à jour** récupère les derniers changements du dépôt (si un fichier modifié localement change aussi sur GitHub, annule d'abord ta modification).
 
 ## Atelier multi-IA (désactivé par défaut)
 
