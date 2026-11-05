@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, db, ocr, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, auth, backup, codeedit, db, ocr, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -677,6 +677,67 @@ def project_file(cid: int, path: str):
         return {"path": path, "content": library.read_file(cid, path)}
     except FileNotFoundError as e:
         raise HTTPException(404, "Fichier introuvable") from e
+
+
+# ---- mode Code : modifications proposées
+
+
+class ProposeIn(BaseModel):
+    path: str = Field(max_length=500)
+    instruction: str = Field(min_length=2, max_length=4000)
+    start: int | None = None
+    end: int | None = None
+    engine: str = "local"
+
+
+@app.post("/api/code/{cid}/propose")
+async def code_propose(cid: int, body: ProposeIn):
+    try:
+        return await codeedit.propose(cid, body.path, body.instruction, body.start, body.end, body.engine)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Fichier introuvable") from e
+    except UnicodeDecodeError as e:
+        raise HTTPException(415, "Fichier non texte") from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Le modèle n'a pas répondu : {e}") from e
+
+
+@app.post("/api/code/proposals/{pid}/apply")
+def code_apply(pid: str):
+    try:
+        out = codeedit.apply(pid)
+    except KeyError as e:
+        raise HTTPException(404, str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(409, str(e)) from e
+    return out
+
+
+@app.get("/api/code/{cid}/changes")
+def code_changes(cid: int):
+    try:
+        return codeedit.changes(cid)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Projet introuvable") from e
+
+
+class RevertIn(BaseModel):
+    path: str = Field(max_length=500)
+
+
+@app.post("/api/code/{cid}/revert")
+def code_revert(cid: int, body: RevertIn):
+    try:
+        codeedit.revert(cid, body.path)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Fichier introuvable") from e
+    except (PermissionError, RuntimeError) as e:
+        raise HTTPException(409, str(e)) from e
+    return {"ok": True}
 
 
 # ---- sauvegardes

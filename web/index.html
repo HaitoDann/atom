@@ -513,6 +513,24 @@
   .cv-bar, .cv-selbar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); min-height: 42px; }
   .cv-bar[hidden], .cv-selbar[hidden] { display: none; }
   .cv-selbar { background: rgba(255,214,102,.05); font-size: 12.5px; color: var(--text-2); }
+  .cv-editbox { padding: 10px 12px; border-bottom: 1px solid var(--border); display: grid; gap: 8px; }
+  .cv-editbox[hidden], .cv-diffbar[hidden], .cv-changes[hidden] { display: none; }
+  .cv-editbox textarea { resize: vertical; min-height: 54px; font-size: 13px; }
+  .cv-editbox .row { display: flex; align-items: center; gap: 6px; }
+  .cv-diffbar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); min-height: 42px; font-size: 12.5px; color: var(--text-2); }
+  .cv-diffbar b { color: var(--strong); font-weight: 500; }
+  .cv-diff { font: 12.5px/1.6 var(--mono); padding: 10px 0; white-space: pre; overflow: auto; }
+  .cv-diff div { padding: 0 16px; min-height: 1.6em; }
+  .cv-diff .add { background: rgba(80, 200, 120, .1); color: var(--strong); }
+  .cv-diff .del { background: rgba(240, 90, 90, .1); color: var(--muted); }
+  .cv-diff .hunk { color: var(--faint); padding-top: 8px; }
+  .cv-diff .note-l { white-space: normal; color: var(--text-2); font-family: var(--sans); padding-bottom: 8px; }
+  .cv-changes { margin: 0 2px 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--text) 3.5%, transparent); font-size: 12px; }
+  .cv-changes .h { display: flex; align-items: center; justify-content: space-between; color: var(--muted); margin-bottom: 4px; }
+  .cv-changes .f { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .cv-changes .f span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .cv-changes button { background: none; border: 0; color: var(--faint); font-size: 11.5px; padding: 0 2px; }
+  .cv-changes button:hover { color: var(--text); }
   .cv-path { font: 12.5px var(--mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .cv-meta { font: 11px var(--mono); color: var(--faint); white-space: nowrap; }
   .btn.sm { padding: 4px 10px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
@@ -955,6 +973,7 @@
       <aside class="cv-side">
         <div class="row" style="gap:6px"><select class="field" id="cvProject" style="flex:1;min-width:0"></select><button class="iconbtn" id="cvSync" title="Mettre à jour le projet" data-i="refresh"></button><button class="iconbtn" id="cvAdd" title="Ajouter un projet" data-i="plus"></button></div>
         <p class="note" id="cvInfo" style="margin:6px 2px 8px"></p>
+        <div class="cv-changes" id="cvChanges" hidden></div>
         <div class="row" style="gap:6px;margin-bottom:6px"><input class="field" id="cvFilter" placeholder="Filtrer les fichiers…" autocomplete="off"><button class="iconbtn" id="cvGrep" title="Chercher dans le contenu des fichiers" data-i="search"></button></div>
         <div class="cv-tree" id="cvTree"></div>
       </aside>
@@ -968,9 +987,18 @@
             <button class="iconbtn" id="cvCopyPath" title="Copier le chemin" data-i="link"></button>
             <button class="iconbtn" id="cvCopy" title="Copier le fichier" data-i="copy"></button>
             <button class="btn sm" id="cvAsk"><span data-i="spark"></span>Expliquer le fichier</button>
+            <button class="btn sm" id="cvEdit"><span data-i="edit"></span>Modifier…</button>
           </div>
           <div class="cv-selbar" id="cvSelBar" hidden><span id="cvSelInfo"></span><span class="spacer"></span>
-            <button class="btn sm" id="cvExplain">Expliquer</button><button class="btn sm" id="cvReview">Relire</button><button class="btn sm" id="cvAskSel">Demander…</button></div>
+            <button class="btn sm" id="cvExplain">Expliquer</button><button class="btn sm" id="cvReview">Relire</button><button class="btn sm" id="cvAskSel">Demander…</button><button class="btn sm" id="cvEditSel">Modifier…</button></div>
+          <div class="cv-editbox" id="cvEditBox" hidden>
+            <textarea class="field" id="cvInstr" rows="2" placeholder="Que faut-il changer ? Ex. « gère le cas où la liste est vide »"></textarea>
+            <div class="row"><span class="note" id="cvEditScope"></span><span class="spacer"></span>
+              <label class="note" id="cvRemoteWrap" hidden><input type="checkbox" id="cvRemote"> <span id="cvRemoteName"></span></label>
+              <button class="btn sm" id="cvEditCancel">Annuler</button><button class="btn sm primary" id="cvEditGo">Proposer</button></div>
+          </div>
+          <div class="cv-diffbar" id="cvDiffBar" hidden><span id="cvDiffInfo"></span><span class="spacer"></span>
+            <button class="btn sm" id="cvDiffDrop">Abandonner</button><button class="btn sm" id="cvDiffPatch"><span data-i="download"></span>Patch</button><button class="btn sm primary" id="cvDiffApply"><span data-i="check"></span>Appliquer</button></div>
           <div class="cv-editor" id="cvEditor"></div>
         </div>
       </div>
@@ -3356,7 +3384,7 @@ async function refreshCounts() {
 async function loadBackups() {
   let d;
   try { d = await getJSON("/api/backups"); } catch { return; }
-  $("bkInfo").textContent = `Atom copie toute sa mémoire (conversations, souvenirs, rappels, lien) chaque nuit à ${d.time}, et garde les ${d.keep} dernières copies dans le dossier « backups » du serveur.`;
+  $("bkInfo").textContent = `Atom copie toute sa mémoire (conversations, souvenirs, rappels) chaque nuit à ${d.time}, et garde les ${d.keep} dernières copies dans le dossier « backups » du serveur.`;
   const label = { auto: "automatique", manual: "manuelle", export: "téléchargée", prerestore: "avant restauration", "": "" };
   $("bkList").innerHTML = d.backups.length ? "" : '<li class="none">Aucune sauvegarde pour l\'instant.</li>';
   for (const b of d.backups) {
@@ -3700,7 +3728,7 @@ $("hyModelSave").onclick = async () => { await saveHybrid({ model: $("hyModelSel
 /* ============================================================
    MODE CODE — parcourir un projet, lire ses fichiers
    ============================================================ */
-const code = { project: null, files: [], open: [], active: null, sel: null, expanded: new Set([""]), grep: false };
+const code = { project: null, files: [], open: [], active: null, sel: null, proposal: null, editRange: null, changes: null, expanded: new Set([""]), grep: false };
 const LANG = (p) => {
   const n = p.toLowerCase(), ext = n.includes(".") ? n.split(".").pop() : n.split("/").pop();
   return ({ py: "py", sh: "sh", bash: "sh", zsh: "sh", yml: "yaml", yaml: "yaml", toml: "toml", ini: "ini", cfg: "ini", conf: "ini", env: "ini",
@@ -3756,10 +3784,11 @@ async function loadCodeProjects() {
   sel.value = code.project;
   await loadCodeFiles();
 }
-$("cvProject").onchange = async () => { code.project = +$("cvProject").value; code.open = []; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
+$("cvProject").onchange = async () => { code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
 
 async function loadCodeFiles() {
   const d = await getJSON(`/api/library/collections/${code.project}/documents`);
+  loadChanges();
   code.files = d.documents.map((x) => ({ path: x.path, size: x.size })).sort((a, b) => a.path.localeCompare(b.path));
   const c = d.collection;
   $("cvInfo").textContent = c.status === "indexing" ? (c.message || "Indexation…") : `${code.files.length} fichiers · ${c.source || ""}`;
@@ -3864,6 +3893,8 @@ const MAX_LINES = 8000;
 function renderEditor(scrollLine) {
   const f = code.open.find((x) => x.path === code.active);
   $("cvBar").hidden = !f; $("cvSelBar").hidden = true;
+  if (code.proposal && code.proposal.path === f?.path) return renderDiff();
+  $("cvDiffBar").hidden = true;
   const ed = $("cvEditor");
   if (!f) { ed.innerHTML = '<div class="cv-placeholder">Choisis un fichier dans l\'arborescence.<small>Clique sur les numéros de ligne (Maj+clic pour une plage) pour demander à Atom d\'expliquer un passage.</small></div>'; return; }
   const lines = f.content.split("\n");
@@ -3923,6 +3954,90 @@ $("cvMd").onclick = () => { const f = code.open.find((x) => x.path === code.acti
 $("cvSync").onclick = async () => { await send_(`/api/library/collections/${code.project}/sync`, "POST"); toast("Mise à jour du projet lancée."); setTimeout(loadCodeFiles, 2500); };
 $("cvAdd").onclick = () => { library.server_projects ||= []; $("libNewCode").onclick(); };
 $("cvAdd2").onclick = () => $("cvAdd").onclick();
+
+/* ---- modifications proposées : Atom propose, tu valides fichier par fichier */
+function openEditBox(withSel) {
+  const f = code.open.find((x) => x.path === code.active);
+  if (!f) return;
+  code.editRange = withSel && code.sel ? [...code.sel] : null;
+  const n = f.content.split("\n").length;
+  $("cvEditScope").textContent = code.editRange ? `Lignes ${code.editRange[0]} à ${code.editRange[1]}` : n > 400 ? "Fichier long : sélectionne d'abord des lignes" : "Fichier entier";
+  const h = typeof hybridState !== "undefined" ? hybridState : null;
+  $("cvRemoteWrap").hidden = !(h?.configured && h?.allow_docs);
+  $("cvRemoteName").textContent = h ? `avec ${h.name}` : "";
+  $("cvEditBox").hidden = false; $("cvInstr").focus();
+}
+$("cvEdit").onclick = () => openEditBox(false);
+$("cvEditSel").onclick = () => openEditBox(true);
+$("cvEditCancel").onclick = () => { $("cvEditBox").hidden = true; };
+$("cvInstr").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("cvEditGo").click(); if (e.key === "Escape") $("cvEditBox").hidden = true; });
+$("cvEditGo").onclick = async () => {
+  const instruction = $("cvInstr").value.trim();
+  if (instruction.length < 2) { $("cvInstr").focus(); return; }
+  const btn = $("cvEditGo"); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Atom réfléchit…';
+  setEmotion("thinking"); entity.scan = true;
+  const [start, end] = code.editRange || [null, null];
+  try {
+    const p = await (await send_(`/api/code/${code.project}/propose`, "POST", { path: code.active, instruction, start, end, engine: $("cvRemote").checked ? "remote" : "local" })).json();
+    code.proposal = p; $("cvEditBox").hidden = true; $("cvInstr").value = "";
+    setEmotion("idle");
+    renderEditor();
+  } catch (e) {
+    setEmotion("idle"); entity.glitch = 1; toast(`<b>Modification</b> · ${esc(e.message)}`);
+  } finally {
+    btn.disabled = false; btn.textContent = "Proposer"; entity.scan = false;
+  }
+};
+function renderDiff() {
+  const p = code.proposal;
+  $("cvDiffBar").hidden = false;
+  $("cvDiffInfo").innerHTML = `Proposition · <b>+${p.added}</b> / <b>−${p.removed}</b>` + (p.by && p.by !== "local" ? ` · ${esc(p.by)}` : "");
+  $("cvDiffApply").hidden = !p.writable;
+  $("cvDiffApply").title = p.writable ? "Écrire la modification dans le clone local" : "";
+  $("cvDiffPatch").title = p.writable ? "Télécharger le patch" : "Projet en lecture seule : télécharge le patch et applique-le avec git apply";
+  const rows = p.diff.split("\n").filter((l, i) => !(i < 2 && (l.startsWith("---") || l.startsWith("+++"))));
+  $("cvEditor").innerHTML = `<div class="cv-diff">${p.note ? `<div class="note-l">${esc(p.note)}</div>` : ""}${rows.map((l) =>
+    `<div class="${l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : ""}">${esc(l)}</div>`).join("")}</div>`;
+}
+function downloadPatch(text, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/x-diff" }));
+  a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$("cvDiffDrop").onclick = () => { code.proposal = null; renderEditor(); };
+$("cvDiffPatch").onclick = () => { const p = code.proposal; if (p) downloadPatch(p.diff, p.path.split("/").pop() + ".patch"); };
+$("cvDiffApply").onclick = async () => {
+  const p = code.proposal; if (!p) return;
+  let d;
+  try { d = await (await send_(`/api/code/proposals/${p.id}/apply`, "POST")).json(); }
+  catch (e) { toast(`<b>Modification</b> · ${esc(e.message)}`); return; }
+  const f = code.open.find((x) => x.path === p.path); if (f) f.content = d.content;
+  code.proposal = null; code.sel = null; entity.seal = 1;
+  toast(`<b>${esc(p.path)}</b> · modification appliquée (clone local).`);
+  renderEditor(); loadChanges();
+};
+async function loadChanges() {
+  const box = $("cvChanges");
+  let d;
+  try { d = await getJSON(`/api/code/${code.project}/changes`); } catch { box.hidden = true; return; }
+  code.changes = d;
+  box.hidden = !d.files.length;
+  if (!d.files.length) return;
+  box.innerHTML = `<div class="h"><span>${d.files.length} modification${d.files.length > 1 ? "s" : ""} locale${d.files.length > 1 ? "s" : ""}</span><button id="cvPatchAll">Patch</button></div>`
+    + d.files.map((f, i) => `<div class="f"><span data-i2="${i}" title="${esc(f.path)} · ${esc(f.status)}">${esc(f.path)}</span><button data-rv="${i}" title="Revenir à la version du dépôt">Annuler</button></div>`).join("");
+  box.querySelector("#cvPatchAll").onclick = () => downloadPatch(d.diff, "atom-modifications.patch");
+  box.querySelectorAll("[data-i2]").forEach((el) => { el.onclick = () => openFile(d.files[+el.dataset.i2].path); });
+  box.querySelectorAll("[data-rv]").forEach((el) => {
+    el.onclick = async () => {
+      const path = d.files[+el.dataset.rv].path;
+      if (!confirm(`Annuler les modifications de ${path} ?`)) return;
+      await send_(`/api/code/${code.project}/revert`, "POST", { path });
+      code.open = code.open.filter((x) => x.path !== path);
+      if (code.active === path) { code.active = null; await openFile(path); }
+      loadChanges();
+    };
+  });
+}
 
 /* ============================================================
    ATELIER MULTI-IA
