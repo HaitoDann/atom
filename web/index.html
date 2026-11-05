@@ -442,6 +442,9 @@
   button.src-l { background: none; cursor: pointer; font: inherit; font-size: 12.5px; }
   @media (max-width: 760px) { #libView { grid-template-columns: 1fr; } .lib-side { border-right: 0; border-bottom: 1px solid var(--border); max-height: 40vh; } .lib-main { padding: 16px; } }
 
+  .acts .via { font: 10.5px var(--mono); color: var(--muted); border: 1px solid var(--border-2); border-radius: 5px; padding: 1px 6px; margin-left: 4px; }
+  #engineBtn.on { color: var(--strong); border-color: #555; }
+
   /* ---------------------------------------------------------------- densité / largeur */
   body.compact { font-size: 13.5px; }
   body.compact .msg { margin-bottom: 18px; }
@@ -608,7 +611,7 @@
     <div class="composer">
       <div class="composer-in">
         <button id="toBottom" title="Aller en bas" data-i="down"></button>
-        <div class="quick" id="quick"><div class="scope-wrap"><button type="button" class="chip" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div></div>
+        <div class="quick" id="quick"><div class="scope-wrap" id="engineWrap" style="display:none"><button type="button" class="chip" id="engineBtn" title="Quel modèle répond"></button><div class="scope-menu" id="engineMenu"></div></div><div class="scope-wrap"><button type="button" class="chip" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div></div>
         <form id="form" autocomplete="off">
           <div style="flex:1;min-width:0">
             <div class="tray" id="tray"></div>
@@ -670,6 +673,7 @@
       <button class="tab on" data-tab="general"><span data-i="settings"></span>Général</button>
       <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
       <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
+      <button class="tab" data-tab="hybrid"><span data-i="spark"></span>Hybride</button>
       <button class="tab" data-tab="backup"><span data-i="download"></span>Sauvegarde</button>
       <button class="tab" data-tab="look"><span data-i="panel"></span>Apparence</button>
       <button class="tab" data-tab="entity"><span data-i="orb"></span>Entité</button>
@@ -719,6 +723,32 @@
           <p class="note" id="remInfo"></p>
         </div>
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
+      </section>
+
+      <section class="pane" data-pane="hybrid">
+        <div class="block">
+          <h4>Mode hybride</h4>
+          <p class="desc" id="hyInfo">Atom répond en local par défaut, et peut s'appuyer sur un modèle plus puissant (Mistral) quand ça vaut le coup.</p>
+          <div id="hySetup" class="note" style="display:none;margin-bottom:12px"></div>
+          <h4 style="font-size:13px;margin-top:6px">Moteur par défaut</h4>
+          <div class="row" id="hyMode" style="margin:8px 0 6px;flex-wrap:wrap"></div>
+          <p class="note">Auto : Mistral pour les demandes longues ou complexes (analyse, comparaison, rédaction…), local pour le reste. Si Mistral ne répond pas, Atom repasse en local. Le choix sous la saisie peut changer le moteur pour une conversation.</p>
+        </div>
+        <div class="block">
+          <h4>Ce qui peut être envoyé à Mistral</h4>
+          <p class="desc">Ton message et le fil de la conversation sont toujours envoyés quand Mistral répond. Le reste ne sort que si tu l'autorises. La mémorisation, la recherche dans tes documents et l'indexation restent toujours en local.</p>
+          <label class="switch"><span>Mes souvenirs (ce qu'Atom sait de moi)</span><input type="checkbox" id="hyMem"></label>
+          <label class="switch"><span>Ma bibliothèque et mes fichiers joints</span><input type="checkbox" id="hyDocs"></label>
+          <label class="switch"><span>Les résultats de recherche web</span><input type="checkbox" id="hyWeb"></label>
+          <p class="note">Si une demande a besoin de ta bibliothèque ou d'un fichier et que l'envoi n'est pas autorisé, Atom répond en local.</p>
+        </div>
+        <div class="block">
+          <h4>Utilisation aujourd'hui</h4>
+          <div class="metric"><div class="l"><span id="hyUseL">—</span><span id="hyUseV"></span></div><div class="bar"><i id="hyUseB"></i></div></div>
+          <label class="lbl">Modèle Mistral</label>
+          <div class="row"><input class="field" id="hyModel" placeholder="mistral-small-latest"><button class="btn" id="hyModelSave">Enregistrer</button></div>
+          <p class="note">mistral-small-latest : rapide et économe · mistral-large-latest : le plus capable · codestral-latest : spécialisé code.</p>
+        </div>
       </section>
 
       <section class="pane" data-pane="backup">
@@ -1744,12 +1774,14 @@ function actions(m, idx) {
   } else {
     btn("copy", "Copier", (e) => flashCopy(e.currentTarget, m.content));
     if (idx === history.length - 1) btn("refresh", "Régénérer", () => regenerate());
+    if (idx === history.length - 1 && !m.meta?.provider && hybridState?.configured) btn("spark", `Réponse approfondie (${hybridState.name})`, () => regenerate("mistral"));
     if (m.id) {
       const up = btn("up2", "Bonne réponse", () => vote(m, 1, up, dn, a));
       const dn = btn("down2", "Mauvaise réponse", () => vote(m, -1, up, dn, a));
       up.classList.toggle("voted", m.feedback === 1); dn.classList.toggle("voted", m.feedback === -1);
     }
     if (m.created_at) { const t = document.createElement("time"); t.textContent = fmtTime(m.created_at); a.appendChild(t); }
+    if (m.meta?.provider) { const v = document.createElement("span"); v.className = "via"; v.textContent = "via " + m.meta.provider; v.title = m.meta.remote_model || ""; a.appendChild(v); }
   }
   return a;
 }
@@ -1823,7 +1855,7 @@ function editMessage(idx) {
   ta.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); box.querySelector('[data-a="send"]').click(); } if (e.key === "Escape") renderHistory(); };
 }
 
-async function regenerate() {
+async function regenerate(withEngine) {
   if (busy) return;
   let i = history.length - 1;
   while (i >= 0 && history[i].role !== "user") i--;
@@ -1832,6 +1864,7 @@ async function regenerate() {
   await send_(`/api/conversations/${settings.conversationId}/truncate`, "POST", { from_id: history[i].id });
   history = history.slice(0, i);
   renderHistory();
+  if (withEngine) engineOverride = withEngine;
   sendMessage(text);
 }
 
@@ -1846,7 +1879,7 @@ $("toBottom").onclick = () => scroller.scrollTo({ top: scroller.scrollHeight, be
 /* ============================================================
    SAISIE ET ENVOI (streaming NDJSON)
    ============================================================ */
-let serverSpeed = 0;
+let serverSpeed = 0, engineOverride = null;
 let busy = false, controller = null, idleTimer = 0, sleepTimer = 0, lastSpeed = null;
 
 function autoGrow() {
@@ -1922,7 +1955,9 @@ async function sendMessage(text, files = []) {
   scroller.scrollTop = scroller.scrollHeight;
   const body = el.querySelector(".body");
 
-  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0, used = null, asstId = null, sources = null, docs = null;
+  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0, used = null, asstId = null, sources = null, docs = null, provider = "local";
+  const engineUsed = engineOverride || engine;
+  engineOverride = null;
   const webMode = webForce ? "force" : (settings.webAuto === false ? "off" : "auto");
   if (webForce) { webForce = false; renderWebBtn(); }
   const render = () => {
@@ -1936,7 +1971,7 @@ async function sendMessage(text, files = []) {
     if (finished) return;
     finished = true;
     const content = reply.trim() + (stopped && reply.trim() ? " …" : "");
-    history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: { ...(used ? { used } : {}), ...(sources ? { sources } : {}), ...(docs ? { docs } : {}) } });
+    history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: { ...(used ? { used } : {}), ...(sources ? { sources } : {}), ...(docs ? { docs } : {}), ...(provider !== "local" ? { provider: hybridState?.name || "Mistral", remote_model: hybridState?.model } : {}) } });
     el.replaceWith(msgEl(history[history.length - 1], history.length - 1));
     markLast();
     if (serverSpeed) { $("speedV").textContent = serverSpeed.toFixed(1) + " tok/s"; serverSpeed = 0; }
@@ -1965,6 +2000,7 @@ async function sendMessage(text, files = []) {
         attachments: files.map((f) => ({ name: f.name, text: f.text })),
         web: webMode,
         scope,
+        engine: engineUsed,
       }),
     });
     const reader = r.body.getReader();
@@ -1986,6 +2022,13 @@ async function sendMessage(text, files = []) {
           userMsg.id = ev.user_id; userMsg.created_at = Date.now() / 1000;
         } else if (ev.type === "context") {
           used = ev.used;
+        } else if (ev.type === "route") {
+          if (ev.provider !== "local") {
+            body.innerHTML = `<span class="live"><span class="mini"></span><span>Atom consulte ${esc(hybridState?.name || "Mistral")}…</span></span>`;
+            setEntityState("consulte…");
+          }
+          if (ev.reason && ev.provider === "local") toast(esc(ev.reason));
+          provider = ev.provider;
         } else if (ev.type === "docs") {
           docs = ev.refs.length ? ev.refs : null;
           if (docs) {
@@ -2122,6 +2165,7 @@ function selectTab(tab) {
   if (tab === "memory") loadMemories();
   if (tab === "reminders") loadReminders();
   if (tab === "backup") loadBackups();
+  if (tab === "hybrid") loadHybrid();
 }
 document.querySelectorAll(".tab").forEach((t) => { t.onclick = () => selectTab(t.dataset.tab); });
 $("openSettings").onclick = () => openSettings();
@@ -2775,6 +2819,68 @@ function docsEl(refs) {
 }
 
 /* ============================================================
+   MODE HYBRIDE (local / auto / Mistral)
+   ============================================================ */
+let hybridState = null;
+let engine = store.get("engine", "default");
+const ENGINE_LABEL = () => ({ default: "Par défaut", local: "Local", auto: "Auto", mistral: hybridState?.name || "Mistral" });
+function renderEngine() {
+  const wrap = $("engineWrap");
+  wrap.style.display = hybridState?.configured ? "" : "none";
+  if (!hybridState) return;
+  const eff = engine === "default" ? hybridState.mode : engine;
+  const lbl = engine === "default" ? `${ENGINE_LABEL()[eff]}` : ENGINE_LABEL()[engine];
+  $("engineBtn").innerHTML = icon(eff === "local" ? "orb" : "spark") + `<span>${esc(lbl)}</span>`;
+  $("engineBtn").classList.toggle("on", eff !== "local");
+}
+function setEngine(v) { engine = v; store.set("engine", v); renderEngine(); }
+$("engineBtn").onclick = (e) => {
+  e.stopPropagation();
+  const m = $("engineMenu");
+  if (!m.classList.toggle("open")) return;
+  const n = hybridState?.name || "Mistral";
+  const opts = [
+    ["default", "orb", `Par défaut (${ENGINE_LABEL()[hybridState.mode]})`, "Le réglage choisi dans Réglages → Hybride"],
+    ["local", "orb", "Local", "Tout reste sur ton serveur"],
+    ["auto", "spark", "Auto", `${n} pour les demandes complexes, local sinon`],
+    ["mistral", "spark", n, `Toujours ${n} (dans les limites de confidentialité)`],
+  ];
+  m.innerHTML = opts.map(([v, ic, t, d]) => `<button data-v="${v}" class="${engine === v ? "on" : ""}">${icon(ic)}<span><b>${esc(t)}</b><small>${esc(d)}</small></span></button>`).join("")
+    + `<div class="sep"></div><button data-v="settings">${icon("settings")}<span><b>Réglages du mode hybride…</b></span></button>`;
+  m.querySelectorAll("button").forEach((b) => b.onclick = () => { m.classList.remove("open"); b.dataset.v === "settings" ? openSettings("hybrid") : setEngine(b.dataset.v); });
+};
+document.addEventListener("click", () => $("engineMenu").classList.remove("open"));
+
+async function loadHybrid() {
+  try { hybridState = await getJSON("/api/hybrid"); } catch { return; }
+  renderEngine();
+  const h = hybridState;
+  $("hySetup").style.display = h.configured ? "none" : "";
+  $("hySetup").innerHTML = "Mistral n'est pas encore configuré : crée une clé sur <b>console.mistral.ai</b> (API Keys), puis ajoute <code>ATOM_REMOTE_API_KEY=…</code> dans le fichier <code>.env</code> du serveur et relance Atom. Voir le README.";
+  $("hyMode").innerHTML = "";
+  for (const [v, t] of [["local", "Local"], ["auto", "Auto"], ["mistral", h.name]]) {
+    const b = document.createElement("button");
+    b.className = "btn" + (h.mode === v ? " primary" : "");
+    b.textContent = t; b.disabled = !h.configured && v !== "local";
+    b.onclick = () => saveHybrid({ mode: v });
+    $("hyMode").appendChild(b);
+  }
+  $("hyMem").checked = h.allow_memory; $("hyDocs").checked = h.allow_docs; $("hyWeb").checked = h.allow_web;
+  $("hyUseL").textContent = `${h.used_today} requête${h.used_today > 1 ? "s" : ""} ${h.name} aujourd'hui`;
+  $("hyUseV").textContent = `limite ${h.limit}`;
+  $("hyUseB").style.width = Math.min(100, 100 * h.used_today / Math.max(1, h.limit)) + "%";
+  $("hyModel").value = h.model_setting || ""; $("hyModel").placeholder = h.model;
+}
+async function saveHybrid(patch) {
+  try { hybridState = await (await api("/api/hybrid", { method: "PUT", body: JSON.stringify(patch) })).json(); } catch (e) { toast(esc(e.message)); }
+  loadHybrid();
+}
+$("hyMem").onchange = () => saveHybrid({ allow_memory: $("hyMem").checked });
+$("hyDocs").onchange = () => saveHybrid({ allow_docs: $("hyDocs").checked });
+$("hyWeb").onchange = () => saveHybrid({ allow_web: $("hyWeb").checked });
+$("hyModelSave").onclick = () => saveHybrid({ model: $("hyModel").value.trim() });
+
+/* ============================================================
    DÉMARRAGE
    ============================================================ */
 applyLayout();
@@ -2791,6 +2897,7 @@ addEventListener("scroll", () => { if (scrollY || scrollX) scrollTo(0, 0); }, { 
 connect();
 applyLook();
 renderWebBtn();
+loadHybrid();
 loadLibrary();
 loadCompanion();
 refreshCounts();

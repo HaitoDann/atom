@@ -11,7 +11,7 @@ from typing import AsyncIterator
 
 import httpx
 
-from . import companion, db, library, llm, memory, reminders, search
+from . import companion, db, hybrid, library, llm, memory, reminders, search
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
@@ -80,6 +80,7 @@ async def chat_events(
     attachments: list[dict] | None = None,
     web: str = "auto",  # "auto" : Atom décide · "force" : chercher · "off" : jamais
     scope: str = "auto",  # bibliothèque : "auto" (documents), "none", ou "3,5" (collections choisies)
+    engine: str = "default",  # "default" (réglage), "local", "mistral", "auto"
 ) -> AsyncIterator[dict]:
     """Événements : meta, context, emotion, token…, reminder…, done, memory — ou error."""
     title_src = message or (attachments[0]["name"] if attachments else "Fichier")
@@ -129,6 +130,24 @@ async def chat_events(
         for m in history
     ]
     msgs.append({"role": "user", "content": with_attachments(message, attachments)})
+    # ---- quel moteur répond ?
+    hs = hybrid.settings()
+    provider, route_reason = hybrid.decide(engine, message, bool(mem_block), bool(docs_block) or bool(attachments))
+    web_block_cur = ""
+
+    def system_for(prov: str) -> str:
+        """Prompt système selon le moteur : pour Mistral, seulement ce que tu as autorisé à sortir."""
+        if prov == "local":
+            return system_prompt(persona, mem_block, web if web == "auto" and not web_block_cur else "off",
+                                 web_block_cur, docs_block)
+        return system_prompt(persona, mem_block if hs["allow_memory"] else "",
+                             web if web == "auto" and not web_block_cur else "off",
+                             web_block_cur if hs["allow_web"] else "", docs_block if hs["allow_docs"] else "")
+
+    msgs[0]["content"] = system_for(provider)
+    if provider != "local" or route_reason:
+        yield dict(type="route", provider=provider, model=hybrid.model() if provider != "local" else model,
+                   reason=route_reason)
     user_meta = {"attachments": attachments} if attachments else None
     user_id = db.add_message(conversation_id, "user", message, meta=user_meta)
     yield dict(type="ids", user_id=user_id)
@@ -141,11 +160,35 @@ async def chat_events(
     if attachments:
         companion.bump("fed")
 
+    async def tokens_from(messages: list[dict]):
+        """Jetons du moteur choisi ; si Mistral échoue avant d'écrire, on repasse en local."""
+        nonlocal provider
+        if provider == "mistral":
+            got = False
+            try:
+                async for tok in hybrid.stream(messages):
+                    got = True
+                    yield tok
+                return
+            except Exception as e:  # noqa: BLE001
+                if got:
+                    raise
+                log_reason = str(e) or e.__class__.__name__
+                provider = "local"
+                messages[0]["content"] = system_for("local")
+                yield {"route": dict(type="route", provider="local", model=model,
+                                     reason=f"{hybrid.REMOTE_NAME} indisponible ({log_reason}) : réponse en local.")}
+        async for tok in llm.stream_chat(model, messages):
+            yield tok
+
     async def run_pass(messages: list[dict], state: dict):
         """Un passage du modèle : émotion, jetons, commandes (dans state)."""
         cmds = reminders.CommandFilter()
         head, emo, out = "", None, ""
-        async for tok in llm.stream_chat(model, messages):
+        async for tok in tokens_from(messages):
+            if isinstance(tok, dict):
+                yield tok["route"]
+                continue
             if emo is None:
                 head += tok
                 # Raisonnement interne (modèles "thinking") : on l'écarte.
@@ -192,7 +235,9 @@ async def chat_events(
         sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"]} for r in results)
         yield dict(type="search", status="done", query=query, sources=sources)
         today = reminders.now_local().strftime("%d/%m/%Y")
-        msgs[0]["content"] = system_prompt(persona, mem_block, "off", search.prompt_block(query, results, today), docs_block)
+        nonlocal web_block_cur
+        web_block_cur = search.prompt_block(query, results, today)
+        msgs[0]["content"] = system_for(provider)
 
     try:
         state: dict = {}
@@ -223,9 +268,12 @@ async def chat_events(
             asst_meta = {**(asst_meta or {}), "sources": sources}
         if doc_refs:
             asst_meta = {**(asst_meta or {}), "docs": doc_refs}
+        if provider != "local":
+            asst_meta = {**(asst_meta or {}), "provider": hybrid.REMOTE_NAME, "remote_model": hybrid.model()}
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
-        yield dict(type="done", emotion=emotion, id=asst_id, stats=dict(llm.last_stats))
+        stats = dict(hybrid.last_stats if provider != "local" else llm.last_stats)
+        yield dict(type="done", emotion=emotion, id=asst_id, stats=stats, provider=provider)
     except GeneratorExit:
         # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
         partial = (locals().get("state") or {}).get("text", "")

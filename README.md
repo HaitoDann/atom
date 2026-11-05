@@ -149,6 +149,32 @@ Si c'est encore lent, vérifie :
 - Réglables dans `.env` : `ATOM_BACKUP_TIME`, `ATOM_BACKUP_KEEP`.
 - Le dossier `backups/` est sur le même disque que le serveur : télécharge une copie de temps en temps, ou inclus le conteneur dans les sauvegardes Proxmox.
 
+## Mode hybride (Mistral)
+
+Atom répond **en local par défaut**. Il peut s'appuyer sur un modèle Mistral, plus puissant, quand ça vaut le coup.
+
+**Mise en route**
+
+1. Crée un compte sur [console.mistral.ai](https://console.mistral.ai), choisis l'offre gratuite (*Experiment*), puis **API Keys → Create new key**.
+2. Dans `.env` : `ATOM_REMOTE_API_KEY=ta_clé`, puis `docker compose up -d atom`.
+3. Réglages → **Hybride** : choisis le moteur par défaut et ce que tu acceptes d'envoyer.
+
+**Les moteurs** (réglage par défaut, et sélecteur sous la saisie pour changer ponctuellement)
+- **Local** : tout reste sur ton serveur.
+- **Auto** : Mistral pour les demandes longues ou complexes (analyse, comparaison, rédaction, architecture…), local pour le reste.
+- **Mistral** : toujours Mistral.
+- Sous une réponse locale, l'icône ✦ **Réponse approfondie** la régénère avec Mistral.
+- Si Mistral ne répond pas (clé refusée, limite atteinte, coupure), Atom repasse en local automatiquement. Les réponses venues de Mistral portent la mention « via Mistral ».
+
+**Confidentialité**
+- Quand Mistral répond, il reçoit ton message et le fil de la conversation.
+- Tes **souvenirs**, ta **bibliothèque et tes fichiers joints**, et les **résultats de recherche web** ne partent que si tu l'autorises (Réglages → Hybride). Par défaut : seuls les résultats web, déjà publics, sont autorisés.
+- Si une demande a besoin de ta bibliothèque ou d'un fichier et que l'envoi n'est pas autorisé, Atom répond en local.
+- La mémorisation, la recherche dans tes documents, l'indexation et les embeddings restent **toujours** en local.
+- Sur l'offre gratuite de Mistral, tes échanges peuvent servir à améliorer leurs modèles : vérifie les conditions et les réglages de confidentialité de ton compte.
+
+**Limites** : `ATOM_REMOTE_DAILY_LIMIT` (200 par défaut) plafonne les requêtes par jour ; au-delà, Atom reste en local. Modèle : `ATOM_REMOTE_MODEL` ou Réglages → Hybride. Tout fournisseur compatible OpenAI fonctionne en changeant `ATOM_REMOTE_URL` et `ATOM_REMOTE_NAME`.
+
 ## Bibliothèque : tes documents et ton code
 
 Barre latérale → **Bibliothèque**.

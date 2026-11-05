@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import agent, backup, companion, db, library, llm, memory, notify, reminders, search, system, telegram
+from . import agent, backup, companion, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -77,6 +77,7 @@ class ChatIn(BaseModel):
     auto_memory: bool = True
     web: str = Field(default="auto", pattern="^(auto|force|off)$")
     scope: str = Field(default="auto", pattern="^(auto|none|[0-9,]+)$")
+    engine: str = Field(default="default", pattern="^(default|local|mistral|auto)$")
 
 
 class MemoryIn(BaseModel):
@@ -149,6 +150,7 @@ async def chat(body: ChatIn):
             [a.model_dump() for a in body.attachments] or None,
             body.web,
             body.scope,
+            body.engine,
         ),
         media_type="application/x-ndjson",
     )
@@ -367,6 +369,28 @@ async def notify_test():
     if not await notify.send("Atom", "Ceci est une notification de test. Tout fonctionne ✨", tags="sparkles"):
         raise HTTPException(502, "Échec de l'envoi : regarde les logs du conteneur atom.")
     return {"ok": True}
+
+
+# ---- mode hybride
+
+
+class HybridIn(BaseModel):
+    mode: str | None = Field(default=None, pattern="^(local|auto|mistral)$")
+    allow_memory: bool | None = None
+    allow_docs: bool | None = None
+    allow_web: bool | None = None
+    model: str | None = Field(default=None, max_length=80)
+
+
+@app.get("/api/hybrid")
+def get_hybrid():
+    return hybrid.status()
+
+
+@app.put("/api/hybrid")
+def put_hybrid(body: HybridIn):
+    hybrid.save_settings({k: v for k, v in body.model_dump().items() if v is not None})
+    return hybrid.status()
 
 
 # ---- bibliothèque

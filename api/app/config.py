@@ -65,3 +65,10 @@ BACKUP_TIME = os.getenv("ATOM_BACKUP_TIME", "03:30")
 DATA_DIR = DB_PATH.parent
 PROJECTS_DIR = Path(os.getenv("ATOM_PROJECTS_DIR", "/projects"))   # dossiers de code du serveur (lecture seule)
 GITHUB_TOKEN = os.getenv("ATOM_GITHUB_TOKEN", "")                    # pour les dépôts privés
+
+# Mode hybride : API externe compatible OpenAI (Mistral par défaut)
+REMOTE_NAME = os.getenv("ATOM_REMOTE_NAME", "Mistral")
+REMOTE_URL = os.getenv("ATOM_REMOTE_URL", "https://api.mistral.ai/v1").rstrip("/")
+REMOTE_API_KEY = os.getenv("ATOM_REMOTE_API_KEY", "")
+REMOTE_MODEL = os.getenv("ATOM_REMOTE_MODEL", "mistral-small-latest")
+REMOTE_DAILY_LIMIT = int(os.getenv("ATOM_REMOTE_DAILY_LIMIT", "200"))
