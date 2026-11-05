@@ -1,6 +1,6 @@
 // Service worker d'Atom : rend l'appli installable et affiche l'interface
 // même si le réseau flanche. L'API n'est jamais mise en cache.
-const CACHE = "atom-shell-v1";
+const CACHE = "atom-shell-v2";
 const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {

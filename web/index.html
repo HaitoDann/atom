@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -80,9 +81,8 @@
   #app.no-side #side { border-right: 0; }
   .side-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 10px 8px 16px; }
   .wordmark { display: inline-flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: lowercase; color: var(--strong); }
-  .wordmark .mark { width: 20px; height: 20px; }
-  .wordmark .mark-ring { transform-origin: 50px 50px; animation: ringSpin 24s linear infinite; }
-  .wordmark:hover .mark-ring { animation-duration: 4s; }
+  .wordmark .mark { width: 22px; height: 22px; transition: transform .8s var(--ease, ease); }
+  .wordmark:hover .mark { transform: rotate(72deg); }
   @keyframes ringSpin { to { transform: rotate(360deg); } }
   .side-new {
     margin: 4px 10px 8px; display: flex; align-items: center; gap: 10px;
@@ -524,6 +524,7 @@
   .login-card { width: min(340px, calc(100vw - 40px)); display: flex; flex-direction: column; gap: 10px; zoom: var(--z, 1); }
   .login-card p { margin: 0; text-align: center; color: var(--muted); font-size: 13.5px; }
   .login-card .btn { padding: 10px; font-size: 14px; }
+  .login-mark { width: 120px; height: 120px; margin: 0 auto 8px; animation: ringSpin 60s linear infinite, orbBreath 5s ease-in-out infinite; filter: drop-shadow(0 0 24px rgba(220,225,235,.12)); }
   .login-orb { width: 74px; height: 74px; margin: 0 auto 6px; border-radius: 50%;
     background: radial-gradient(circle at 40% 38%, rgba(220,225,235,.95) 0 6%, rgba(200,206,216,.35) 30%, rgba(200,206,216,.06) 62%, transparent 70%);
     box-shadow: 0 0 50px rgba(200,206,216,.12); animation: orbBreath 4s ease-in-out infinite; }
@@ -745,7 +746,7 @@
   <!-- ============================================================ barre latérale -->
   <aside id="side">
     <div class="side-top">
-      <span class="wordmark"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="12" fill="currentColor"/><g class="mark-ring"><circle cx="83.0" cy="50.0" r="3.6" fill="currentColor" opacity="1"/><circle cx="81.9" cy="58.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="78.6" cy="66.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="73.3" cy="73.3" r="3.6" fill="currentColor" opacity="1"/><circle cx="66.5" cy="78.6" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="58.5" cy="81.9" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="50.0" cy="83.0" r="3.6" fill="currentColor" opacity="1"/><circle cx="41.5" cy="81.9" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="33.5" cy="78.6" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="26.7" cy="73.3" r="3.6" fill="currentColor" opacity="1"/><circle cx="21.4" cy="66.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="18.1" cy="58.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="17.0" cy="50.0" r="3.6" fill="currentColor" opacity="1"/><circle cx="18.1" cy="41.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="21.4" cy="33.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="26.7" cy="26.7" r="3.6" fill="currentColor" opacity="1"/><circle cx="33.5" cy="21.4" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="41.5" cy="18.1" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="50.0" cy="17.0" r="3.6" fill="currentColor" opacity="1"/><circle cx="58.5" cy="18.1" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="66.5" cy="21.4" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="73.3" cy="26.7" r="3.6" fill="currentColor" opacity="1"/><circle cx="78.6" cy="33.5" r="2.4" fill="currentColor" opacity="0.5"/><circle cx="81.9" cy="41.5" r="2.4" fill="currentColor" opacity="0.5"/></g></svg>atom</span>
+      <span class="wordmark"><img class="mark" src="/icons/mark-light.svg" alt="">atom</span>
       <button class="iconbtn" id="sideClose" title="Masquer la barre latérale" data-i="sidebar"></button>
     </div>
     <button class="side-new" id="newConv" title="Nouvelle conversation (Ctrl+Maj+O)"><span data-i="plus"></span>Nouvelle conversation</button>
@@ -1067,7 +1068,7 @@
 <div id="toast"></div>
 <div id="login" hidden>
   <form class="login-card" id="loginForm" autocomplete="on">
-    <div class="login-orb"></div>
+    <img class="login-mark" src="/icons/mark-full.svg" alt="">
     <div class="wordmark" style="font-size:20px;text-align:center">atom</div>
     <p id="loginText">Entre ton mot de passe.</p>
     <input type="text" name="username" value="atom" autocomplete="username" hidden>
