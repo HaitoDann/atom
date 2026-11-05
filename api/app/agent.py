@@ -232,7 +232,8 @@ async def chat_events(
             yield dict(type="search", status="error", query=query, message=str(e))
             return
         companion.bump("fed")
-        sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"]} for r in results)
+        sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"],
+                        "snippet": (r.get("snippet") or r.get("content") or "")[:220]} for r in results)
         yield dict(type="search", status="done", query=query, sources=sources)
         today = reminders.now_local().strftime("%d/%m/%Y")
         nonlocal web_block_cur
@@ -260,14 +261,20 @@ async def chat_events(
                 async for ev in run_pass(msgs, state):
                     yield ev
         text, emotion = state.get("text", ""), state.get("emotion", "talking")
+        rem_cards = []
         for cmd, arg in state.get("commands", []):
             if cmd.lower() != "recherche":
-                yield reminders.execute(cmd, arg, conversation_id)
+                ev = reminders.execute(cmd, arg, conversation_id)
+                if ev.get("action") in ("created", "cancelled"):
+                    rem_cards.append({k: ev.get(k) for k in ("action", "id", "text", "when", "due_at")})
+                yield ev
         text = text.strip() or "…"
         if sources:
             asst_meta = {**(asst_meta or {}), "sources": sources}
         if doc_refs:
             asst_meta = {**(asst_meta or {}), "docs": doc_refs}
+        if rem_cards:
+            asst_meta = {**(asst_meta or {}), "reminders": rem_cards}
         if provider != "local":
             asst_meta = {**(asst_meta or {}), "provider": hybrid.REMOTE_NAME, "remote_model": hybrid.model()}
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
