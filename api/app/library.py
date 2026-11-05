@@ -22,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import db, llm
+from . import db, llm, ocr
 from .config import DATA_DIR, GITHUB_TOKEN, PROJECTS_DIR
 
 log = logging.getLogger("atom.library")
@@ -113,10 +113,16 @@ def extract_pages(name: str, raw: bytes) -> list[tuple[int | None, str]]:
         from pypdf import PdfReader
 
         reader = PdfReader(io.BytesIO(raw))
-        pages = [(i + 1, (p.extract_text() or "").strip()) for i, p in enumerate(reader.pages[:2000])]
-        pages = [p for p in pages if p[1]]
+        allp = [(i + 1, (p.extract_text() or "").strip()) for i, p in enumerate(reader.pages[:2000])]
+        # Pages scannées (pas ou presque pas de texte) : lecture par OCR.
+        scanned = {n for n, t in allp if len(t) < 40}
+        if scanned and ocr.pdf_available():
+            got = dict(ocr.pdf_pages(raw, only=scanned))
+            allp = [(n, got.get(n, t)) for n, t in allp]
+        pages = [p for p in allp if p[1]]
         if not pages:
-            raise Unsupported("PDF sans texte (document scanné ?) — la lecture des scans viendra plus tard.")
+            raise Unsupported("PDF sans texte (document scanné ?) et lecture des scans indisponible sur ce serveur."
+                              if not ocr.pdf_available() else "Aucun texte lisible, même par OCR.")
         return pages
     if ext == "docx":
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
@@ -132,8 +138,15 @@ def extract_pages(name: str, raw: bytes) -> list[tuple[int | None, str]]:
         xml = re.sub(r"</text:p>|</text:h>", "\n", xml)
         import html as _h
         return [(None, _h.unescape(re.sub(r"<[^>]+>", "", xml)).strip())]
-    if ext in {"png", "jpg", "jpeg", "gif", "webp", "heic", "bmp", "tif", "tiff"}:
-        raise Unsupported("Les images ne sont pas encore lues (la lecture des scans viendra plus tard).")
+    if ext in ocr.IMAGE_EXT:
+        if not ocr.available():
+            raise Unsupported("Lecture des images (OCR) indisponible sur ce serveur.")
+        text = ocr.image_text(raw, ext)
+        if not text:
+            raise Unsupported("Aucun texte trouvé dans l'image.")
+        return [(None, text)]
+    if ext == "heic":
+        raise Unsupported("Format HEIC non pris en charge : exporte l'image en JPEG.")
     for enc in ("utf-8", "utf-16", "latin-1"):
         try:
             text = raw.decode(enc)

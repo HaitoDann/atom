@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from . import backup, db, hybrid, library, search, telegram
+from . import backup, db, hybrid, library, ocr, search, telegram
 from .config import (DATA_DIR, DB_PATH, DEFAULT_MODEL, EMBED_MODEL, NTFY_URL, OLLAMA_URL, PROVIDER, SEARXNG_URL,
                      TELEGRAM_ALLOWED, TELEGRAM_TOKEN)
 
@@ -95,6 +95,9 @@ def _storage() -> list[dict]:
         age = (time.time() - last[0]["created_at"]) / 3600
         out.append(_c("Sauvegarde", "ok" if age < 30 else "warn",
                       f"dernière il y a {age:.0f} h · {len(last)} copie(s)", "" if age < 30 else "vérifie les logs de sauvegarde"))
+    out.append(_c("Lecture des scans (OCR)", "ok" if ocr.pdf_available() else "warn",
+                  f"Tesseract ({ocr.LANGS})" if ocr.pdf_available() else "absent : PDF scannés et images illisibles",
+                  "" if ocr.pdf_available() else "./update.sh (reconstruit l'image avec Tesseract)"))
     cols = library.list_collections()
     errs = [c["name"] for c in cols if c["status"] == "error"]
     out.append(_c("Bibliothèque", "warn" if errs else "ok",

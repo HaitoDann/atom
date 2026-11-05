@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, auth, backup, db, ocr, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -298,14 +298,28 @@ def extract(body: ExtractIn):
 
             reader = PdfReader(io.BytesIO(raw))
             pages = [p.extract_text() or "" for p in reader.pages[:200]]
+            scanned = {i + 1 for i, t in enumerate(pages) if len(t.strip()) < 40}
+            ocr_used = False
+            if scanned and ocr.pdf_available():
+                got = dict(ocr.pdf_pages(raw, max_pages=30, only=scanned))
+                pages = [got.get(i + 1, t) for i, t in enumerate(pages)]
+                ocr_used = bool(got)
             text = "\n\n".join(f"--- page {i + 1} ---\n{t.strip()}" for i, t in enumerate(pages) if t.strip())
         except Exception as e:  # noqa: BLE001
             raise HTTPException(400, f"PDF illisible : {e}") from e
         if not text.strip():
-            raise HTTPException(400, "Ce PDF ne contient pas de texte (document scanné ?).")
-        return {"name": body.name, "text": text[:200_000], "pages": len(reader.pages)}
-    if ext in {"png", "jpg", "jpeg", "gif", "webp", "heic", "bmp"}:
-        raise HTTPException(415, "Les images ne sont pas encore lues : le modèle actuel ne voit pas.")
+            raise HTTPException(400, "Ce PDF ne contient pas de texte lisible." if ocr.pdf_available()
+                                else "Ce PDF ne contient pas de texte (document scanné ?) et l'OCR n'est pas installé.")
+        return {"name": body.name, "text": text[:200_000], "pages": len(reader.pages), "ocr": ocr_used}
+    if ext in ocr.IMAGE_EXT:
+        if not ocr.available():
+            raise HTTPException(415, "Lecture des images (OCR) indisponible sur ce serveur.")
+        text = ocr.image_text(raw, ext)
+        if not text:
+            raise HTTPException(415, "Aucun texte trouvé dans l'image (Atom lit le texte, il ne voit pas les images).")
+        return {"name": body.name, "text": text[:200_000], "ocr": True}
+    if ext == "heic":
+        raise HTTPException(415, "Format HEIC non pris en charge : exporte l'image en JPEG.")
     for enc in ("utf-8", "utf-16", "latin-1"):
         try:
             text = raw.decode(enc)

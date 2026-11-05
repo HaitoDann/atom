@@ -244,7 +244,7 @@ Pour une demande importante, plusieurs IA collaborent. Réglages → **Atelier**
 
 Barre latérale → **Bibliothèque**.
 
-**Documents** — dépose tes fichiers (PDF, Word `.docx`/`.odt`, texte, Markdown, HTML, CSV, JSON…) dans une collection (« Mes documents », « Administratif »…). Atom les découpe en passages et les indexe. Les PDF scannés (images) ne sont pas encore lus.
+**Documents** — dépose tes fichiers (PDF, Word `.docx`/`.odt`, texte, Markdown, HTML, CSV, JSON…) dans une collection (« Mes documents », « Administratif »…). Atom les découpe en passages et les indexe. Les **PDF scannés et les images** (photos de documents, captures) sont lus par OCR (Tesseract, français + anglais, sur le serveur) : page par page, seules les pages sans texte passent par l'OCR. Compte quelques secondes par page. Même chose pour une pièce jointe dans une discussion (30 pages max).
 
 **Projets de code** (lecture seule) — « Ajouter un projet de code » :
 - **GitHub** : colle l'adresse du dépôt. Pour un dépôt privé, crée un jeton *fine-grained* en lecture seule (github.com → Settings → Developer settings → Personal access tokens → *Contents : Read-only*) et mets-le dans `.env` : `ATOM_GITHUB_TOKEN=github_pat_…`. « Mettre à jour » récupère les derniers changements et ne réindexe que les fichiers modifiés.
