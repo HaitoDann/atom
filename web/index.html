@@ -1042,6 +1042,11 @@
 
       <section class="pane" data-pane="entity">
         <div class="block">
+          <h4>Apparence de l'entité</h4>
+          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine.</p>
+          <div class="row" id="styleRow"></div>
+        </div>
+        <div class="block">
           <h4>Votre lien</h4>
           <p class="desc">Le lien grandit avec chaque moment partagé : conversations, souvenirs, caresses, fichiers et recherches qui le nourrissent. Il ne diminue jamais. À chaque stade, Atom gagne des fragments, puis un second anneau et un cœur lumineux.</p>
           <ul id="stagesList" class="list"></ul>
@@ -1249,6 +1254,43 @@ function setEntityState(t) { $("emoState").textContent = t; }
     px[i] = (rand() - 0.5) * 600; py[i] = (rand() - 0.5) * 600; pz[i] = (rand() - 0.5) * 600;
   }
 
+  // ---- Maillage : une partie des fragments de la coque deviennent des nœuds reliés à leurs voisins.
+  const sxA = new Float32Array(N), syA = new Float32Array(N), szA = new Float32Array(N), visA = new Uint8Array(N);
+  const isNode = new Uint8Array(N);
+  const nodeIdx = [];
+  // Répartition régulière : on ne garde un fragment de la coque que s'il est assez loin des nœuds déjà choisis.
+  {
+    const minD2 = (R0 * 0.135) ** 2;
+    for (let i = 0; i < N && nodeIdx.length < 360; i++) {
+      if (isOrb[i] || rN[i] < 0.92) continue;
+      let ok = true;
+      for (const j of nodeIdx) { if ((ax[i] - ax[j]) ** 2 + (ay[i] - ay[j]) ** 2 + (az[i] - az[j]) ** 2 < minD2) { ok = false; break; } }
+      if (ok) { isNode[i] = 1; nodeIdx.push(i); rank[i] = 0; }   // les nœuds sont toujours visibles
+    }
+  }
+  const edges = [];   // [a, b, longueur au repos]
+  {
+    const K = 6, seen = new Set();
+    for (const a of nodeIdx) {
+      const near = nodeIdx.filter((b) => b !== a)
+        .map((b) => [b, (ax[a] - ax[b]) ** 2 + (ay[a] - ay[b]) ** 2 + (az[a] - az[b]) ** 2])
+        .sort((p, q) => p[1] - q[1]).slice(0, K);
+      for (const [b, d2] of near) {
+        if (d2 > (R0 * 0.42) ** 2) continue;   // pas de lien qui traverse la sphère
+        const key = a < b ? a * N + b : b * N + a;
+        if (!seen.has(key)) { seen.add(key); edges.push([a, b]); }
+      }
+    }
+  }
+  // Quelques orbiteurs reliés entre eux : un anneau de réseau autour de la sphère.
+  const orbNodes = [];
+  for (let i = 0; i < N && orbNodes.length < 18; i++) if (isOrb[i]) orbNodes.push(i);
+  orbNodes.sort((a, b) => phase[a] - phase[b]);
+  // Signaux : de la lumière qui voyage le long des liens.
+  const SIG = 40, sgE = new Int32Array(SIG).fill(-1), sgT = new Float32Array(SIG), sgV = new Float32Array(SIG);
+  let sigAcc = 0;
+  const bucketPaths = Array.from({ length: 10 }, () => null);
+
   // Fragments « nourriture » (recherche web) : ils arrivent de l'extérieur et sont absorbés.
   const fx = new Float32Array(F), fy = new Float32Array(F), fv = new Float32Array(F), fa = new Uint8Array(F), fs = new Float32Array(F);
   function spawnFeeder(i, R) {
@@ -1447,7 +1489,9 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const glJ = entity.glitch * 9, glBand = entity.glitch > 0.05 ? ((t * 23) | 0) % 9 : -1;
     let lastQ = -1;
 
+    const meshMode = settings.entityStyle !== "fragments";
     for (let i = 0; i < N; i++) {
+      visA[i] = 0;
       if (rank[i] > visible) continue;
       let tx, ty, tz;
       const ph = phase[i];
@@ -1499,16 +1543,92 @@ function setEntityState(t) { $("emoState").textContent = t; }
       const ry = py[i] * cosT - rz0 * sinT, rz = py[i] * sinT + rz0 * cosT;
       const sc = fov / (fov + rz);
       if (sc <= 0) continue;
+      sxA[i] = rx * sc; syA[i] = ry * sc; szA[i] = rz; visA[i] = 1;
+      if (meshMode && (isNode[i] || (isOrb[i] && orbNodes.includes(i)))) continue;   // dessinés avec le maillage
       const backFade = rz > 0 ? 1 - Math.min(0.8, rz / 320) : 1;
       let alpha = (sc * 0.9 > 1 ? 1 : sc * 0.9) * 0.85 * globalA;
       alpha *= isOrb[i] ? 0.45 : depth[i] * cur.dim * backFade;
       alpha *= 0.65 + Math.abs(Math.sin(t * 0.9 + ph * 3)) * 0.35;
       if (scK > 0.01 && !isOrb[i]) { const near = 1 - Math.abs(ry - scanY) / (R0 * 0.16); if (near > 0) alpha = Math.min(1, alpha * (1 + near * 1.6 * scK)); }
       if (spK > 0.3 && !isOrb[i]) alpha *= (i % nSplit) === act ? 1.25 : 0.7;
+      if (meshMode) alpha *= isOrb[i] ? 0.6 : 0.42;   // poussière intérieure discrète
       const q = (alpha * 32) | 0;
       if (q !== lastQ) { lastQ = q; ctx.globalAlpha = q / 32; }
       const sz = Math.max(size[i] * sc * pxSize * (1.15 + P * 0.35), pxSize * 0.8);
       ctx.fillRect(rx * sc - sz * 0.5, ry * sc - sz * 0.5, sz, sz);
+    }
+
+    // ---- maillage : liens (regroupés par opacité pour aller vite), signaux, nœuds
+    if (meshMode) {
+      const lw = Math.max(0.55, 0.9 * (1 + P * 0.4)) * pxSize;
+      for (let b = 0; b < 10; b++) bucketPaths[b] = null;
+      const depthA = (z) => (z > 0 ? 1 - Math.min(0.85, z / 230) : 1);
+      for (let e = 0; e < edges.length; e++) {
+        const a = edges[e][0], b = edges[e][1];
+        if (!visA[a] || !visA[b]) continue;
+        let al = 0.5 * cur.dim * globalA * Math.min(depthA(szA[a]), depthA(szA[b]));
+        if (spK > 0.05 && (a % nSplit) !== (b % nSplit)) al *= 1 - spK;          // atelier : les amas se détachent
+        if (scK > 0.01) { const near = 1 - Math.abs((syA[a] + syA[b]) / 2 - scanY * 0.9) / (R0 * 0.2); if (near > 0) al *= 1 + near * 1.5 * scK; }
+        // un lien trop étiré (onde de choc, pointes) s'affine
+        const dx = sxA[a] - sxA[b], dy = syA[a] - syA[b], d = Math.sqrt(dx * dx + dy * dy);
+        if (d > R0 * 0.9) al *= Math.max(0, 1 - (d - R0 * 0.9) / (R0 * 0.5));
+        const k = Math.min(9, (al * 14) | 0);
+        if (k <= 0) continue;
+        (bucketPaths[k] ||= new Path2D());
+        bucketPaths[k].moveTo(sxA[a], syA[a]); bucketPaths[k].lineTo(sxA[b], syA[b]);
+      }
+      // anneau de nœuds en orbite
+      const ringPath = new Path2D();
+      for (let k = 0; k < orbNodes.length; k++) {
+        const a = orbNodes[k], b = orbNodes[(k + 1) % orbNodes.length];
+        if (visA[a] && visA[b] && Math.hypot(sxA[a] - sxA[b], syA[a] - syA[b]) < R0 * 0.55) { ringPath.moveTo(sxA[a], syA[a]); ringPath.lineTo(sxA[b], syA[b]); }
+      }
+      ctx.strokeStyle = `rgb(${tint})`; ctx.lineWidth = lw; ctx.lineCap = "round";
+      for (let k = 1; k < 10; k++) if (bucketPaths[k]) { ctx.globalAlpha = k / 14; ctx.stroke(bucketPaths[k]); }
+      ctx.globalAlpha = 0.16 * globalA * cur.dim; ctx.stroke(ringPath);
+
+      // signaux : plus nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA
+      const busyAct = entity.activity === "thinking" || entity.activity === "talking" || entity.activity === "focus" || entity.activity === "curious";
+      const rate = 1.2 + (busyAct ? 9 : 0) + entity.tokenKick * 30 + entity.remoteK * 10 + spK * 8 + (entity.feeding ? 6 : 0) + pw * 4;
+      sigAcc += dt * rate;
+      while (sigAcc >= 1) {
+        sigAcc -= 1;
+        for (let k = 0; k < SIG; k++) if (sgE[k] < 0) { sgE[k] = (Math.random() * edges.length) | 0; sgT[k] = 0; sgV[k] = 1.2 + Math.random() * 1.6; break; }
+      }
+      ctx.fillStyle = "#fff";
+      for (let k = 0; k < SIG; k++) {
+        if (sgE[k] < 0) continue;
+        sgT[k] += dt * sgV[k];
+        if (sgT[k] >= 1) {   // le signal continue parfois vers un lien voisin
+          const [, b] = edges[sgE[k]];
+          if (Math.random() < 0.55) {
+            const next = edges.findIndex((ed, n) => n !== sgE[k] && (ed[0] === b || ed[1] === b));
+            if (next >= 0) { if (edges[next][1] === b) edges[next] = [edges[next][1], edges[next][0]]; sgE[k] = next; sgT[k] = 0; continue; }
+          }
+          sgE[k] = -1; continue;
+        }
+        const [a, b] = edges[sgE[k]];
+        if (!visA[a] || !visA[b]) { sgE[k] = -1; continue; }
+        const u = sgT[k], x = sxA[a] + (sxA[b] - sxA[a]) * u, y = syA[a] + (syA[b] - syA[a]) * u;
+        const z = szA[a] + (szA[b] - szA[a]) * u;
+        const al = Math.sin(u * Math.PI) * globalA * (z > 0 ? 0.35 : 0.95);
+        ctx.globalAlpha = al * 0.25; ctx.beginPath(); ctx.arc(x, y, 3.2 * pxSize, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = al; ctx.fillRect(x - pxSize, y - pxSize, pxSize * 2, pxSize * 2);
+      }
+
+      // nœuds : petits disques, plus gros et nets à l'avant
+      ctx.fillStyle = `rgb(${tint})`;
+      const drawNode = (i, base) => {
+        if (!visA[i]) return;
+        const z = szA[i], f = z > 0 ? 1 - Math.min(0.8, z / 260) : 1;
+        let al = base * f * cur.dim * globalA;
+        if (spK > 0.3) al *= (i % nSplit) === act ? 1.2 : 0.7;
+        ctx.globalAlpha = Math.min(1, al);
+        const r = (0.7 + 1.1 * f) * pxSize * (1 + P * 0.3);
+        ctx.beginPath(); ctx.arc(sxA[i], syA[i], r, 0, 6.283); ctx.fill();
+      };
+      for (const i of nodeIdx) drawNode(i, 0.95);
+      for (const i of orbNodes) drawNode(i, 0.6);
     }
 
     // ---- nourriture : fragments bleus attirés vers la sphère
@@ -2756,6 +2876,7 @@ function choiceRow(id, key, options) {
   }
 }
 choiceRow("densityRow", "density", [["comfort", "Confortable"], ["compact", "Compacte"]]);
+choiceRow("styleRow", "entityStyle", [["mesh", "Maillage"], ["fragments", "Fragments"]]);
 choiceRow("widthRow", "width", [["normal", "Normale"], ["narrow", "Étroite"], ["wide", "Large"]]);
 
 /* ============================================================
