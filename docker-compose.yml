@@ -74,6 +74,7 @@ services:
       - ATOM_EMBED_MODEL=${ATOM_EMBED_MODEL:-nomic-embed-text}
       - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
       - ATOM_NUM_THREADS=${ATOM_NUM_THREADS:-0}
+      - ATOM_GITHUB_TOKEN=${ATOM_GITHUB_TOKEN:-}
       - ATOM_BACKUP_DIR=/backups
       - ATOM_BACKUP_KEEP=${ATOM_BACKUP_KEEP:-7}
       - ATOM_BACKUP_TIME=${ATOM_BACKUP_TIME:-03:30}
@@ -88,6 +89,8 @@ services:
       - atom-data:/data
       # Sauvegardes visibles sur l'hôte (dossier ./backups) : faciles à copier ailleurs.
       - ./backups:/backups
+      # Tes projets de code sur le serveur, en lecture seule (voir README « Bibliothèque »)
+      - ${ATOM_PROJECTS_HOST_DIR:-./projects}:/projects:ro
 
   # Accès distant en HTTPS via Tailscale, sans VM ni /dev/net/tun (mode espace utilisateur).
   # Activé seulement avec le profil « tailscale » (COMPOSE_PROFILES=tailscale dans .env).

@@ -149,6 +149,24 @@ Si c'est encore lent, vérifie :
 - Réglables dans `.env` : `ATOM_BACKUP_TIME`, `ATOM_BACKUP_KEEP`.
 - Le dossier `backups/` est sur le même disque que le serveur : télécharge une copie de temps en temps, ou inclus le conteneur dans les sauvegardes Proxmox.
 
+## Bibliothèque : tes documents et ton code
+
+Barre latérale → **Bibliothèque**.
+
+**Documents** — dépose tes fichiers (PDF, Word `.docx`/`.odt`, texte, Markdown, HTML, CSV, JSON…) dans une collection (« Mes documents », « Administratif »…). Atom les découpe en passages et les indexe. Les PDF scannés (images) ne sont pas encore lus.
+
+**Projets de code** (lecture seule) — « Ajouter un projet de code » :
+- **GitHub** : colle l'adresse du dépôt. Pour un dépôt privé, crée un jeton *fine-grained* en lecture seule (github.com → Settings → Developer settings → Personal access tokens → *Contents : Read-only*) et mets-le dans `.env` : `ATOM_GITHUB_TOKEN=github_pat_…`. « Mettre à jour » récupère les derniers changements et ne réindexe que les fichiers modifiés.
+- **Dossier du serveur** : place (ou clone) tes projets dans `~/atom/projects/` — ils sont montés en lecture seule. Pour pointer ailleurs (un autre disque, un partage NAS monté sur le LXC) : `ATOM_PROJECTS_HOST_DIR=/chemin` dans `.env`.
+- Les dossiers lourds (`node_modules`, `.git`, `dist`, `build`, `venv`…) et les fichiers minifiés sont ignorés.
+
+**Dans la conversation** — le bouton sous la saisie choisit ce qu'Atom consulte :
+- **Documents** (par défaut) : Atom puise dans tes collections de documents quand c'est pertinent ;
+- **une collection ou un projet précis** : il ne regarde que là (pratique pour « Explique l'architecture de ce projet », « Où est géré le login ? ») ;
+- **Sans bibliothèque**.
+
+Les passages utilisés s'affichent sous la réponse (`D1 bail.pdf, p. 4`) ; un clic ouvre l'aperçu du document avec le passage mis en évidence. « Poser une question » depuis la bibliothèque ouvre une conversation déjà ciblée.
+
 ## Recherche sur Internet
 
 Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans port exposé) : il interroge plusieurs moteurs sans traçage. Atom lit ensuite les meilleures pages et répond en citant ses sources, affichées sous la réponse.

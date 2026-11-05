@@ -380,6 +380,68 @@
   .memfrag { position: fixed; z-index: 90; width: 9px; height: 9px; border-radius: 50%; pointer-events: none;
     background: #fff; box-shadow: 0 0 10px 3px rgba(255,255,255,.7), 0 0 26px 8px rgba(200,215,255,.35); }
 
+  /* ---------------------------------------------------------------- bibliothèque */
+  .side-nav button.on { background: var(--surface-2); color: var(--strong); }
+  #libView { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); border-top: 1px solid var(--border); }
+  #libView[hidden] { display: none; }
+  .lib-side { border-right: 1px solid var(--border); padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+  .lib-cols { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+  .lib-col { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; border: 0; background: none; color: var(--text-2); font-size: 13.5px; text-align: left; }
+  .lib-col:hover { background: var(--surface); }
+  .lib-col.on { background: var(--surface-2); color: var(--strong); }
+  .lib-col .n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-col .c { font: 11px var(--mono); color: var(--faint); }
+  .lib-col .err { color: var(--danger); font-weight: 600; }
+  .lib-side .btn { text-align: left; }
+  .lib-main { overflow-y: auto; padding: 22px 28px 40px; }
+  .lib-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 18px; flex-wrap: wrap; }
+  .lib-head h2 { margin: 0 0 4px; font-size: 18px; font-weight: 500; color: var(--strong); }
+  .lib-head p { margin: 0; color: var(--muted); font-size: 13px; }
+  .lib-head .btn { display: inline-flex; align-items: center; gap: 7px; }
+  .lib-err { color: var(--danger) !important; }
+  .drop-zone { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px; margin-bottom: 18px; border: 1px dashed var(--border-2); border-radius: 14px; color: var(--muted); cursor: pointer; text-align: center; transition: background .15s, border-color .15s; }
+  .drop-zone:hover, .drop-zone.over { background: var(--surface); border-color: #555; color: var(--text); }
+  .drop-zone svg { width: 22px; height: 22px; transform: rotate(180deg); }
+  .drop-zone b { font-weight: 500; color: var(--text); }
+  .drop-zone span { font-size: 12.5px; }
+  .lib-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .lib-table th { text-align: left; font-weight: 500; font-size: 12px; color: var(--faint); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .lib-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); }
+  .lib-table td.nm { color: var(--text); }
+  .lib-table td.nm > div { display: flex; align-items: center; gap: 9px; }
+  .lib-table td.nm span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+  .lib-table td.nm svg { color: var(--muted); }
+  .lib-table td.act { text-align: right; white-space: nowrap; }
+  .lib-table .none { color: var(--faint); text-align: center; padding: 20px; }
+  .spin { display: inline-block; width: 11px; height: 11px; border: 1.5px solid var(--faint); border-top-color: var(--text); border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .scope-wrap { position: relative; }
+  #scopeBtn.on { color: var(--strong); border-color: #555; }
+  #scopeBtn span { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .scope-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 30; min-width: 280px; max-height: 360px; overflow-y: auto; display: none;
+    background: var(--surface); border: 1px solid var(--border-2); border-radius: 12px; padding: 5px; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+  .scope-menu.open { display: block; }
+  .scope-menu button { width: 100%; display: flex; gap: 10px; align-items: flex-start; padding: 7px 9px; border: 0; border-radius: 8px; background: none; text-align: left; color: var(--text-2); }
+  .scope-menu button:hover, .scope-menu button.on { background: var(--surface-2); color: var(--text); }
+  .scope-menu button svg { margin-top: 2px; color: var(--muted); }
+  .scope-menu b { display: block; font-weight: 500; font-size: 13px; }
+  .scope-menu small { display: block; font-size: 11.5px; color: var(--faint); }
+  .scope-menu .sep { height: 1px; background: var(--border); margin: 4px 6px; }
+  .modal { position: fixed; inset: 0; z-index: 55; display: none; place-items: center; background: rgba(0,0,0,.55); }
+  .modal.open { display: grid; }
+  .modal-in { width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 60px); overflow-y: auto; background: var(--bg); border: 1px solid var(--border-2); border-radius: 14px; padding: 20px 22px; box-shadow: 0 24px 80px rgba(0,0,0,.5); zoom: var(--z, 1); }
+  .modal-in.wide { width: min(820px, calc(100vw - 32px)); }
+  .modal-in h4 { margin: 0 0 4px; font-size: 15px; font-weight: 500; color: var(--strong); }
+  .modal-in .desc { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .lbl { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 5px; }
+  .pv-body { display: flex; flex-direction: column; gap: 10px; }
+  .pv-chunk { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; color: var(--text-2); white-space: pre-wrap; }
+  .pv-chunk.hit { border-color: #666; background: var(--surface); color: var(--text); }
+  .pv-chunk small { display: block; font: 11px var(--mono); color: var(--faint); margin-bottom: 5px; }
+  .pv-chunk pre { margin: 0; font: 12.5px/1.55 var(--mono); overflow-x: auto; white-space: pre; }
+  button.src-l { background: none; cursor: pointer; font: inherit; font-size: 12.5px; }
+  @media (max-width: 760px) { #libView { grid-template-columns: 1fr; } .lib-side { border-right: 0; border-bottom: 1px solid var(--border); max-height: 40vh; } .lib-main { padding: 16px; } }
+
   /* ---------------------------------------------------------------- densité / largeur */
   body.compact { font-size: 13.5px; }
   body.compact .msg { margin-bottom: 18px; }
@@ -504,6 +566,7 @@
     <button class="side-new" id="newConv" title="Nouvelle conversation (Ctrl+Maj+O)"><span data-i="plus"></span>Nouvelle conversation</button>
     <label class="search"><span data-i="search"></span><input id="search" placeholder="Rechercher" autocomplete="off"><kbd>Ctrl K</kbd></label>
     <div class="side-nav">
+      <button id="navLib"><span data-i="library"></span>Bibliothèque</button>
       <button data-goto="memory"><span data-i="memory"></span>Souvenirs<span class="count" id="navMem"></span></button>
       <button data-goto="reminders"><span data-i="clock"></span>Rappels<span class="count" id="navRem"></span></button>
     </div>
@@ -533,10 +596,19 @@
       <button class="iconbtn" id="panelBtn" title="Panneau de l'entité" data-i="panel"></button>
     </div>
     <div id="scroller"><div id="chat"></div></div>
+    <section id="libView" hidden>
+      <aside class="lib-side">
+        <div class="lib-cols" id="libCols"></div>
+        <button class="btn" id="libNewDocs">＋ Nouvelle collection</button>
+        <button class="btn" id="libNewCode">＋ Ajouter un projet de code</button>
+        <p class="note">Atom lit tes documents et ton code, et cite ses sources. Rien ne quitte ton serveur.</p>
+      </aside>
+      <div class="lib-main" id="libMain"></div>
+    </section>
     <div class="composer">
       <div class="composer-in">
         <button id="toBottom" title="Aller en bas" data-i="down"></button>
-        <div class="quick" id="quick"></div>
+        <div class="quick" id="quick"><div class="scope-wrap"><button type="button" class="chip" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div></div>
         <form id="form" autocomplete="off">
           <div style="flex:1;min-width:0">
             <div class="tray" id="tray"></div>
@@ -702,6 +774,27 @@
   </div>
 </div>
 <div id="toast"></div>
+<div class="modal" id="codeDlg">
+  <div class="modal-in">
+    <h4>Ajouter un projet de code</h4>
+    <p class="desc">Atom lit le code (lecture seule) pour répondre à tes questions sur le projet.</p>
+    <label class="lbl">Dépôt GitHub</label>
+    <input class="field" id="codeUrl" placeholder="https://github.com/utilisateur/projet">
+    <p class="note">Dépôt privé : ajoute un jeton en lecture seule dans <code>ATOM_GITHUB_TOKEN</code> (voir README).</p>
+    <label class="lbl">ou un dossier du serveur</label>
+    <select class="field" id="codeServer"></select>
+    <p class="note">Les dossiers placés dans <code>~/atom/projects</code> sur le serveur apparaissent ici.</p>
+    <label class="lbl">Nom (facultatif)</label>
+    <input class="field" id="codeName" placeholder="Mon projet">
+    <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="codeCancel">Annuler</button><button class="btn primary" id="codeOk">Ajouter</button></div>
+  </div>
+</div>
+<div class="modal" id="preview">
+  <div class="modal-in wide">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px"><h4 id="pvTitle" style="margin:0">Aperçu</h4><button class="iconbtn" id="pvClose" data-i="x"></button></div>
+    <div id="pvBody" class="pv-body"></div>
+  </div>
+</div>
 <div id="drop"><div>Dépose tes fichiers ici<small>Texte, code, Markdown, CSV, JSON, PDF</small></div></div>
 <div id="presenceBg"></div>
 <div id="presence" aria-hidden="true">
@@ -745,6 +838,9 @@ const ICONS = {
   scale: '<path d="M12 4v16M7 20h10M5 8h14M5 8l-2.5 6a3 3 0 0 0 5 0zM19 8l-2.5 6a3 3 0 0 0 5 0z"/>',
   orb: '<circle cx="12" cy="12" r="7.5"/><ellipse cx="12" cy="12" rx="10" ry="3.2"/>',
   user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"/>',
+  code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14"/>',
+  folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  library: '<path d="M5 4.5v15M9.5 4.5v15M14 5.5l4.5 13.5M3.5 19.5h17"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5c-2.5-2.6-3.6-5.4-3.6-8.5s1.1-5.9 3.6-8.5z"/>',
   clip: '<path d="M19 11.5l-7.2 7.2a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.2 4.2l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l7-7"/>',
   up2: '<path d="M7.5 10.5V20H4.5v-9.5zM7.5 10.5l4-7c1.4 0 2.3 1.1 2 2.4l-.8 3.6h5.4a2 2 0 0 1 2 2.3l-1.2 6.5a2 2 0 0 1-2 1.7H7.5"/>',
@@ -1484,6 +1580,7 @@ $("exportBtn").onclick = () => {
 
 async function openConversation(id) {
   if (busy) return;
+  if (!$("libView").hidden) showView("chat");
   try {
     history = (await getJSON(`/api/conversations/${id}/messages`)).messages;
     settings.conversationId = id;
@@ -1501,6 +1598,7 @@ async function openConversation(id) {
 
 function newConversation() {
   if (busy) return;
+  if (!$("libView").hidden) showView("chat");
   settings.conversationId = null;
   saveSettings();
   history = [];
@@ -1562,6 +1660,7 @@ function msgEl(m, idx) {
   if (isUser || m.error) body.textContent = m.content; else setMd(body, m.content);
   if (isUser && !m.content) body.style.display = "none";
   el.appendChild(body);
+  if (!isUser && m.meta?.docs?.length) el.appendChild(docsEl(m.meta.docs));
   if (!isUser && m.meta?.sources?.length) el.appendChild(sourcesEl(m.meta.sources));
   if (!isUser && m.meta?.used) el.appendChild(usedEl(m.meta.used));
   if (!m.error) el.appendChild(actions(m, idx));
@@ -1823,7 +1922,7 @@ async function sendMessage(text, files = []) {
   scroller.scrollTop = scroller.scrollHeight;
   const body = el.querySelector(".body");
 
-  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0, used = null, asstId = null, sources = null;
+  let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0, used = null, asstId = null, sources = null, docs = null;
   const webMode = webForce ? "force" : (settings.webAuto === false ? "off" : "auto");
   if (webForce) { webForce = false; renderWebBtn(); }
   const render = () => {
@@ -1837,7 +1936,7 @@ async function sendMessage(text, files = []) {
     if (finished) return;
     finished = true;
     const content = reply.trim() + (stopped && reply.trim() ? " …" : "");
-    history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: { ...(used ? { used } : {}), ...(sources ? { sources } : {}) } });
+    history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: { ...(used ? { used } : {}), ...(sources ? { sources } : {}), ...(docs ? { docs } : {}) } });
     el.replaceWith(msgEl(history[history.length - 1], history.length - 1));
     markLast();
     if (serverSpeed) { $("speedV").textContent = serverSpeed.toFixed(1) + " tok/s"; serverSpeed = 0; }
@@ -1865,6 +1964,7 @@ async function sendMessage(text, files = []) {
         persona: settings.persona, auto_memory: settings.autoMemory,
         attachments: files.map((f) => ({ name: f.name, text: f.text })),
         web: webMode,
+        scope,
       }),
     });
     const reader = r.body.getReader();
@@ -1886,6 +1986,12 @@ async function sendMessage(text, files = []) {
           userMsg.id = ev.user_id; userMsg.created_at = Date.now() / 1000;
         } else if (ev.type === "context") {
           used = ev.used;
+        } else if (ev.type === "docs") {
+          docs = ev.refs.length ? ev.refs : null;
+          if (docs) {
+            setEmotion("focus"); setEntityState("lit…");
+            body.innerHTML = `<span class="live"><span class="mini"></span><span>Lecture de ${docs.length} passage${docs.length > 1 ? "s" : ""} de ta bibliothèque…</span></span>`;
+          }
         } else if (ev.type === "reset") {
           reply = ""; tokens = 0; t0 = 0;
           body.innerHTML = '<span class="live"><span class="mini"></span><span>Atom réfléchit…</span></span>';
@@ -2193,7 +2299,13 @@ addEventListener("dragleave", () => { dragDepth = Math.max(0, dragDepth - 1); if
 addEventListener("dragover", (e) => e.preventDefault());
 addEventListener("drop", (e) => {
   e.preventDefault(); dragDepth = 0; $("drop").classList.remove("on");
-  if (e.dataTransfer?.files?.length) addFiles([...e.dataTransfer.files]);
+  if (!e.dataTransfer?.files?.length) return;
+  if (!$("libView").hidden) {
+    const c = library.collections.find((x) => x.id === libSel && x.kind === "docs") || library.collections.find((x) => x.kind === "docs");
+    if (c) uploadDocs(c.id, [...e.dataTransfer.files]);
+    return;
+  }
+  addFiles([...e.dataTransfer.files]);
 });
 input.addEventListener("paste", (e) => {
   const files = [...(e.clipboardData?.files || [])];
@@ -2456,6 +2568,213 @@ $("benchBtn").onclick = async () => {
 };
 
 /* ============================================================
+   BIBLIOTHÈQUE — documents et projets de code
+   ============================================================ */
+let library = { collections: [], server_projects: [] }, libSel = null, libTimer = 0;
+let scope = store.get("scope", "auto");   // "auto" | "none" | "3,5"
+
+function showView(v) {
+  const lib = v === "library";
+  $("libView").hidden = !lib;
+  $("scroller").hidden = lib;
+  document.querySelector(".composer").hidden = lib;
+  $("navLib").classList.toggle("on", lib);
+  if (lib) { $("title").textContent = "Bibliothèque"; loadLibrary(); app.classList.remove("side-open"); }
+  else { updateTitle(); clearTimeout(libTimer); }
+}
+$("navLib").onclick = () => showView($("libView").hidden ? "library" : "chat");
+
+async function loadLibrary() {
+  try { library = await getJSON("/api/library"); } catch { return; }
+  if (!libSel || !library.collections.some((c) => c.id === libSel)) libSel = library.collections[0]?.id ?? null;
+  renderLibrary();
+  renderScope();
+  const busyIdx = library.collections.some((c) => c.status === "indexing");
+  clearTimeout(libTimer);
+  if (!$("libView").hidden) libTimer = setTimeout(loadLibrary, busyIdx ? 2500 : 15000);
+}
+
+function renderLibrary() {
+  const list = $("libCols");
+  list.innerHTML = "";
+  for (const c of library.collections) {
+    const b = document.createElement("button");
+    b.className = "lib-col" + (c.id === libSel ? " on" : "");
+    const st = c.status === "indexing" ? '<span class="spin"></span>' : c.status === "error" ? '<span class="err">!</span>' : "";
+    b.innerHTML = `${icon(c.kind === "code" ? "code" : "folder")}<span class="n">${esc(c.name)}</span>${st}<span class="c">${c.documents}</span>`;
+    b.onclick = () => { libSel = c.id; renderLibrary(); };
+    list.appendChild(b);
+  }
+  renderCollection();
+}
+
+async function renderCollection() {
+  const box = $("libMain");
+  const c = library.collections.find((x) => x.id === libSel);
+  if (!c) { box.innerHTML = '<div class="side-empty">Aucune collection.</div>'; return; }
+  let d;
+  try { d = await getJSON(`/api/library/collections/${c.id}/documents`); } catch { return; }
+  const isCode = c.kind === "code";
+  box.innerHTML = `
+    <div class="lib-head">
+      <div><h2>${esc(c.name)}</h2>
+        <p>${isCode ? `Projet de code · ${esc(c.source || "")}` : "Documents"} · ${d.documents.length} fichier${d.documents.length > 1 ? "s" : ""} · ${c.chunks} passage${c.chunks > 1 ? "s" : ""} indexé${c.chunks > 1 ? "s" : ""}</p>
+        ${c.message ? `<p class="${c.status === "error" ? "lib-err" : ""}">${esc(c.message)}</p>` : ""}
+      </div>
+      <div class="row">
+        ${isCode ? `<button class="btn" data-a="sync">${icon("refresh")} Mettre à jour</button>` : ""}
+        <button class="btn" data-a="ask">${icon("spark")} Poser une question</button>
+        <button class="iconbtn" data-a="rename" title="Renommer">${icon("edit")}</button>
+        <button class="iconbtn" data-a="del" title="Supprimer la collection">${icon("trash")}</button>
+      </div>
+    </div>
+    ${isCode ? "" : `<label class="drop-zone" id="libDrop">${icon("download")}<b>Dépose tes documents ici</b><span>ou clique pour choisir · PDF, Word, texte, Markdown, HTML, CSV…</span><input type="file" multiple hidden id="libFile"></label>`}
+    <table class="lib-table"><thead><tr><th>${isCode ? "Fichier" : "Document"}</th><th>${isCode ? "Taille" : "Pages"}</th><th>Passages</th><th></th></tr></thead><tbody></tbody></table>`;
+  const tb = box.querySelector("tbody");
+  if (!d.documents.length) tb.innerHTML = `<tr><td colspan="4" class="none">${isCode ? "Indexation en cours…" : "Aucun document pour l'instant."}</td></tr>`;
+  for (const doc of d.documents.slice(0, 400)) {
+    const tr = document.createElement("tr");
+    const status = doc.status === "indexing" ? '<span class="spin"></span> lecture…' : doc.status === "error" ? `<span class="lib-err" title="${esc(doc.message || "")}">${esc((doc.message || "erreur").slice(0, 60))}</span>` : doc.chunks;
+    tr.innerHTML = `<td class="nm"><div>${icon(isCode ? "code" : "doc")}<span>${esc(isCode ? doc.path : doc.name)}</span></div></td><td>${isCode ? fmtBytes(doc.size) : (doc.pages || "—")}</td><td>${status}</td><td class="act"></td>`;
+    const act = tr.querySelector(".act");
+    const v = document.createElement("button"); v.className = "iconbtn"; v.title = "Aperçu"; v.innerHTML = icon("search");
+    v.onclick = () => previewDoc(doc.id);
+    act.appendChild(v);
+    if (!isCode) {
+      const dl = document.createElement("a"); dl.className = "iconbtn"; dl.title = "Télécharger"; dl.href = `/api/library/documents/${doc.id}/file`; dl.innerHTML = icon("download");
+      const del = document.createElement("button"); del.className = "iconbtn"; del.title = "Supprimer"; del.innerHTML = icon("trash");
+      del.onclick = async () => { if (!confirm(`Supprimer « ${doc.name} » de la bibliothèque ?`)) return; await send_(`/api/library/documents/${doc.id}`, "DELETE"); loadLibrary(); };
+      act.append(dl, del);
+    }
+    tb.appendChild(tr);
+  }
+  if (d.documents.length > 400) tb.insertAdjacentHTML("beforeend", `<tr><td colspan="4" class="none">… et ${d.documents.length - 400} autres fichiers</td></tr>`);
+  box.querySelector('[data-a="del"]').onclick = async () => {
+    if (!confirm(`Supprimer la collection « ${c.name} » et tout son index ?`)) return;
+    await send_(`/api/library/collections/${c.id}`, "DELETE"); libSel = null; loadLibrary();
+  };
+  box.querySelector('[data-a="rename"]').onclick = async () => {
+    const n = prompt("Nouveau nom", c.name); if (!n?.trim()) return;
+    await send_(`/api/library/collections/${c.id}`, "PATCH", { name: n.trim(), kind: c.kind }); loadLibrary();
+  };
+  box.querySelector('[data-a="ask"]').onclick = () => { setScope(String(c.id)); showView("chat"); newConversation(); fillInput(isCode ? "Explique-moi l'architecture de ce projet." : "Que contiennent ces documents ? "); };
+  box.querySelector('[data-a="sync"]')?.addEventListener("click", async () => { await send_(`/api/library/collections/${c.id}/sync`, "POST"); toast("Mise à jour du projet lancée."); loadLibrary(); });
+  const drop = $("libDrop");
+  if (drop) {
+    $("libFile").onchange = (e) => { uploadDocs(c.id, [...e.target.files]); e.target.value = ""; };
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.remove("over"); $("drop").classList.remove("on"); uploadDocs(c.id, [...e.dataTransfer.files]); });
+  }
+}
+
+async function uploadDocs(cid, files) {
+  for (const f of files) {
+    if (f.size > 100 * 1024 * 1024) { toast(`<b>${esc(f.name)}</b> · trop gros (100 Mo max)`); continue; }
+    try {
+      const r = await fetch(`/api/library/collections/${cid}/documents?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream" } });
+      if (!r.ok) throw new Error((await r.json()).detail || "échec");
+      entity.feeding = true; setTimeout(() => { entity.feeding = false; }, 2500);
+    } catch (e) { toast(`<b>${esc(f.name)}</b> · ${esc(e.message)}`); }
+  }
+  toast(`<b>${files.length} document${files.length > 1 ? "s" : ""}</b> ajouté${files.length > 1 ? "s" : ""} · Atom les lit…`);
+  loadLibrary();
+}
+
+$("libNewDocs").onclick = async () => {
+  const n = prompt("Nom de la collection (ex. Administratif, Travail, Homelab)"); if (!n?.trim()) return;
+  const c = await (await send_("/api/library/collections", "POST", { name: n.trim(), kind: "docs" })).json();
+  libSel = c.id; loadLibrary();
+};
+$("libNewCode").onclick = () => {
+  $("codeDlg").classList.add("open");
+  const sel = $("codeServer");
+  sel.innerHTML = library.server_projects.length ? library.server_projects.map((p) => `<option>${esc(p)}</option>`).join("") : '<option value="">(aucun dossier dans /projects)</option>';
+  $("codeUrl").value = ""; $("codeName").value = "";
+  $("codeUrl").focus();
+};
+$("codeCancel").onclick = () => $("codeDlg").classList.remove("open");
+$("codeOk").onclick = async () => {
+  const url = $("codeUrl").value.trim(), srv = $("codeServer").value;
+  const source = url || srv;
+  if (!source) { toast("Indique une adresse GitHub ou choisis un dossier du serveur."); return; }
+  const name = $("codeName").value.trim() || source.replace(/\.git$/, "").split("/").filter(Boolean).pop();
+  try {
+    const c = await (await send_("/api/library/collections", "POST", { name, kind: "code", source })).json();
+    $("codeDlg").classList.remove("open"); libSel = c.id; toast("Projet ajouté · Atom lit le code…"); loadLibrary();
+  } catch (e) { toast(esc(e.message)); }
+};
+
+/* Aperçu d'un document : tous ses passages, celui cité mis en évidence */
+async function previewDoc(did, chunkId) {
+  let d;
+  try { d = await getJSON(`/api/library/documents/${did}`); } catch { toast("Document introuvable (supprimé ?)."); return; }
+  $("pvTitle").textContent = d.document.path && !d.document.path.startsWith("/") ? d.document.path : d.document.name;
+  const body = $("pvBody");
+  body.innerHTML = "";
+  for (const ch of d.chunks) {
+    const el = document.createElement("div");
+    el.className = "pv-chunk" + (ch.id === chunkId ? " hit" : "");
+    const where = ch.page ? `page ${ch.page}` : ch.line_start ? `lignes ${ch.line_start}-${ch.line_end}` : `passage ${ch.ord + 1}`;
+    el.innerHTML = `<small>${where}</small>`;
+    const pre = document.createElement(ch.line_start ? "pre" : "div");
+    if (ch.line_start) pre.innerHTML = highlight(ch.text.replace(/^# .*\n/, "")); else pre.textContent = ch.text;
+    el.appendChild(pre);
+    body.appendChild(el);
+  }
+  if (!d.chunks.length) body.innerHTML = `<p class="note">${esc(d.document.message || "Pas encore indexé.")}</p>`;
+  $("preview").classList.add("open");
+  requestAnimationFrame(() => body.querySelector(".hit")?.scrollIntoView({ block: "center" }));
+}
+$("pvClose").onclick = () => $("preview").classList.remove("open");
+$("preview").addEventListener("click", (e) => { if (e.target.id === "preview") $("preview").classList.remove("open"); });
+
+/* Portée de la conversation : quelles collections Atom consulte */
+function scopeLabel() {
+  if (scope === "auto") return "Documents";
+  if (scope === "none") return "Sans bibliothèque";
+  const ids = scope.split(",").map(Number);
+  const names = library.collections.filter((c) => ids.includes(c.id)).map((c) => c.name);
+  return names.length ? names.join(", ") : "Documents";
+}
+function setScope(v) { scope = v; store.set("scope", v); renderScope(); }
+function renderScope() {
+  $("scopeBtn").innerHTML = icon(scope !== "auto" && scope !== "none" && library.collections.find((c) => String(c.id) === scope)?.kind === "code" ? "code" : "folder") + `<span>${esc(scopeLabel())}</span>`;
+  $("scopeBtn").classList.toggle("on", scope !== "auto" && scope !== "none");
+}
+$("scopeBtn").onclick = (e) => {
+  e.stopPropagation();
+  const m = $("scopeMenu");
+  if (m.classList.toggle("open")) {
+    const ids = scope.split(",");
+    m.innerHTML = `<button data-v="auto">${icon("folder")}<span><b>Documents</b><small>Atom consulte tes documents quand c'est utile</small></span></button>
+      <button data-v="none">${icon("x")}<span><b>Sans bibliothèque</b><small>Ne rien consulter</small></span></button>
+      <div class="sep"></div>` + library.collections.map((c) =>
+      `<button data-v="${c.id}" class="${ids.includes(String(c.id)) ? "on" : ""}">${icon(c.kind === "code" ? "code" : "folder")}<span><b>${esc(c.name)}</b><small>${c.kind === "code" ? "Projet de code" : "Collection"} · ${c.documents} fichier${c.documents > 1 ? "s" : ""}</small></span></button>`).join("")
+      + `<div class="sep"></div><button data-v="manage">${icon("settings")}<span><b>Gérer la bibliothèque…</b></span></button>`;
+    m.querySelectorAll("button").forEach((b) => b.onclick = () => {
+      m.classList.remove("open");
+      if (b.dataset.v === "manage") return showView("library");
+      setScope(b.dataset.v);
+    });
+  }
+};
+document.addEventListener("click", () => $("scopeMenu").classList.remove("open"));
+
+function docsEl(refs) {
+  const d = document.createElement("div");
+  d.className = "sources";
+  for (const r of refs) {
+    const b = document.createElement("button");
+    b.className = "src-l";
+    b.innerHTML = `<i>D${r.n}</i><span>${esc(r.label)}</span><small>${esc(r.collection)}</small>`;
+    b.onclick = () => previewDoc(r.document_id, r.chunk_id);
+    d.appendChild(b);
+  }
+  return d;
+}
+
+/* ============================================================
    DÉMARRAGE
    ============================================================ */
 applyLayout();
@@ -2472,6 +2791,7 @@ addEventListener("scroll", () => { if (scrollY || scrollX) scrollTo(0, 0); }, { 
 connect();
 applyLook();
 renderWebBtn();
+loadLibrary();
 loadCompanion();
 refreshCounts();
 setInterval(refreshCounts, 60000);

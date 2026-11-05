@@ -11,14 +11,14 @@ from typing import AsyncIterator
 
 import httpx
 
-from . import companion, db, llm, memory, reminders, search
+from . import companion, db, library, llm, memory, reminders, search
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
 _background: set[asyncio.Task] = set()
 
 
-def system_prompt(persona: str, memory_block: str, web: str = "off", web_block: str = "") -> str:
+def system_prompt(persona: str, memory_block: str, web: str = "off", web_block: str = "", docs_block: str = "") -> str:
     s = (
         f"{persona.strip()}\n\n"
         "Tu possèdes un corps : une sphère de fragments lumineux qui exprime ton état.\n\n"
@@ -46,6 +46,8 @@ def system_prompt(persona: str, memory_block: str, web: str = "off", web_block: 
         )
     if memory_block:
         s += "\n\n" + memory_block
+    if docs_block:
+        s += "\n\n" + docs_block
     if web_block:
         s += "\n\n" + web_block
     return s
@@ -77,6 +79,7 @@ async def chat_events(
     title_prefix: str = "",
     attachments: list[dict] | None = None,
     web: str = "auto",  # "auto" : Atom décide · "force" : chercher · "off" : jamais
+    scope: str = "auto",  # bibliothèque : "auto" (documents), "none", ou "3,5" (collections choisies)
 ) -> AsyncIterator[dict]:
     """Événements : meta, context, emotion, token…, reminder…, done, memory — ou error."""
     title_src = message or (attachments[0]["name"] if attachments else "Fichier")
@@ -93,7 +96,34 @@ async def chat_events(
         yield dict(type="context", used=used)
     if not search.enabled():
         web = "off"
-    msgs = [{"role": "system", "content": system_prompt(persona, mem_block, web if web == "auto" else "off")}]
+    # Bibliothèque : passages de tes documents / ton code proches de la question
+    docs_block, doc_refs = "", []
+    if scope != "none":
+        try:
+            if scope == "auto":
+                ids = [c["id"] for c in library.list_collections() if c["kind"] == "docs"]
+            else:
+                ids = [int(x) for x in scope.split(",") if x.strip().isdigit()]
+            if ids:
+                chosen = scope != "auto"
+                hits = await library.retrieve(message or title_src, ids, k=6 if chosen else 4,
+                                              min_score=0.35 if chosen else library.DOC_MIN_SCORE)
+                if hits:
+                    docs_block = library.prompt_block(hits)
+                    doc_refs = [{"n": i + 1, "chunk_id": h["id"], "document_id": h["document_id"],
+                                 "collection_id": h["collection_id"], "label": library.ref_label(h),
+                                 "collection": h["collection"], "kind": h["kind"],
+                                 "path": h.get("path") if h["kind"] == "code" else None,
+                                 "line_start": h.get("line_start"), "page": h.get("page")} for i, h in enumerate(hits)]
+                code_cols = [c for c in library.list_collections() if c["id"] in ids and c["kind"] == "code"] if chosen else []
+                for c in code_cols[:2]:
+                    docs_block += f"\n\nStructure du projet « {c['name']} » :\n{library.tree(c['id'], 60)}"
+                if doc_refs or code_cols:
+                    yield dict(type="docs", refs=doc_refs)
+        except Exception:  # noqa: BLE001 — la bibliothèque ne doit pas bloquer la réponse
+            import logging
+            logging.getLogger("atom.agent").exception("recherche dans la bibliothèque impossible")
+    msgs = [{"role": "system", "content": system_prompt(persona, mem_block, web if web == "auto" else "off", "", docs_block)}]
     msgs += [
         {"role": m["role"], "content": with_attachments(m["content"], m["meta"].get("attachments"))}
         for m in history
@@ -162,7 +192,7 @@ async def chat_events(
         sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"]} for r in results)
         yield dict(type="search", status="done", query=query, sources=sources)
         today = reminders.now_local().strftime("%d/%m/%Y")
-        msgs[0]["content"] = system_prompt(persona, mem_block, "off", search.prompt_block(query, results, today))
+        msgs[0]["content"] = system_prompt(persona, mem_block, "off", search.prompt_block(query, results, today), docs_block)
 
     try:
         state: dict = {}
@@ -191,6 +221,8 @@ async def chat_events(
         text = text.strip() or "…"
         if sources:
             asst_meta = {**(asst_meta or {}), "sources": sources}
+        if doc_refs:
+            asst_meta = {**(asst_meta or {}), "docs": doc_refs}
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
         yield dict(type="done", emotion=emotion, id=asst_id, stats=dict(llm.last_stats))

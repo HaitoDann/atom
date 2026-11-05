@@ -60,3 +60,8 @@ NUM_THREADS = int(os.getenv("ATOM_NUM_THREADS", "0"))
 BACKUP_DIR = Path(os.getenv("ATOM_BACKUP_DIR", "data/backups"))
 BACKUP_KEEP = int(os.getenv("ATOM_BACKUP_KEEP", "7"))
 BACKUP_TIME = os.getenv("ATOM_BACKUP_TIME", "03:30")
+
+# Bibliothèque
+DATA_DIR = DB_PATH.parent
+PROJECTS_DIR = Path(os.getenv("ATOM_PROJECTS_DIR", "/projects"))   # dossiers de code du serveur (lecture seule)
+GITHUB_TOKEN = os.getenv("ATOM_GITHUB_TOKEN", "")                    # pour les dépôts privés
