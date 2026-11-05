@@ -175,6 +175,26 @@ Atom répond **en local par défaut**. Il peut s'appuyer sur un modèle Mistral,
 
 **Limites** : `ATOM_REMOTE_DAILY_LIMIT` (200 par défaut) plafonne les requêtes par jour ; au-delà, Atom reste en local. Modèle : `ATOM_REMOTE_MODEL` ou Réglages → Hybride. Tout fournisseur compatible OpenAI fonctionne en changeant `ATOM_REMOTE_URL` et `ATOM_REMOTE_NAME`.
 
+## Mode Code
+
+Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub ou dossier du serveur), en lecture seule.
+
+- **Arborescence** repliable, **filtre** par nom de fichier, et **recherche dans le contenu** (loupe) avec les lignes trouvées — un clic ouvre le fichier à la bonne ligne.
+- **Onglets** (8 fichiers ouverts au plus), **numéros de ligne**, **coloration syntaxique** par langage (Python, JS/TS, Go, Rust, C/C++, Java, PHP, Shell, SQL, YAML, TOML, JSON, HTML, CSS…), **aperçu** des fichiers Markdown.
+- **Demander à Atom** : clique sur un numéro de ligne (Maj+clic pour une plage), puis **Expliquer**, **Relire** (bugs, cas oubliés) ou **Demander…** — le passage est joint à une nouvelle conversation ciblée sur le projet. « Expliquer le fichier » fait de même pour tout le fichier.
+- **Mettre à jour** récupère les derniers changements du dépôt.
+
+## Atelier multi-IA (désactivé par défaut)
+
+Pour une demande importante, plusieurs IA collaborent. Réglages → **Atelier** → « Activer l'atelier », puis le bouton **Atelier** (icône de groupe) sous la saisie pour le message suivant.
+
+- **Rédaction puis relecture** : un rédacteur écrit, un relecteur critique, une version corrigée est produite (1 à 3 tours).
+- **Comité et arbitre** : deux propositions indépendantes, un arbitre fait la synthèse.
+- **Débat contradictoire** : deux positions opposées, un arbitre tranche — utile pour une décision.
+- Chaque rôle peut être tenu par le modèle **local** ou un modèle du **mode hybride** (Groq, Mistral…) ; mélanger des modèles différents donne de meilleurs résultats.
+- Le travail intermédiaire de chaque IA est visible dans une carte repliable au-dessus de la réponse finale.
+- Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges (ni souvenirs, ni bibliothèque, ni fichiers). Un participant distant devient local si l'API manque ou si le quota du jour est atteint. Coût : 3 étapes ou plus par demande.
+
 ## Bibliothèque : tes documents et ton code
 
 Barre latérale → **Bibliothèque**.

@@ -549,3 +549,28 @@ def read_file(cid: int, rel: str) -> str:
     if not str(p).startswith(str(root)) or not p.is_file():
         raise FileNotFoundError(rel)
     return p.read_text("utf-8", "ignore")[:400_000]
+
+
+def grep(cid: int, q: str, limit: int = 300) -> list[dict]:
+    col = get_collection(cid)
+    if not col or col["kind"] != "code":
+        raise FileNotFoundError(cid)
+    root = _code_root(col).resolve()
+    with db.conn() as c:
+        paths = [r["path"] for r in c.execute("SELECT path FROM documents WHERE collection_id = ? ORDER BY path", (cid,))]
+    ql = q.lower()
+    out = []
+    for rel in paths:
+        p = root / rel
+        try:
+            text = p.read_text("utf-8", "ignore")
+        except OSError:
+            continue
+        if ql not in text.lower():
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            if ql in line.lower():
+                out.append({"path": rel, "line": n, "text": line.strip()[:200]})
+                if len(out) >= limit:
+                    return out
+    return out

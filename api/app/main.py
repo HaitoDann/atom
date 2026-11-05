@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import agent, backup, companion, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram
+from . import agent, backup, companion, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -401,6 +401,43 @@ def put_hybrid(body: HybridIn):
     return hybrid.status()
 
 
+# ---- atelier multi-IA
+
+
+class WorkshopIn(BaseModel):
+    enabled: bool | None = None
+    pattern: str | None = Field(default=None, pattern="^(review|panel|debate)$")
+    participants: list[str] | None = Field(default=None, max_length=3)
+    rounds: int | None = Field(default=None, ge=1, le=3)
+
+
+class WorkshopRunIn(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    conversation_id: int | None = None
+    pattern: str | None = Field(default=None, pattern="^(review|panel|debate)$")
+    participants: list[str] | None = Field(default=None, max_length=3)
+
+
+@app.get("/api/workshop")
+def get_workshop():
+    return {**workshop.settings(), "patterns": workshop.PATTERNS, "roles": workshop.ROLES}
+
+
+@app.put("/api/workshop")
+def put_workshop(body: WorkshopIn):
+    workshop.save_settings({k: v for k, v in body.model_dump().items() if v is not None})
+    return get_workshop()
+
+
+@app.post("/api/workshop/run")
+async def run_workshop(body: WorkshopRunIn):
+    if not workshop.settings()["enabled"]:
+        raise HTTPException(400, "L'atelier est désactivé (Réglages → Atelier).")
+    return StreamingResponse(
+        (event(**ev) async for ev in workshop.run(body.message.strip(), body.conversation_id, body.pattern, body.participants)),
+        media_type="application/x-ndjson")
+
+
 # ---- bibliothèque
 
 
@@ -508,6 +545,18 @@ async def reindex_document(did: int):
         raise HTTPException(404, "Document introuvable")
     background(library.index_document(did))
     return {"ok": True}
+
+
+@app.get("/api/library/collections/{cid}/grep")
+def project_grep(cid: int, q: str):
+    """Recherche texte dans un projet de code : [{path, line, text}]."""
+    q = q.strip()
+    if len(q) < 2:
+        return {"matches": []}
+    try:
+        return {"matches": library.grep(cid, q)}
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Projet introuvable") from e
 
 
 @app.get("/api/library/collections/{cid}/file")

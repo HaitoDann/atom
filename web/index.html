@@ -36,6 +36,7 @@
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
   body {
     background: var(--bg); color: var(--text);
@@ -382,7 +383,7 @@
 
   /* ---------------------------------------------------------------- bibliothèque */
   .side-nav button.on { background: var(--surface-2); color: var(--strong); }
-  #libView { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); border-top: 1px solid var(--border); }
+  #libView { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); border-top: 1px solid var(--border); }
   #libView[hidden] { display: none; }
   .lib-side { border-right: 1px solid var(--border); padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
   .lib-cols { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
@@ -444,6 +445,73 @@
 
   .acts .via { font: 10.5px var(--mono); color: var(--muted); border: 1px solid var(--border-2); border-radius: 5px; padding: 1px 6px; margin-left: 4px; }
   #engineBtn.on { color: var(--strong); border-color: #555; }
+
+  /* ---------------------------------------------------------------- mode code */
+  #codeView { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); border-top: 1px solid var(--border); }
+  #codeView[hidden] { display: none; }
+  .cv-side { border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; min-height: 0; }
+  .cv-side .field { padding: 6px 9px; font-size: 13px; }
+  .cv-tree { flex: 1; overflow: auto; margin: 0 -4px; }
+  .cv-row { display: flex; align-items: center; gap: 7px; width: 100%; padding: 4px 8px; border: 0; background: none; color: var(--text-2); font: 13px var(--sans); text-align: left; border-radius: 6px; white-space: nowrap; }
+  .cv-row span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .cv-row:hover { background: var(--surface); color: var(--text); }
+  .cv-row.on { background: var(--surface-2); color: var(--strong); }
+  .cv-row svg { width: 14px; height: 14px; color: var(--muted); }
+  .cv-row.dir { color: var(--text); }
+  .cv-row .car { width: 10px; color: var(--faint); font-size: 10px; }
+  #cvGrep.on { color: var(--strong); background: var(--surface-2); }
+  .cv-hit { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 5px 8px; border-radius: 6px; color: var(--text-2); }
+  .cv-hit:hover { background: var(--surface); }
+  .cv-hit small { display: block; font: 11px var(--mono); color: var(--muted); }
+  .cv-hit code { font: 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .cv-hit mark { background: rgba(255,214,102,.25); color: var(--strong); border-radius: 2px; }
+  .cv-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .cv-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .cv-wrap[hidden] { display: none; }
+  .cv-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--side); min-height: 37px; scrollbar-width: none; }
+  .cv-tab { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 12px; height: 36px; border-right: 1px solid var(--border); color: var(--muted); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+  .cv-tab.on { background: var(--bg); color: var(--strong); box-shadow: inset 0 -1px 0 var(--bg), inset 0 2px 0 #9a9a9a; }
+  .cv-tab button { background: none; border: 0; color: var(--faint); display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; }
+  .cv-tab button:hover { background: var(--surface-2); color: var(--text); }
+  .cv-tab button svg { width: 12px; height: 12px; }
+  .cv-bar, .cv-selbar { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); min-height: 42px; }
+  .cv-bar[hidden], .cv-selbar[hidden] { display: none; }
+  .cv-selbar { background: rgba(255,214,102,.05); font-size: 12.5px; color: var(--text-2); }
+  .cv-path { font: 12.5px var(--mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .cv-meta { font: 11px var(--mono); color: var(--faint); white-space: nowrap; }
+  .btn.sm { padding: 4px 10px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+  .btn.sm svg { width: 13px; height: 13px; }
+  .btn.sm.on { background: var(--surface-2); border-color: #555; }
+  .cv-editor { flex: 1; overflow: auto; background: #181818; }
+  .cv-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); text-align: center; padding: 30px; }
+  .cv-placeholder small { display: block; color: var(--faint); margin-top: 6px; max-width: 420px; }
+  .cv-code { display: flex; min-width: max-content; font: 12.8px/1.6 var(--mono); }
+  .cv-gutter { position: sticky; left: 0; z-index: 2; background: #181818; padding: 12px 0; text-align: right; user-select: none; border-right: 1px solid var(--border); }
+  .cv-gutter span { display: block; padding: 0 12px 0 16px; color: #4f4f4f; cursor: pointer; }
+  .cv-gutter span:hover { color: var(--text-2); }
+  .cv-gutter span.on { color: #e8c76a; background: rgba(255,214,102,.08); }
+  .cv-src { position: relative; flex: 1; }
+  .cv-hl { position: absolute; left: 0; right: 0; background: rgba(255,214,102,.07); border-left: 2px solid rgba(255,214,102,.55); display: none; pointer-events: none; }
+  pre.cv { margin: 0; padding: 12px 24px 12px 14px; font: inherit; color: #c9d1d9; tab-size: 4; position: relative; }
+  pre.cv .tk-c { color: #6a7480; font-style: italic; }
+  pre.cv .tk-s { color: #a5d6a7; }
+  pre.cv .tk-n { color: #f2b380; }
+  pre.cv .tk-k { color: #c5a3ff; font-weight: 500; }
+  pre.cv .tk-f { color: #82b8ff; text-decoration: none; }
+  pre.cv .tk-d { color: #e8c76a; }
+  .cv-md { padding: 24px 32px; max-width: 860px; }
+  @media (max-width: 760px) { #codeView { grid-template-columns: 1fr; } .cv-side { max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--border); } }
+
+  /* ---------------------------------------------------------------- atelier */
+  #wsBtn.on { color: #e8c76a; background: rgba(255,214,102,.1); }
+  details.ws { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.015); }
+  details.ws > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12.5px; color: var(--muted); }
+  details.ws > summary::-webkit-details-marker { display: none; }
+  details.ws > summary svg { width: 15px; height: 15px; }
+  .ws-step { border-top: 1px solid var(--border); padding: 10px 14px; font-size: 13.5px; color: var(--text-2); }
+  .ws-h { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .ws-h b { font-weight: 500; color: var(--text); font-size: 12.5px; }
+  .ws-h span { font: 11px var(--mono); color: var(--faint); }
 
   /* ---------------------------------------------------------------- densité / largeur */
   body.compact { font-size: 13.5px; }
@@ -570,6 +638,7 @@
     <label class="search"><span data-i="search"></span><input id="search" placeholder="Rechercher" autocomplete="off"><kbd>Ctrl K</kbd></label>
     <div class="side-nav">
       <button id="navLib"><span data-i="library"></span>Bibliothèque</button>
+      <button id="navCode"><span data-i="code"></span>Code</button>
       <button data-goto="memory"><span data-i="memory"></span>Souvenirs<span class="count" id="navMem"></span></button>
       <button data-goto="reminders"><span data-i="clock"></span>Rappels<span class="count" id="navRem"></span></button>
     </div>
@@ -599,6 +668,30 @@
       <button class="iconbtn" id="panelBtn" title="Panneau de l'entité" data-i="panel"></button>
     </div>
     <div id="scroller"><div id="chat"></div></div>
+    <section id="codeView" hidden>
+      <aside class="cv-side">
+        <div class="row" style="gap:6px"><select class="field" id="cvProject" style="flex:1;min-width:0"></select><button class="iconbtn" id="cvSync" title="Mettre à jour le projet" data-i="refresh"></button><button class="iconbtn" id="cvAdd" title="Ajouter un projet" data-i="plus"></button></div>
+        <p class="note" id="cvInfo" style="margin:6px 2px 8px"></p>
+        <div class="row" style="gap:6px;margin-bottom:6px"><input class="field" id="cvFilter" placeholder="Filtrer les fichiers…" autocomplete="off"><button class="iconbtn" id="cvGrep" title="Chercher dans le contenu des fichiers" data-i="search"></button></div>
+        <div class="cv-tree" id="cvTree"></div>
+      </aside>
+      <div class="cv-main">
+        <div id="cvEmpty" class="cv-placeholder" hidden>Aucun projet de code pour l'instant.<small>Ajoute un dépôt GitHub ou un dossier du serveur pour le parcourir ici.</small><button class="btn primary" id="cvAdd2" style="margin-top:14px">Ajouter un projet</button></div>
+        <div id="cvMainWrap" class="cv-wrap">
+          <div class="cv-tabs" id="cvTabs"></div>
+          <div class="cv-bar" id="cvBar" hidden>
+            <span class="cv-path" id="cvPath"></span><span class="cv-meta" id="cvMeta"></span><span class="spacer"></span>
+            <button class="btn sm" id="cvMd" hidden>Aperçu</button>
+            <button class="iconbtn" id="cvCopyPath" title="Copier le chemin" data-i="link"></button>
+            <button class="iconbtn" id="cvCopy" title="Copier le fichier" data-i="copy"></button>
+            <button class="btn sm" id="cvAsk"><span data-i="spark"></span>Expliquer le fichier</button>
+          </div>
+          <div class="cv-selbar" id="cvSelBar" hidden><span id="cvSelInfo"></span><span class="spacer"></span>
+            <button class="btn sm" id="cvExplain">Expliquer</button><button class="btn sm" id="cvReview">Relire</button><button class="btn sm" id="cvAskSel">Demander…</button></div>
+          <div class="cv-editor" id="cvEditor"></div>
+        </div>
+      </div>
+    </section>
     <section id="libView" hidden>
       <aside class="lib-side">
         <div class="lib-cols" id="libCols"></div>
@@ -618,6 +711,7 @@
             <div style="display:flex;align-items:flex-end;gap:6px">
               <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF)" data-i="clip"></button>
               <button class="iconbtn" id="webBtn" type="button" title="Rechercher sur Internet pour ce message" data-i="globe"></button>
+              <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA pour ce message" data-i="users" style="display:none"></button>
               <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
             </div>
           </div>
@@ -674,6 +768,7 @@
       <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
       <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
       <button class="tab" data-tab="hybrid"><span data-i="spark"></span>Hybride</button>
+      <button class="tab" data-tab="workshop"><span data-i="users"></span>Atelier</button>
       <button class="tab" data-tab="backup"><span data-i="download"></span>Sauvegarde</button>
       <button class="tab" data-tab="look"><span data-i="panel"></span>Apparence</button>
       <button class="tab" data-tab="entity"><span data-i="orb"></span>Entité</button>
@@ -748,6 +843,27 @@
           <label class="lbl" id="hyModelLbl">Modèle</label>
           <div class="row"><select class="field" id="hyModelSel"></select><button class="btn" id="hyModelSave">Enregistrer</button></div>
           <p class="note" id="hyModelNote">Liste des modèles proposés par ton fournisseur.</p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="workshop">
+        <div class="block">
+          <h4>Atelier multi-IA</h4>
+          <p class="desc">Pour une demande importante, plusieurs IA travaillent ensemble : l'une rédige, une autre critique, une troisième corrige ou arbitre. Active-le ici, puis utilise le bouton <b>Atelier</b> sous la saisie pour un message.</p>
+          <label class="switch"><span>Activer l'atelier</span><input type="checkbox" id="wsEnabled"></label>
+        </div>
+        <div class="block">
+          <h4>Schéma de travail</h4>
+          <div class="row" id="wsPattern" style="flex-wrap:wrap;margin:8px 0"></div>
+          <p class="note">Rédaction puis relecture : un rédacteur, un relecteur exigeant, une version corrigée. · Comité et arbitre : deux propositions indépendantes, un arbitre fait la synthèse. · Débat : deux positions opposées, un arbitre tranche — utile pour une décision.</p>
+        </div>
+        <div class="block">
+          <h4>Participants</h4>
+          <p class="desc">Mélanger des modèles différents donne de meilleurs résultats : deux copies du même modèle se trompent souvent de la même façon.</p>
+          <div id="wsParts"></div>
+          <div class="row" id="wsRoundsRow" style="margin-top:10px"><span style="width:130px;font-size:13px;color:var(--text-2)">Tours de relecture</span><select class="field" id="wsRounds" style="max-width:120px"><option>1</option><option>2</option><option>3</option></select></div>
+          <p class="note" id="wsCost"></p>
+          <p class="note">Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges — ni souvenirs, ni bibliothèque, ni fichiers. Un participant distant devient local si l'API n'est pas configurée ou si le quota du jour est atteint.</p>
         </div>
       </section>
 
@@ -871,6 +987,8 @@ const ICONS = {
   code: '<path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14"/>',
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   library: '<path d="M5 4.5v15M9.5 4.5v15M14 5.5l4.5 13.5M3.5 19.5h17"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  users: '<circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3.5 19c.7-3 3-4.6 5.5-4.6s4.8 1.6 5.5 4.6M14.5 15c2.6-.4 5 .8 6 3.5"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5c-2.5-2.6-3.6-5.4-3.6-8.5s1.1-5.9 3.6-8.5z"/>',
   clip: '<path d="M19 11.5l-7.2 7.2a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.2 4.2l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l7-7"/>',
   up2: '<path d="M7.5 10.5V20H4.5v-9.5zM7.5 10.5l4-7c1.4 0 2.3 1.1 2 2.4l-.8 3.6h5.4a2 2 0 0 1 2 2.3l-1.2 6.5a2 2 0 0 1-2 1.7H7.5"/>',
@@ -1610,7 +1728,7 @@ $("exportBtn").onclick = () => {
 
 async function openConversation(id) {
   if (busy) return;
-  if (!$("libView").hidden) showView("chat");
+  if (currentView !== "chat") showView("chat");
   try {
     history = (await getJSON(`/api/conversations/${id}/messages`)).messages;
     settings.conversationId = id;
@@ -1628,7 +1746,7 @@ async function openConversation(id) {
 
 function newConversation() {
   if (busy) return;
-  if (!$("libView").hidden) showView("chat");
+  if (currentView !== "chat") showView("chat");
   settings.conversationId = null;
   saveSettings();
   history = [];
@@ -1690,6 +1808,7 @@ function msgEl(m, idx) {
   if (isUser || m.error) body.textContent = m.content; else setMd(body, m.content);
   if (isUser && !m.content) body.style.display = "none";
   el.appendChild(body);
+  if (!isUser && m.meta?.workshop) el.insertBefore(workshopEl(m.meta.workshop), body);
   if (!isUser && m.meta?.docs?.length) el.appendChild(docsEl(m.meta.docs));
   if (!isUser && m.meta?.sources?.length) el.appendChild(sourcesEl(m.meta.sources));
   if (!isUser && m.meta?.used) el.appendChild(usedEl(m.meta.used));
@@ -1911,7 +2030,8 @@ form.addEventListener("submit", (e) => {
     const files = pending.slice();
     pending = []; renderTray();
     input.value = ""; clearDraft(); autoGrow();
-    sendMessage(text, files);
+    if (workshopNext && text && !files.length) sendWorkshop(text);
+    else sendMessage(text, files);
   }
 });
 
@@ -2166,6 +2286,7 @@ function selectTab(tab) {
   if (tab === "reminders") loadReminders();
   if (tab === "backup") loadBackups();
   if (tab === "hybrid") loadHybrid();
+  if (tab === "workshop") loadWorkshop();
 }
 document.querySelectorAll(".tab").forEach((t) => { t.onclick = () => selectTab(t.dataset.tab); });
 $("openSettings").onclick = () => openSettings();
@@ -2617,16 +2738,23 @@ $("benchBtn").onclick = async () => {
 let library = { collections: [], server_projects: [] }, libSel = null, libTimer = 0;
 let scope = store.get("scope", "auto");   // "auto" | "none" | "3,5"
 
+let currentView = "chat";
 function showView(v) {
-  const lib = v === "library";
-  $("libView").hidden = !lib;
-  $("scroller").hidden = lib;
-  document.querySelector(".composer").hidden = lib;
-  $("navLib").classList.toggle("on", lib);
-  if (lib) { $("title").textContent = "Bibliothèque"; loadLibrary(); app.classList.remove("side-open"); }
+  currentView = v;
+  $("libView").hidden = v !== "library";
+  $("codeView").hidden = v !== "code";
+  $("scroller").hidden = v !== "chat";
+  document.querySelector(".composer").hidden = v !== "chat";
+  $("navLib").classList.toggle("on", v === "library");
+  $("navCode").classList.toggle("on", v === "code");
+  ["pinBtn", "exportBtn"].forEach((id) => { if (v !== "chat") $(id).style.display = "none"; });
+  app.classList.remove("side-open");
+  if (v === "library") { $("title").textContent = "Bibliothèque"; loadLibrary(); }
+  else if (v === "code") { $("title").textContent = "Code"; loadCodeProjects(); clearTimeout(libTimer); }
   else { updateTitle(); clearTimeout(libTimer); }
 }
-$("navLib").onclick = () => showView($("libView").hidden ? "library" : "chat");
+$("navLib").onclick = () => showView(currentView === "library" ? "chat" : "library");
+$("navCode").onclick = () => showView(currentView === "code" ? "chat" : "code");
 
 async function loadLibrary() {
   try { library = await getJSON("/api/library"); } catch { return; }
@@ -2895,6 +3023,356 @@ $("hyWeb").onchange = () => saveHybrid({ allow_web: $("hyWeb").checked });
 $("hyModelSave").onclick = async () => { await saveHybrid({ model: $("hyModelSel").value }); toast(`Modèle : <b>${esc($("hyModelSel").value)}</b>`); };
 
 /* ============================================================
+   MODE CODE — parcourir un projet, lire ses fichiers
+   ============================================================ */
+const code = { project: null, files: [], open: [], active: null, sel: null, expanded: new Set([""]), grep: false };
+const LANG = (p) => {
+  const n = p.toLowerCase(), ext = n.includes(".") ? n.split(".").pop() : n.split("/").pop();
+  return ({ py: "py", sh: "sh", bash: "sh", zsh: "sh", yml: "yaml", yaml: "yaml", toml: "toml", ini: "ini", cfg: "ini", conf: "ini", env: "ini",
+    rb: "rb", js: "js", mjs: "js", cjs: "js", jsx: "js", ts: "js", tsx: "js", vue: "html", svelte: "html", json: "json",
+    c: "c", h: "c", cpp: "c", hpp: "c", cc: "c", cs: "c", java: "c", kt: "c", go: "c", rs: "c", swift: "c", dart: "c", scala: "c", php: "c",
+    css: "css", scss: "css", sass: "css", less: "css", html: "html", htm: "html", xml: "html", svg: "html",
+    sql: "sql", lua: "sql", hs: "sql", md: "md", markdown: "md", dockerfile: "sh", makefile: "sh", tf: "sh", hcl: "sh", nix: "sh", r: "sh" })[ext] || "txt";
+};
+const COMMENT = { py: "#", sh: "#", yaml: "#", toml: "#", ini: "[#;]", rb: "#", js: "//", c: "//", css: null, sql: "--", json: null, html: null, md: null, txt: null };
+
+/* Coloration par langage : commentaires, chaînes, nombres, mots-clés, fonctions, décorateurs, balises. */
+function highlightLang(src, lang) {
+  if (lang === "txt" || lang === "md") return esc(src);
+  const lc = COMMENT[lang];
+  const parts = [];
+  if (lang === "html") parts.push("(<!--[\\s\\S]*?-->)");
+  else if (["js", "c", "css"].includes(lang)) parts.push("(\\/\\*[\\s\\S]*?\\*\\/" + (lc ? "|" + lc + "[^\\n]*" : "") + ")");
+  else if (lc) parts.push("(" + lc + "[^\\n]*)");
+  else parts.push("(\\u0000)");
+  parts.push(lang === "py" ? "(\"\"\"[\\s\\S]*?\"\"\"|'''[\\s\\S]*?'''|\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*')"
+    : "(\"(?:\\\\.|[^\"\\\\\\n])*\"|'(?:\\\\.|[^'\\\\\\n])*'|`(?:\\\\.|[^`\\\\])*`)");
+  parts.push("\\b(\\d+(?:\\.\\d+)?)\\b");
+  parts.push(lang === "html" ? "(<\\/?[A-Za-z][\\w-]*|\\/?>)" : lang === "css" ? "(#[0-9a-fA-F]{3,8}\\b|@[\\w-]+)" : "(@[A-Za-z_][\\w.]*)");
+  parts.push("\\b([A-Za-z_]\\w*)(?=\\s*\\()");
+  parts.push("\\b([A-Za-z_][\\w-]*)\\b");
+  const re = new RegExp(parts.join("|"), "g");
+  let out = "", last = 0, m;
+  while ((m = re.exec(src))) {
+    if (!m[0]) { re.lastIndex++; continue; }
+    out += esc(src.slice(last, m.index));
+    const [tok, com, str, num, deco, fn, word] = m;
+    if (com && com !== "\u0000") out += `<span class="tk-c">${esc(com)}</span>`;
+    else if (str) out += `<span class="tk-s">${esc(str)}</span>`;
+    else if (num) out += `<span class="tk-n">${num}</span>`;
+    else if (deco) out += `<span class="tk-d">${esc(deco)}</span>`;
+    else if (fn) out += KW.has(fn) ? `<span class="tk-k">${fn}</span>` : `<span class="tk-f">${fn}</span>`;
+    else if (word) out += KW.has(word) ? `<span class="tk-k">${word}</span>` : (lang === "json" || lang === "yaml") && /^[A-Za-z]/.test(word) && src[m.index + word.length] === ":" ? `<span class="tk-f">${word}</span>` : esc(word);
+    else out += esc(tok);
+    last = m.index + tok.length;
+  }
+  return out + esc(src.slice(last));
+}
+
+async function loadCodeProjects() {
+  try { library = await getJSON("/api/library"); } catch { return; }
+  const projects = library.collections.filter((c) => c.kind === "code");
+  const sel = $("cvProject");
+  sel.innerHTML = projects.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  $("cvEmpty").hidden = projects.length > 0;
+  $("cvMainWrap").hidden = projects.length === 0;
+  if (!projects.length) return;
+  if (!projects.some((p) => p.id === code.project)) code.project = projects[0].id;
+  sel.value = code.project;
+  await loadCodeFiles();
+}
+$("cvProject").onchange = async () => { code.project = +$("cvProject").value; code.open = []; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
+
+async function loadCodeFiles() {
+  const d = await getJSON(`/api/library/collections/${code.project}/documents`);
+  code.files = d.documents.map((x) => ({ path: x.path, size: x.size })).sort((a, b) => a.path.localeCompare(b.path));
+  const c = d.collection;
+  $("cvInfo").textContent = c.status === "indexing" ? (c.message || "Indexation…") : `${code.files.length} fichiers · ${c.source || ""}`;
+  renderTree();
+}
+
+function renderTree() {
+  const box = $("cvTree");
+  const q = $("cvFilter").value.trim().toLowerCase();
+  box.innerHTML = "";
+  if (code.grep && q.length >= 2) return runGrep(q);
+  if (q) {
+    for (const f of code.files.filter((f) => f.path.toLowerCase().includes(q)).slice(0, 300)) box.appendChild(fileRow(f.path, f.path, 0));
+    if (!box.children.length) box.innerHTML = '<div class="side-empty">Aucun fichier.</div>';
+    return;
+  }
+  // arbre : dossiers repliables
+  const tree = {};
+  for (const f of code.files) {
+    const parts = f.path.split("/");
+    let node = tree;
+    parts.forEach((p, i) => { if (i === parts.length - 1) (node.__files ||= []).push(f.path); else node = (node[p] ||= {}); });
+  }
+  const walk = (node, prefix, depth) => {
+    for (const k of Object.keys(node).filter((k) => k !== "__files").sort()) {
+      const path = prefix ? `${prefix}/${k}` : k;
+      const open = code.expanded.has(path);
+      const r = document.createElement("button");
+      r.className = "cv-row dir"; r.style.paddingLeft = 8 + depth * 14 + "px";
+      r.innerHTML = `<span class="car">${open ? "▾" : "▸"}</span>${icon("folder")}<span>${esc(k)}</span>`;
+      r.onclick = () => { open ? code.expanded.delete(path) : code.expanded.add(path); renderTree(); };
+      box.appendChild(r);
+      if (open) walk(node[k], path, depth + 1);
+    }
+    for (const p of (node.__files || []).sort()) box.appendChild(fileRow(p, p.split("/").pop(), depth));
+  };
+  walk(tree, "", 0);
+}
+function fileRow(path, label, depth) {
+  const r = document.createElement("button");
+  r.className = "cv-row" + (code.active === path ? " on" : "");
+  r.style.paddingLeft = 22 + depth * 14 + "px";
+  r.title = path;
+  r.innerHTML = `${icon("doc")}<span>${esc(label)}</span>`;
+  r.onclick = () => openFile(path);
+  return r;
+}
+async function runGrep(q) {
+  const box = $("cvTree");
+  box.innerHTML = '<div class="side-empty"><span class="spin"></span> Recherche…</div>';
+  let r;
+  try { r = await getJSON(`/api/library/collections/${code.project}/grep?q=${encodeURIComponent(q)}`); } catch { return; }
+  box.innerHTML = r.matches.length ? "" : '<div class="side-empty">Aucun résultat.</div>';
+  for (const m of r.matches) {
+    const b = document.createElement("button");
+    b.className = "cv-hit";
+    const i = m.text.toLowerCase().indexOf(q);
+    const t = i >= 0 ? esc(m.text.slice(0, i)) + `<mark>${esc(m.text.slice(i, i + q.length))}</mark>` + esc(m.text.slice(i + q.length)) : esc(m.text);
+    b.innerHTML = `<small>${esc(m.path)}:${m.line}</small><code>${t}</code>`;
+    b.onclick = () => openFile(m.path, m.line);
+    box.appendChild(b);
+  }
+}
+let grepTimer = 0;
+$("cvFilter").addEventListener("input", () => { clearTimeout(grepTimer); grepTimer = setTimeout(renderTree, code.grep ? 300 : 0); });
+$("cvGrep").onclick = () => { code.grep = !code.grep; $("cvGrep").classList.toggle("on", code.grep); $("cvFilter").placeholder = code.grep ? "Chercher dans le contenu…" : "Filtrer les fichiers…"; renderTree(); $("cvFilter").focus(); };
+
+async function openFile(path, line) {
+  let f = code.open.find((x) => x.path === path);
+  if (!f) {
+    try {
+      const r = await getJSON(`/api/library/collections/${code.project}/file?path=${encodeURIComponent(path)}`);
+      f = { path, content: r.content, md: false };
+    } catch { toast("Fichier introuvable (projet à mettre à jour ?)."); return; }
+    code.open.push(f);
+    if (code.open.length > 8) code.open.shift();
+  }
+  code.active = path; code.sel = line ? [line, line] : null;
+  renderTabs(); renderEditor(line); renderTree();
+}
+function closeTab(path) {
+  code.open = code.open.filter((x) => x.path !== path);
+  if (code.active === path) code.active = code.open.at(-1)?.path || null;
+  code.sel = null; renderTabs(); renderEditor(); renderTree();
+}
+function renderTabs() {
+  const t = $("cvTabs");
+  t.innerHTML = "";
+  for (const f of code.open) {
+    const b = document.createElement("div");
+    b.className = "cv-tab" + (f.path === code.active ? " on" : "");
+    b.title = f.path;
+    b.innerHTML = `<span>${esc(f.path.split("/").pop())}</span>`;
+    const x = document.createElement("button"); x.innerHTML = icon("x"); x.title = "Fermer";
+    x.onclick = (e) => { e.stopPropagation(); closeTab(f.path); };
+    b.onclick = () => { code.active = f.path; code.sel = null; renderTabs(); renderEditor(); renderTree(); };
+    b.appendChild(x); t.appendChild(b);
+  }
+}
+const MAX_LINES = 8000;
+function renderEditor(scrollLine) {
+  const f = code.open.find((x) => x.path === code.active);
+  $("cvBar").hidden = !f; $("cvSelBar").hidden = true;
+  const ed = $("cvEditor");
+  if (!f) { ed.innerHTML = '<div class="cv-placeholder">Choisis un fichier dans l\'arborescence.<small>Clique sur les numéros de ligne (Maj+clic pour une plage) pour demander à Atom d\'expliquer un passage.</small></div>'; return; }
+  const lines = f.content.split("\n");
+  const shown = lines.slice(0, MAX_LINES);
+  const lang = LANG(f.path);
+  $("cvPath").textContent = f.path;
+  $("cvMeta").textContent = `${lines.length} lignes · ${lang.toUpperCase()}`;
+  $("cvMd").hidden = lang !== "md";
+  $("cvMd").classList.toggle("on", f.md);
+  if (lang === "md" && f.md) { ed.innerHTML = `<div class="cv-md md">${md(f.content)}</div>`; renderMath(ed); return; }
+  ed.innerHTML = `<div class="cv-code"><div class="cv-gutter">${shown.map((_, i) => `<span data-l="${i + 1}">${i + 1}</span>`).join("")}</div><div class="cv-src"><div class="cv-hl" id="cvHl"></div><pre class="cv"><code>${highlightLang(shown.join("\n"), lang)}</code></pre></div></div>`
+    + (lines.length > MAX_LINES ? `<div class="note" style="padding:10px 16px">Fichier long : seules les ${MAX_LINES} premières lignes sont affichées.</div>` : "");
+  ed.querySelector(".cv-gutter").onclick = (e) => {
+    const l = +e.target.dataset.l; if (!l) return;
+    code.sel = e.shiftKey && code.sel ? [Math.min(code.sel[0], l), Math.max(code.sel[1], l)] : [l, l];
+    paintSel();
+  };
+  paintSel();
+  if (scrollLine) requestAnimationFrame(() => { const lh = lineH(); ed.scrollTop = Math.max(0, (scrollLine - 6) * lh); });
+}
+const lineH = () => parseFloat(getComputedStyle(document.querySelector(".cv") || document.body).lineHeight) || 19;
+function paintSel() {
+  const hl = $("cvHl");
+  if (!hl) return;
+  document.querySelectorAll(".cv-gutter span.on").forEach((x) => x.classList.remove("on"));
+  if (!code.sel) { hl.style.display = "none"; $("cvSelBar").hidden = true; return; }
+  const [a, b] = code.sel, lh = lineH();
+  Object.assign(hl.style, { display: "block", top: 12 + (a - 1) * lh + "px", height: (b - a + 1) * lh + "px" });
+  for (let i = a; i <= b; i++) document.querySelector(`.cv-gutter span[data-l="${i}"]`)?.classList.add("on");
+  $("cvSelBar").hidden = false;
+  $("cvSelInfo").textContent = a === b ? `Ligne ${a}` : `Lignes ${a} à ${b}`;
+}
+function selectionText() {
+  const f = code.open.find((x) => x.path === code.active);
+  if (!f) return "";
+  const [a, b] = code.sel || [1, f.content.split("\n").length];
+  return f.content.split("\n").slice(a - 1, b).join("\n");
+}
+function askAtom(prompt, withSel) {
+  const f = code.open.find((x) => x.path === code.active);
+  if (!f) return;
+  setScope(String(code.project));
+  const [a, b] = code.sel || [];
+  const name = withSel && code.sel ? `${f.path} (l. ${a}-${b})` : f.path;
+  const text = withSel && code.sel ? selectionText() : f.content.slice(0, 12000);
+  showView("chat"); newConversation();
+  pending = [{ name, text }]; renderTray();
+  fillInput(prompt);
+}
+$("cvExplain").onclick = () => askAtom("Explique-moi ces lignes : ce qu'elles font et pourquoi.", true);
+$("cvReview").onclick = () => askAtom("Relis ces lignes : bugs possibles, cas oubliés, améliorations.", true);
+$("cvAskSel").onclick = () => askAtom("", true);
+$("cvAsk").onclick = () => askAtom("Explique-moi ce fichier : son rôle dans le projet et son fonctionnement.", false);
+$("cvCopy").onclick = (e) => flashCopy(e.currentTarget, code.open.find((x) => x.path === code.active)?.content || "");
+$("cvCopyPath").onclick = () => { copyText(code.active || ""); toast("Chemin copié."); };
+$("cvMd").onclick = () => { const f = code.open.find((x) => x.path === code.active); if (f) { f.md = !f.md; renderEditor(); } };
+$("cvSync").onclick = async () => { await send_(`/api/library/collections/${code.project}/sync`, "POST"); toast("Mise à jour du projet lancée."); setTimeout(loadCodeFiles, 2500); };
+$("cvAdd").onclick = () => { library.server_projects ||= []; $("libNewCode").onclick(); };
+$("cvAdd2").onclick = () => $("cvAdd").onclick();
+
+/* ============================================================
+   ATELIER MULTI-IA
+   ============================================================ */
+let workshopCfg = null, workshopNext = false, remoteModels = [];
+async function loadWorkshop() {
+  try { workshopCfg = await getJSON("/api/workshop"); } catch { return; }
+  $("wsBtn").style.display = workshopCfg.enabled ? "" : "none";
+  if (!workshopCfg.enabled && workshopNext) { workshopNext = false; }
+  $("wsBtn").classList.toggle("on", workshopNext);
+  $("wsEnabled").checked = workshopCfg.enabled;
+  $("wsPattern").innerHTML = "";
+  for (const [k, label] of Object.entries(workshopCfg.patterns)) {
+    const b = document.createElement("button");
+    b.className = "btn" + (workshopCfg.pattern === k ? " primary" : "");
+    b.textContent = label; b.onclick = () => saveWorkshop({ pattern: k });
+    $("wsPattern").appendChild(b);
+  }
+  if (hybridState?.configured && !remoteModels.length) { try { remoteModels = (await getJSON("/api/hybrid/models")).models; } catch {} }
+  const opts = [["local", "Local (modèle du serveur)"], ...remoteModels.map((m) => [`remote:${m}`, `${hybridState?.name || "Distant"} · ${m}`])];
+  const roles = workshopCfg.roles[workshopCfg.pattern];
+  $("wsParts").innerHTML = "";
+  roles.forEach((role, i) => {
+    const row = document.createElement("div"); row.className = "row"; row.style.margin = "6px 0";
+    const cur = workshopCfg.participants[i] || "local";
+    row.innerHTML = `<span style="width:130px;font-size:13px;color:var(--text-2)">${esc(role)}</span>`;
+    const sel = document.createElement("select"); sel.className = "field";
+    sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(t)}</option>`).join("")
+      + (opts.some(([v]) => v === cur) ? "" : `<option selected value="${esc(cur)}">${esc(cur)}</option>`);
+    sel.onchange = () => { const p = [...workshopCfg.participants]; p[i] = sel.value; saveWorkshop({ participants: p }); };
+    row.appendChild(sel); $("wsParts").appendChild(row);
+  });
+  $("wsRoundsRow").hidden = workshopCfg.pattern !== "review";
+  $("wsRounds").value = workshopCfg.rounds;
+  const n = workshopCfg.pattern === "review" ? 1 + 2 * workshopCfg.rounds : 3;
+  const remote = (workshopCfg.pattern === "review"
+    ? [workshopCfg.participants[0], ...Array(workshopCfg.rounds).fill(0).flatMap(() => [workshopCfg.participants[1], workshopCfg.participants[2]])]
+    : workshopCfg.participants.slice(0, 3)).filter((p) => p.startsWith("remote")).length;
+  $("wsCost").textContent = `${n} étapes par demande, dont ${remote} via ${hybridState?.name || "l'API"}. Compte ${n}× le temps d'une réponse normale.`;
+}
+async function saveWorkshop(patch) {
+  try { await api("/api/workshop", { method: "PUT", body: JSON.stringify(patch) }); } catch (e) { toast(esc(e.message)); }
+  loadWorkshop();
+}
+$("wsEnabled").onchange = () => saveWorkshop({ enabled: $("wsEnabled").checked });
+$("wsRounds").onchange = () => saveWorkshop({ rounds: +$("wsRounds").value });
+$("wsBtn").onclick = () => { workshopNext = !workshopNext; $("wsBtn").classList.toggle("on", workshopNext); input.focus(); };
+
+function workshopEl(w) {
+  const d = document.createElement("details");
+  d.className = "ws";
+  d.innerHTML = `<summary>${icon("users")}Atelier · ${esc(w.name)} · ${w.steps.length} étape${w.steps.length > 1 ? "s" : ""} avant la réponse</summary>`;
+  for (const s of w.steps) {
+    const c = document.createElement("div"); c.className = "ws-step";
+    c.innerHTML = `<div class="ws-h"><b>${esc(s.role)}</b><span>${esc(s.engine)}</span></div><div class="md"></div>`;
+    setMd(c.querySelector(".md"), s.text);
+    d.appendChild(c);
+  }
+  return d;
+}
+
+async function sendWorkshop(text) {
+  workshopNext = false; $("wsBtn").classList.remove("on");
+  $("empty")?.remove();
+  setBusy(true);
+  const userMsg = { role: "user", content: text };
+  history.push(userMsg);
+  chat.appendChild(msgEl(userMsg, history.length - 1));
+  setEmotion("focus"); setEntityState("atelier…");
+  const el = document.createElement("div");
+  el.className = "msg atom";
+  el.innerHTML = `<details class="ws" open><summary>${icon("users")}Atelier en cours…</summary><div class="ws-live"></div></details><div class="body md"></div>`;
+  chat.appendChild(el); scroller.scrollTop = scroller.scrollHeight;
+  const live = el.querySelector(".ws-live"), body = el.querySelector(".body"), sum = el.querySelector("summary");
+  const steps = []; let final = "", asstId = null, q = false;
+  controller = new AbortController();
+  try {
+    const r = await api("/api/workshop/run", { method: "POST", signal: controller.signal,
+      body: JSON.stringify({ message: text, conversation_id: settings.conversationId }) });
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "meta") { if (settings.conversationId !== ev.conversation_id) { settings.conversationId = ev.conversation_id; saveSettings(); loadConversations(); } }
+        else if (ev.type === "ids") { userMsg.id = ev.user_id; }
+        else if (ev.type === "step" && ev.status === "start") {
+          sum.innerHTML = `${icon("users")}Atelier · ${esc(ev.role)} (${esc(ev.engine)})…`;
+          entity.tokenKick = 1;
+          if (!ev.final) {
+            const c = document.createElement("div"); c.className = "ws-step";
+            c.innerHTML = `<div class="ws-h"><b>${esc(ev.role)}</b><span>${esc(ev.engine)}</span></div><div class="md"><span class="live"><span class="mini"></span><span>écrit…</span></span></div>`;
+            live.appendChild(c); steps[ev.index] = { el: c, text: "" };
+          } else { body.innerHTML = '<span class="live"><span class="mini"></span><span>Rédaction de la réponse finale…</span></span>'; setEmotion("talking"); }
+        } else if (ev.type === "step" && ev.status === "token") {
+          const s = steps[ev.index]; if (!s) continue; s.text += ev.text;
+          if (!q) { q = true; requestAnimationFrame(() => { q = false; steps.forEach((x) => x && (x.el.querySelector(".md").innerHTML = md(x.text))); }); }
+        } else if (ev.type === "step" && ev.status === "done") {
+          const s = steps[ev.index]; if (s) { s.text = ev.text; setMd(s.el.querySelector(".md"), ev.text); }
+        } else if (ev.type === "token") {
+          final += ev.text; entity.tokenKick = 1;
+          body.innerHTML = md(final); body.lastElementChild?.classList.add("cursor");
+          if (atBottom()) scroller.scrollTop = scroller.scrollHeight;
+        } else if (ev.type === "done") { asstId = ev.id; final = ev.final; }
+        else if (ev.type === "error") throw new Error(ev.message);
+      }
+    }
+    setBusy(false);
+    await openConversation(settings.conversationId);
+    setEmotion("joy");
+  } catch (err) {
+    setBusy(false);
+    if (err.name === "AbortError") { toast("Atelier arrêté."); await openConversation(settings.conversationId); }
+    else { el.replaceWith(msgEl({ role: "assistant", content: err.message, error: true }, -1)); setEmotion("fear"); }
+  } finally {
+    controller = null; setBusy(false); scheduleRest(); loadConversations();
+  }
+}
+
+/* ============================================================
    DÉMARRAGE
    ============================================================ */
 applyLayout();
@@ -2911,7 +3389,7 @@ addEventListener("scroll", () => { if (scrollY || scrollX) scrollTo(0, 0); }, { 
 connect();
 applyLook();
 renderWebBtn();
-loadHybrid();
+loadHybrid().then(loadWorkshop);
 loadLibrary();
 loadCompanion();
 refreshCounts();
