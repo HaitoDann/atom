@@ -1029,6 +1029,12 @@ const entity = {
   load: 0, mood: 0, night: false, hover: false,
   pet: 0, petting: -1e9, snuggle: 0, snuggling: false,
   feeding: false, level: 0, grow: 0,
+  feedColor: [110, 170, 255],     // bleu = Internet, blanc = documents
+  remote: false, remoteK: 0,      // consulte une IA distante : ondes qui partent de la sphère
+  split: 0, splitK: 0, activeCluster: 0,   // atelier : la sphère se divise en amas qui dialoguent
+  scan: false, scanK: 0,          // lecture (code, documents) : fragments alignés en lignes, balayage
+  glitch: 0,                      // secours / erreur : brève perturbation
+  seal: 0,                        // sauvegarde : contraction et anneau scellé
   fly: { p: 0, from: 0, to: 0, start: 0, dur: 900, active: false, onEnd: null },
   screen: { x: 0, y: 0, r: 0 },   // centre et rayon de la sphère à l'écran (pour les animations DOM)
 };
@@ -1195,6 +1201,11 @@ function setEntityState(t) { $("emoState").textContent = t; }
     entity.absorb *= Math.exp(-dt * 2.2);
     entity.tokenKick *= Math.exp(-dt * 9);
     entity.grow *= Math.exp(-dt * 0.9);
+    entity.glitch *= Math.exp(-dt * 2.5);
+    entity.seal *= Math.exp(-dt * 1.4);
+    entity.remoteK += ((entity.remote ? 1 : 0) - entity.remoteK) * Math.min(1, dt * 3);
+    entity.scanK += ((entity.scan ? 1 : 0) - entity.scanK) * Math.min(1, dt * 3);
+    entity.splitK += ((entity.split ? 1 : 0) - entity.splitK) * Math.min(1, dt * (entity.split ? 1.6 : 2.4));
 
     // ---- cible : émotion, puis caresse, humeur, nuit, charge, attention
     const T = { r: A.color[0], g: A.color[1], b: A.color[2] };
@@ -1213,12 +1224,16 @@ function setEntityState(t) { $("emoState").textContent = t; }
     if (entity.hover) T.dim = Math.min(1, T.dim + 0.08);
     if (entity.feeding) { T.radius *= 1.06; T.spin *= 1.8; T.r += (110 - T.r) * 0.35; T.g += (170 - T.g) * 0.35; T.b += (255 - T.b) * 0.35; }
     T.radius *= 1 - entity.snuggle * 0.16;
+    if (entity.remoteK > 0.01) { const w = entity.remoteK * 0.45; T.r += (205 - T.r) * w; T.g += (195 - T.g) * w; T.b += (255 - T.b) * w; T.spin *= 1 + entity.remoteK * 0.8; }
+    if (entity.scanK > 0.01) { T.spin *= 1 - entity.scanK * 0.85; T.oscAmp *= 1 - entity.scanK * 0.7; T.dim = Math.min(1, T.dim + 0.1 * entity.scanK); }
+    if (entity.glitch > 0.02) T.dim *= 1 - entity.glitch * 0.35;
+    T.radius *= 1 - entity.seal * 0.18;
     T.oscFreq *= 1 + entity.load * 0.9; T.oscAmp *= 1 + entity.load * 0.5;
 
     const k = Math.min(1, dt * 2.5);
     cur.r += (T.r - cur.r) * k; cur.g += (T.g - cur.g) * k; cur.b += (T.b - cur.b) * k;
     for (const key of KEYS) cur[key] += (T[key] - cur[key]) * k;
-    const flash = entity.absorb * 0.35 + entity.grow * 0.5;
+    const flash = entity.absorb * 0.35 + entity.grow * 0.5 + entity.seal * 0.4;
     const tint = `${Math.min(255, cur.r + flash * 70) | 0},${Math.min(255, cur.g + flash * 70) | 0},${Math.min(255, cur.b + flash * 70) | 0}`;
     if (((t * 10) | 0) !== entity._orbTick) { entity._orbTick = (t * 10) | 0; document.documentElement.style.setProperty("--orb", `${cur.r | 0},${cur.g | 0},${cur.b | 0}`); }
 
@@ -1271,6 +1286,9 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const pxSize = 1 / scale;
     const visible = 0.58 + entity.level * 0.084;          // plus de fragments à chaque stade
     const ring2 = entity.level >= 3;
+    const spK = entity.splitK, nSplit = Math.max(2, entity.split || 2), act = entity.activeCluster % nSplit;
+    const scK = entity.scanK, band = R0 * 0.13, scanY = Math.sin(t * 1.4) * R0 * 0.95;
+    const glJ = entity.glitch * 9, glBand = entity.glitch > 0.05 ? ((t * 23) | 0) % 9 : -1;
     let lastQ = -1;
 
     for (let i = 0; i < N; i++) {
@@ -1297,6 +1315,21 @@ function setEntityState(t) { $("emoState").textContent = t; }
         if (jit) {   // agitation frénétique
           tx += Math.sin(t * 47 + ph * 13) * jit; ty += Math.cos(t * 43 + ph * 7) * jit; tz += Math.sin(t * 39 + ph * 5) * jit;
         }
+        if (spK > 0.01) {   // atelier : amas qui tournent autour d'un centre commun
+          const c = i % nSplit, a = t * 0.55 + (c * Math.PI * 2) / nSplit;
+          const k2 = 1 - 0.5 * spK;
+          tx = tx * k2 + Math.cos(a) * R0 * 1.05 * spK;
+          tz = tz * k2 + Math.sin(a) * R0 * 0.7 * spK;
+          ty = ty * k2 + Math.sin(a * 2 + c) * R0 * 0.12 * spK;
+        }
+        if (scK > 0.01) {   // lecture : les fragments se rangent en lignes
+          ty += (Math.round(ty / band) * band - ty) * scK;
+          tz *= 1 - 0.35 * scK;
+        }
+        if (glJ > 0.3) {   // perturbation : décalage par bandes
+          tx += Math.sin(t * 61 + ph * 19) * glJ;
+          if (((ay[i] / R0 * 4.5 + 4.5) | 0) === glBand) tx += glJ * 2.2;
+        }
         if (mAct) {
           const dx = px[i] - mx, dy = py[i] - my, d2 = dx * dx + dy * dy;
           if (d2 < RR) {
@@ -1314,6 +1347,8 @@ function setEntityState(t) { $("emoState").textContent = t; }
       let alpha = (sc * 0.9 > 1 ? 1 : sc * 0.9) * 0.85 * globalA;
       alpha *= isOrb[i] ? 0.45 : depth[i] * cur.dim * backFade;
       alpha *= 0.65 + Math.abs(Math.sin(t * 0.9 + ph * 3)) * 0.35;
+      if (scK > 0.01 && !isOrb[i]) { const near = 1 - Math.abs(ry - scanY) / (R0 * 0.16); if (near > 0) alpha = Math.min(1, alpha * (1 + near * 1.6 * scK)); }
+      if (spK > 0.3 && !isOrb[i]) alpha *= (i % nSplit) === act ? 1.25 : 0.7;
       const q = (alpha * 32) | 0;
       if (q !== lastQ) { lastQ = q; ctx.globalAlpha = q / 32; }
       const sz = Math.max(size[i] * sc * pxSize * (1.15 + P * 0.35), pxSize * 0.8);
@@ -1321,7 +1356,7 @@ function setEntityState(t) { $("emoState").textContent = t; }
     }
 
     // ---- nourriture : fragments bleus attirés vers la sphère
-    ctx.fillStyle = "rgb(110,170,255)";
+    ctx.fillStyle = `rgb(${entity.feedColor.join(",")})`;
     let alive = 0;
     for (let i = 0; i < F; i++) {
       if (!fa[i]) { if (entity.feeding && rand() < dt * 6) spawnFeeder(i, R0); continue; }
@@ -1338,6 +1373,29 @@ function setEntityState(t) { $("emoState").textContent = t; }
       ctx.fillRect(fx[i] - sz / 2, fy[i] - sz / 2, sz, sz);
       ctx.globalAlpha *= 0.35;
       ctx.fillRect(fx[i] + (fx[i] / d) * 6 - sz / 2, fy[i] + (fy[i] / d) * 6 - sz / 2, sz, sz);
+    }
+
+    // ---- IA distante : ondes de fragments qui partent de la sphère vers l'extérieur
+    if (entity.remoteK > 0.02) {
+      ctx.fillStyle = "rgb(205,195,255)";
+      for (let w = 0; w < 3; w++) {
+        const ph = (t * 0.55 + w / 3) % 1, rr = R0 * (1.15 + ph * 2.4);
+        const n = 90, a0 = t * 0.3 + w;
+        ctx.globalAlpha = Math.min(1, (1 - ph) * 1.1) * entity.remoteK * globalA;
+        for (let j = 0; j < n; j++) {
+          const a = a0 + (j / n) * Math.PI * 2;
+          const sz = pxSize * (2.6 - ph * 1.2);
+          ctx.fillRect(Math.cos(a) * rr - sz / 2, Math.sin(a) * rr * 0.34 - sz / 2, sz, sz);
+        }
+      }
+    }
+    // ---- sauvegarde : un anneau se referme autour de la sphère
+    if (entity.seal > 0.03) {
+      ctx.strokeStyle = `rgba(${tint},${entity.seal * 0.8 * globalA})`;
+      ctx.lineWidth = pxSize * 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, R0 * (1.25 + entity.seal * 0.9), R0 * (1.25 + entity.seal * 0.9) * 0.36, 0, 0, Math.PI * 2 * (1 - entity.seal * 0.7));
+      ctx.stroke();
     }
     ctx.restore();
   }
@@ -2103,7 +2161,7 @@ async function sendMessage(text, files = []) {
     loadConversations();
     if (stopped) syncIds();
     presenceSay(content);
-    entity.feeding = false;
+    entity.feeding = false; entity.remote = false; entity.scan = false;
     setTimeout(refreshMood, 500);
     setTimeout(loadCompanion, 800);
     input.focus();
@@ -2143,6 +2201,8 @@ async function sendMessage(text, files = []) {
         } else if (ev.type === "context") {
           used = ev.used;
         } else if (ev.type === "route") {
+          entity.remote = ev.provider !== "local";
+          if (ev.provider === "local" && ev.reason) entity.glitch = 1;
           if (ev.provider !== "local") {
             body.innerHTML = `<span class="live"><span class="mini"></span><span>Atom consulte ${esc(hybridState?.name || "Mistral")}…</span></span>`;
             setEntityState("consulte…");
@@ -2152,6 +2212,7 @@ async function sendMessage(text, files = []) {
         } else if (ev.type === "docs") {
           docs = ev.refs.length ? ev.refs : null;
           if (docs) {
+            entity.scan = true;
             setEmotion("focus"); setEntityState("lit…");
             body.innerHTML = `<span class="live"><span class="mini"></span><span>Lecture de ${docs.length} passage${docs.length > 1 ? "s" : ""} de ta bibliothèque…</span></span>`;
           }
@@ -2160,7 +2221,7 @@ async function sendMessage(text, files = []) {
           body.innerHTML = '<span class="live"><span class="mini"></span><span>Atom réfléchit…</span></span>';
         } else if (ev.type === "search") {
           if (ev.status === "start") {
-            entity.feeding = true; setEmotion("curious"); setEntityState("cherche…");
+            entity.feedColor = [110, 170, 255]; entity.feeding = true; setEmotion("curious"); setEntityState("cherche…");
             body.innerHTML = `<span class="live"><span class="mini"></span><span>Recherche : <span class="q">${esc(ev.query)}</span></span></span>`;
           } else if (ev.status === "done") {
             entity.feeding = false; sources = ev.sources;
@@ -2172,7 +2233,7 @@ async function sendMessage(text, files = []) {
         } else if (ev.type === "emotion") {
           emotion = ev.emotion; setEmotion(emotion); setEntityState("répond…");
         } else if (ev.type === "token") {
-          if (!t0) t0 = performance.now();
+          if (!t0) { t0 = performance.now(); entity.remote = false; entity.scan = false; }
           tokens++;
           reply += ev.text;
           entity.tokenKick = 1;
@@ -2201,12 +2262,12 @@ async function sendMessage(text, files = []) {
     finish();
   } catch (err) {
     if (finished) return;
-    entity.feeding = false;
+    entity.feeding = false; entity.remote = false; entity.scan = false;
     if (err.name === "AbortError") { finish(true); return; }
     finished = true;
     const msg = err instanceof TypeError ? "Serveur Atom injoignable." : err.message;
     el.replaceWith(msgEl({ role: "assistant", content: msg, error: true }, -1));
-    setEmotion("fear");
+    setEmotion("fear"); entity.glitch = 1;
     setEntityState("erreur");
     setBusy(false);
     scheduleRest();
@@ -2369,6 +2430,21 @@ for (const e of EMOTIONS) {
   b.onclick = () => setEmotion(e);
   $("emos").appendChild(b);
 }
+const DEMOS = [
+  ["Consulte une IA distante", () => { entity.remote = true; setTimeout(() => { entity.remote = false; }, 4000); }],
+  ["Atelier", () => { entity.split = 2; let k = 0; const it = setInterval(() => { entity.activeCluster = ++k; }, 1300); setTimeout(() => { clearInterval(it); entity.split = 0; entity.rippleT = 0; }, 5200); }],
+  ["Lecture", () => { entity.scan = true; setTimeout(() => { entity.scan = false; }, 4000); }],
+  ["Recherche web", () => { entity.feedColor = [110, 170, 255]; entity.feeding = true; setTimeout(() => { entity.feeding = false; }, 3500); }],
+  ["Indexation", () => { entity.feedColor = [235, 235, 240]; entity.feeding = true; setTimeout(() => { entity.feeding = false; entity.feedColor = [110, 170, 255]; }, 3500); }],
+  ["Souvenir retenu", () => memoryFlight($("openSettings"))],
+  ["Sauvegarde", () => { entity.seal = 1; }],
+  ["Secours / erreur", () => { entity.glitch = 1; }],
+  ["Croissance", () => { entity.grow = 1; entity.rippleT = 0; }],
+];
+const demoRow = document.createElement("div");
+demoRow.className = "emos"; demoRow.style.marginTop = "12px";
+for (const [label, fn] of DEMOS) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.onclick = fn; demoRow.appendChild(b); }
+$("emos").after(demoRow);
 
 /* ============================================================
    CONNEXION
@@ -2709,7 +2785,7 @@ async function loadBackups() {
     $("bkList").appendChild(li);
   }
 }
-$("bkNow").onclick = async () => { try { await send_("/api/backups", "POST"); toast("<b>Sauvegarde créée</b>"); } catch (e) { toast(esc(e.message)); } loadBackups(); };
+$("bkNow").onclick = async () => { try { await send_("/api/backups", "POST"); entity.seal = 1; toast("<b>Sauvegarde créée</b>"); } catch (e) { toast(esc(e.message)); } loadBackups(); };
 $("bkExport").onclick = () => { location.href = "/api/export"; setTimeout(loadBackups, 1500); };
 $("bkImport").onclick = () => $("bkFile").click();
 $("bkFile").onchange = async (e) => {
@@ -2762,6 +2838,8 @@ async function loadLibrary() {
   renderLibrary();
   renderScope();
   const busyIdx = library.collections.some((c) => c.status === "indexing");
+  entity.feedColor = busyIdx ? [235, 235, 240] : [110, 170, 255];
+  if (!$("libView").hidden || !$("codeView").hidden) entity.feeding = busyIdx;
   clearTimeout(libTimer);
   if (!$("libView").hidden) libTimer = setTimeout(loadLibrary, busyIdx ? 2500 : 15000);
 }
@@ -2846,7 +2924,8 @@ async function uploadDocs(cid, files) {
     try {
       const r = await fetch(`/api/library/collections/${cid}/documents?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream" } });
       if (!r.ok) throw new Error((await r.json()).detail || "échec");
-      entity.feeding = true; setTimeout(() => { entity.feeding = false; }, 2500);
+      entity.feedColor = [235, 235, 240]; entity.feeding = true;
+      setTimeout(() => { entity.feeding = false; entity.feedColor = [110, 170, 255]; }, 2500);
     } catch (e) { toast(`<b>${esc(f.name)}</b> · ${esc(e.message)}`); }
   }
   toast(`<b>${files.length} document${files.length > 1 ? "s" : ""}</b> ajouté${files.length > 1 ? "s" : ""} · Atom les lit…`);
@@ -3164,6 +3243,7 @@ async function openFile(path, line) {
   }
   code.active = path; code.sel = line ? [line, line] : null;
   renderTabs(); renderEditor(line); renderTree();
+  entity.scan = true; clearTimeout(openFile._t); openFile._t = setTimeout(() => { entity.scan = false; }, 1400);
 }
 function closeTab(path) {
   code.open = code.open.filter((x) => x.path !== path);
@@ -3342,6 +3422,8 @@ async function sendWorkshop(text) {
         else if (ev.type === "step" && ev.status === "start") {
           sum.innerHTML = `${icon("users")}Atelier · ${esc(ev.role)} (${esc(ev.engine)})…`;
           entity.tokenKick = 1;
+          if (ev.final) { entity.split = 0; entity.rippleT = 0; entity.remote = false; }
+          else { entity.split = 2; entity.activeCluster = ev.index; entity.remote = /^(?!Local)/.test(ev.engine); }
           if (!ev.final) {
             const c = document.createElement("div"); c.className = "ws-step";
             c.innerHTML = `<div class="ws-h"><b>${esc(ev.role)}</b><span>${esc(ev.engine)}</span></div><div class="md"><span class="live"><span class="mini"></span><span>écrit…</span></span></div>`;
@@ -3360,10 +3442,12 @@ async function sendWorkshop(text) {
         else if (ev.type === "error") throw new Error(ev.message);
       }
     }
+    entity.split = 0; entity.remote = false;
     setBusy(false);
     await openConversation(settings.conversationId);
     setEmotion("joy");
   } catch (err) {
+    entity.split = 0; entity.remote = false; entity.glitch = 1;
     setBusy(false);
     if (err.name === "AbortError") { toast("Atelier arrêté."); await openConversation(settings.conversationId); }
     else { el.replaceWith(msgEl({ role: "assistant", content: err.message, error: true }, -1)); setEmotion("fear"); }

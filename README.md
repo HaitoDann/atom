@@ -229,6 +229,7 @@ Un côté « familier » sans contrainte : **rien ne diminue jamais**, pas de fa
 - **Le lien grandit** avec les conversations, les souvenirs, les caresses et la « nourriture » (fichiers joints, recherches). Six stades : Éveil, Curieux, Familier, Complice, Attaché, Inséparable. À chaque stade la sphère gagne des fragments, puis un second anneau (stade 4) et un cœur lumineux (stade 5).
 - **Caresser** : passe doucement le curseur sur la sphère ; ses fragments se resserrent, se réchauffent et viennent vers toi au lieu de fuir. **Maintiens le clic** : elle se blottit.
 - **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
+- Situations : **consulter une IA distante** (ondes de fragments lavande qui partent de la sphère), **atelier** (la sphère se divise en amas qui tournent ensemble, celui qui travaille s'éclaire, puis ils fusionnent pour la réponse finale), **lecture** de code ou de documents (les fragments se rangent en lignes, un balayage lumineux les parcourt), **indexation** (fragments blancs absorbés), **sauvegarde** (contraction et anneau qui se referme), **secours ou erreur** (brève perturbation par bandes). Toutes prévisualisables dans Réglages → Entité.
 - Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation, le bien-être (après une caresse) les rend chauds et denses avec une vibration fine.
 
 ## Accéder à Atom hors de chez toi (Tailscale)
