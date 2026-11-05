@@ -61,18 +61,22 @@ services:
     build:
       context: .
       dockerfile: api/Dockerfile
+      args:
+        ATOM_VERSION: ${ATOM_VERSION:-dev}
     restart: unless-stopped
     depends_on:
       - ollama
       - ntfy
       - searxng
     ports:
-      - "${ATOM_PORT:-8000}:8000"
+      # ATOM_BIND=127.0.0.1 : Atom n'est plus joignable depuis le réseau local, seulement via Tailscale.
+      - "${ATOM_BIND:-0.0.0.0}:${ATOM_PORT:-8000}:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434
       - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
       - ATOM_EMBED_MODEL=${ATOM_EMBED_MODEL:-nomic-embed-text}
       - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
+      - ATOM_PASSWORD=${ATOM_PASSWORD:-}
       - ATOM_NUM_THREADS=${ATOM_NUM_THREADS:-0}
       - ATOM_GITHUB_TOKEN=${ATOM_GITHUB_TOKEN:-}
       - ATOM_REMOTE_API_KEY=${ATOM_REMOTE_API_KEY:-}

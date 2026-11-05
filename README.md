@@ -111,6 +111,42 @@ Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passe
 - **Android / Chrome / Edge** : Réglages d'Atom → Apparence → « Installer l'application », ou menu du navigateur → « Installer ».
 - **iPhone / iPad (Safari)** : bouton Partager → « Sur l'écran d'accueil ».
 
+## Sécurité
+
+- **Mot de passe** : au premier lancement, l'interface demande d'en créer un (8 caractères minimum). Tout l'accès aux données (`/api/…`) est refusé sans session. Pour le fixer d'avance : `ATOM_PASSWORD=…` dans `.env`.
+- **Appareils** : chaque navigateur reste connecté 90 jours après sa dernière visite. Réglages → **Sécurité** : liste des appareils, déconnexion à distance, changement de mot de passe (les autres appareils sont alors déconnectés).
+- **Essais limités** : après 5 mauvais mots de passe en 10 minutes, l'adresse est bloquée 1 min, puis 5, puis 30.
+- **Requêtes protégées** : toute modification doit venir de l'interface (en-tête dédié), ce qui bloque les attaques depuis un autre site.
+- **Mot de passe oublié** :
+
+  ```bash
+  docker compose exec atom python -m app.auth reset
+  ```
+
+  puis ouvre Atom pour en créer un nouveau.
+- **Accès Tailscale uniquement** : `ATOM_BIND=127.0.0.1` dans `.env`, puis `docker compose up -d atom`. Le port 8000 n'est plus ouvert au réseau local ; Atom reste joignable via `https://atom.<ton-tailnet>.ts.net`.
+- Telegram n'est pas concerné : seuls les identifiants de `ATOM_TELEGRAM_ALLOWED` sont servis.
+
+## Mise à jour
+
+```bash
+./update.sh
+```
+
+Le script récupère le code, fait une **sauvegarde de sécurité**, reconstruit et redémarre les services, puis vérifie qu'Atom répond. Réglages → **État** vérifie ensuite chaque service (modèles, recherche, notifications, Telegram, mode hybride, disque, sauvegardes, bibliothèque) et indique quoi faire en cas de problème.
+
+## Tests
+
+```bash
+pip install -r api/requirements.txt -r api/requirements-dev.txt
+```
+
+```bash
+cd api && python -m pytest -q
+```
+
+Les tests tournent sans modèle ni Internet (mode test) ; ils sont aussi lancés automatiquement par GitHub Actions à chaque envoi de code.
+
 ## Vitesse
 
 Atom affiche la vitesse réelle mesurée par Ollama (panneau → Système → Vitesse). Réglages → Général → **Mesurer la vitesse** fait un test rapide. Sur CPU, un modèle 4B devrait écrire entre **6 et 12 tokens/s** ; sous 3 tok/s, quelque chose freine.

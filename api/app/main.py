@@ -19,11 +19,12 @@ from typing import AsyncIterator
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import agent, backup, companion, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import health as healthcheck
+from . import agent, auth, backup, companion, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -53,7 +54,119 @@ async def lifespan(_app: FastAPI):
 
 db.init()
 library.init()
+auth.init()
 app = FastAPI(title="Atom", lifespan=lifespan)
+
+
+# ---- protection : tout /api/ demande une session, sauf /api/auth/*
+@app.middleware("http")
+async def guard(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and not path.startswith("/api/auth/"):
+        if not auth.is_set() or not auth.session_for(request.cookies.get(auth.COOKIE)):
+            return JSONResponse({"detail": "Connexion requise", "auth": True}, status_code=401)
+        # Protection CSRF : les requêtes qui modifient quelque chose doivent venir de l'interface.
+        if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get("x-atom") != "1":
+            return JSONResponse({"detail": "Requête refusée"}, status_code=403)
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "same-origin")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    return resp
+
+
+def _ip(request: Request) -> str:
+    return request.client.host if request.client else "?"
+
+
+def _secure(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+
+
+class PasswordIn(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+
+
+class PasswordChangeIn(BaseModel):
+    current: str = Field(min_length=1, max_length=200)
+    new: str = Field(min_length=1, max_length=200)
+
+
+def _login_response(request: Request, payload: dict) -> JSONResponse:
+    token = auth.create_session(auth.device_name(request.headers.get("user-agent", "")), _ip(request))
+    resp = JSONResponse(payload)
+    resp.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_DAYS * 86400, httponly=True,
+                    samesite="lax", secure=_secure(request), path="/")
+    return resp
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    s = auth.session_for(request.cookies.get(auth.COOKIE))
+    return {"setup_needed": not auth.is_set(), "authenticated": bool(s and auth.is_set()),
+            "session_id": s["id"] if s else None}
+
+
+@app.post("/api/auth/setup")
+def auth_setup(body: PasswordIn, request: Request):
+    if auth.is_set():
+        raise HTTPException(409, "Un mot de passe existe déjà.")
+    try:
+        auth.set_password(body.password)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return _login_response(request, {"ok": True})
+
+
+@app.post("/api/auth/login")
+def auth_login(body: PasswordIn, request: Request):
+    ip = _ip(request)
+    wait = auth.blocked_for(ip)
+    if wait:
+        raise HTTPException(429, f"Trop d'essais. Réessaie dans {wait // 60 + 1} min.")
+    if not auth.is_set() or not auth.check_password(body.password):
+        auth.record_failure(ip)
+        raise HTTPException(401, "Mot de passe incorrect.")
+    auth.record_success(ip)
+    return _login_response(request, {"ok": True})
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request):
+    auth.revoke(token=request.cookies.get(auth.COOKIE))
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE, path="/")
+    return resp
+
+
+@app.get("/api/security/sessions")
+def security_sessions(request: Request):
+    cur = auth.session_for(request.cookies.get(auth.COOKIE))
+    return {"sessions": auth.list_sessions(), "current": cur["id"] if cur else None}
+
+
+@app.delete("/api/security/sessions/{sid}")
+def security_revoke(sid: int):
+    auth.revoke(sid=sid)
+    return {"ok": True}
+
+
+@app.post("/api/security/password")
+def security_password(body: PasswordChangeIn, request: Request):
+    if not auth.check_password(body.current):
+        raise HTTPException(401, "Mot de passe actuel incorrect.")
+    try:
+        auth.set_password(body.new)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    cur = auth.session_for(request.cookies.get(auth.COOKIE))
+    auth.revoke(all_but=cur["id"] if cur else -1)   # les autres appareils devront se reconnecter
+    return {"ok": True}
+
+
+@app.get("/api/status")
+async def status_report():
+    return await healthcheck.report()
 _jobs: set[asyncio.Task] = set()
 
 

@@ -513,6 +513,21 @@
   .ws-h b { font-weight: 500; color: var(--text); font-size: 12.5px; }
   .ws-h span { font: 11px var(--mono); color: var(--faint); }
 
+  /* ---------------------------------------------------------------- connexion, état */
+  #login { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #232323, #141414 70%); }
+  .login-card { width: min(340px, calc(100vw - 40px)); display: flex; flex-direction: column; gap: 10px; zoom: var(--z, 1); }
+  .login-card p { margin: 0; text-align: center; color: var(--muted); font-size: 13.5px; }
+  .login-card .btn { padding: 10px; font-size: 14px; }
+  .login-orb { width: 74px; height: 74px; margin: 0 auto 6px; border-radius: 50%;
+    background: radial-gradient(circle at 40% 38%, rgba(220,225,235,.95) 0 6%, rgba(200,206,216,.35) 30%, rgba(200,206,216,.06) 62%, transparent 70%);
+    box-shadow: 0 0 50px rgba(200,206,216,.12); animation: orbBreath 4s ease-in-out infinite; }
+  .login-err { color: var(--danger) !important; min-height: 1.2em; }
+  .st-list li { display: flex; gap: 10px; align-items: flex-start; }
+  .st-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; background: #666; }
+  .st-dot.ok { background: #8fd19e; } .st-dot.warn { background: #e8c76a; } .st-dot.error { background: var(--danger); } .st-dot.off { background: #4a4a4a; }
+  .st-list b { font-weight: 500; color: var(--text); display: block; }
+  .st-list code { font: 11.5px var(--mono); color: var(--muted); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+
   /* ---------------------------------------------------------------- densité / largeur */
   body.compact { font-size: 13.5px; }
   body.compact .msg { margin-bottom: 18px; }
@@ -765,6 +780,8 @@
     <nav class="tabs">
       <h2>Réglages</h2>
       <button class="tab on" data-tab="general"><span data-i="settings"></span>Général</button>
+      <button class="tab" data-tab="status"><span data-i="pulse"></span>État</button>
+      <button class="tab" data-tab="security"><span data-i="lock"></span>Sécurité</button>
       <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
       <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
       <button class="tab" data-tab="hybrid"><span data-i="spark"></span>Hybride</button>
@@ -793,6 +810,30 @@
           <p class="desc" id="srvInfo">…</p>
           <div class="row"><button class="btn" id="reconnect">Tester la connexion</button><button class="btn" id="benchBtn">Mesurer la vitesse</button></div>
           <p class="note" id="benchInfo"></p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="status">
+        <div class="block">
+          <div class="row" style="justify-content:space-between;padding-right:34px"><h4>État d'Atom</h4><button class="btn sm" id="stRefresh">Vérifier</button></div>
+          <p class="desc" id="stInfo">Chaque service d'Atom est vérifié ici.</p>
+          <ul class="list st-list" id="stList"></ul>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="security">
+        <div class="block">
+          <h4>Appareils connectés</h4>
+          <p class="desc">Chaque navigateur reste connecté 90 jours après sa dernière visite. Déconnecte ceux que tu ne reconnais pas.</p>
+          <ul class="list" id="secList"></ul>
+          <div class="row" style="margin-top:10px"><button class="btn" id="secLogout">Me déconnecter</button><button class="btn danger" id="secOthers">Déconnecter les autres appareils</button></div>
+        </div>
+        <div class="block">
+          <h4>Changer le mot de passe</h4>
+          <input class="field" type="password" id="secCur" placeholder="Mot de passe actuel" autocomplete="current-password" style="margin-bottom:8px">
+          <input class="field" type="password" id="secNew" placeholder="Nouveau mot de passe (8 caractères min.)" autocomplete="new-password" style="margin-bottom:8px">
+          <button class="btn primary" id="secChange">Changer</button>
+          <p class="note">Les autres appareils seront déconnectés. Mot de passe oublié : sur le serveur, <code>docker compose exec atom python -m app.auth reset</code>.</p>
         </div>
       </section>
 
@@ -920,6 +961,19 @@
   </div>
 </div>
 <div id="toast"></div>
+<div id="login" hidden>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <div class="login-orb"></div>
+    <div class="wordmark" style="font-size:20px;text-align:center">atom</div>
+    <p id="loginText">Entre ton mot de passe.</p>
+    <input type="text" name="username" value="atom" autocomplete="username" hidden>
+    <input class="field" type="password" id="loginPw" autocomplete="current-password" placeholder="Mot de passe" required>
+    <input class="field" type="password" id="loginPw2" autocomplete="new-password" placeholder="Confirme le mot de passe" hidden>
+    <p class="login-err" id="loginErr"></p>
+    <button class="btn primary" id="loginBtn" type="submit">Se connecter</button>
+    <p class="note" id="loginNote" style="text-align:center"></p>
+  </form>
+</div>
 <div class="modal" id="codeDlg">
   <div class="modal-in">
     <h4>Ajouter un projet de code</h4>
@@ -988,6 +1042,8 @@ const ICONS = {
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   library: '<path d="M5 4.5v15M9.5 4.5v15M14 5.5l4.5 13.5M3.5 19.5h17"/>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  pulse: '<path d="M3.5 12h4l2.5-6 4 12 2.5-6h4"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
   users: '<circle cx="9" cy="9" r="3"/><circle cx="16.5" cy="10" r="2.4"/><path d="M3.5 19c.7-3 3-4.6 5.5-4.6s4.8 1.6 5.5 4.6M14.5 15c2.6-.4 5 .8 6 3.5"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.6 5.4 3.6 8.5s-1.1 5.9-3.6 8.5c-2.5-2.6-3.6-5.4-3.6-8.5s1.1-5.9 3.6-8.5z"/>',
   clip: '<path d="M19 11.5l-7.2 7.2a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.2 4.2l-7.6 7.6a1.5 1.5 0 0 1-2.1-2.1l7-7"/>',
@@ -1442,11 +1498,12 @@ const settings = Object.assign(
 const saveSettings = () => store.set("settings", settings);
 
 async function api(path, opts = {}) {
-  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } });
+  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Atom": "1", ...(opts.headers || {}) } });
   if (!r.ok) {
-    let detail = "";
-    try { detail = (await r.json()).detail; } catch {}
-    throw new Error(detail || `${path} → ${r.status}`);
+    let j = {};
+    try { j = await r.json(); } catch {}
+    if (r.status === 401 && j.auth) showLogin(false);
+    throw new Error(j.detail || `${path} → ${r.status}`);
   }
   return r;
 }
@@ -2346,6 +2403,8 @@ function selectTab(tab) {
   if (tab === "memory") loadMemories();
   if (tab === "reminders") loadReminders();
   if (tab === "backup") loadBackups();
+  if (tab === "status") loadStatus();
+  if (tab === "security") loadSecurity();
   if (tab === "hybrid") loadHybrid();
   if (tab === "workshop") loadWorkshop();
 }
@@ -2792,7 +2851,7 @@ $("bkFile").onchange = async (e) => {
   const f = e.target.files[0]; e.target.value = "";
   if (!f || !confirm(`Restaurer « ${f.name} » ? L'état actuel sera sauvegardé avant.`)) return;
   try {
-    const r = await fetch("/api/import", { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream" } });
+    const r = await fetch("/api/import", { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream", "X-Atom": "1" } });
     if (!r.ok) throw new Error((await r.json()).detail || "Échec");
     toast("<b>Mémoire restaurée</b> · rechargement…"); setTimeout(() => location.reload(), 900);
   } catch (err) { toast(esc(err.message)); }
@@ -2922,7 +2981,7 @@ async function uploadDocs(cid, files) {
   for (const f of files) {
     if (f.size > 100 * 1024 * 1024) { toast(`<b>${esc(f.name)}</b> · trop gros (100 Mo max)`); continue; }
     try {
-      const r = await fetch(`/api/library/collections/${cid}/documents?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream" } });
+      const r = await fetch(`/api/library/collections/${cid}/documents?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f, headers: { "Content-Type": "application/octet-stream", "X-Atom": "1" } });
       if (!r.ok) throw new Error((await r.json()).detail || "échec");
       entity.feedColor = [235, 235, 240]; entity.feeding = true;
       setTimeout(() => { entity.feeding = false; entity.feedColor = [110, 170, 255]; }, 2500);
@@ -3463,6 +3522,10 @@ applyLayout();
 setBusy(false);
 // La page elle-même ne doit jamais défiler (seules les zones internes défilent).
 addEventListener("scroll", () => { if (scrollY || scrollX) scrollTo(0, 0); }, { passive: true });
+let booted = false;
+function boot() {
+if (booted) return;
+booted = true;
 (async () => {
   const fromLink = parseInt(new URLSearchParams(location.search).get("c"), 10);
   if (fromLink) { settings.conversationId = fromLink; window.history.replaceState(null, "", "/"); }
@@ -3502,6 +3565,83 @@ setInterval(async () => {
 }, 15000);
 scheduleRest();
 input.focus();
+}
+
+/* ============================================================
+   CONNEXION
+   ============================================================ */
+let loginSetup = false;
+function showLogin(setup) {
+  loginSetup = setup;
+  $("login").hidden = false;
+  $("loginPw2").hidden = !setup;
+  $("loginPw").autocomplete = setup ? "new-password" : "current-password";
+  $("loginText").textContent = setup ? "Bienvenue. Choisis le mot de passe qui protégera Atom." : "Entre ton mot de passe.";
+  $("loginBtn").textContent = setup ? "Créer le mot de passe" : "Se connecter";
+  $("loginNote").textContent = setup ? "8 caractères minimum. Cet appareil restera connecté." : "";
+  $("loginErr").textContent = "";
+  setTimeout(() => $("loginPw").focus(), 50);
+}
+$("loginForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const pw = $("loginPw").value;
+  if (loginSetup && pw !== $("loginPw2").value) { $("loginErr").textContent = "Les deux mots de passe sont différents."; return; }
+  $("loginBtn").disabled = true;
+  try {
+    const r = await fetch(loginSetup ? "/api/auth/setup" : "/api/auth/login", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Atom": "1" }, body: JSON.stringify({ password: pw }) });
+    if (!r.ok) throw new Error((await r.json()).detail || "Échec");
+    $("login").hidden = true; $("loginPw").value = ""; $("loginPw2").value = "";
+    if (booted) location.reload(); else boot();
+  } catch (err) { $("loginErr").textContent = err.message; }
+  finally { $("loginBtn").disabled = false; }
+};
+(async () => {
+  try {
+    const s = await (await fetch("/api/auth/status")).json();
+    if (s.authenticated) boot(); else showLogin(s.setup_needed);
+  } catch { boot(); }
+})();
+
+/* État et sécurité */
+async function loadStatus() {
+  $("stInfo").textContent = "Vérification…";
+  let r;
+  try { r = await getJSON("/api/status"); } catch (e) { $("stInfo").textContent = e.message; return; }
+  const n = { ok: 0, warn: 0, error: 0, off: 0 };
+  r.checks.forEach((c) => n[c.status]++);
+  $("stInfo").textContent = (r.status === "ok" ? "Tout fonctionne." : r.status === "warn" ? `${n.warn} point(s) à surveiller.` : `${n.error} problème(s) détecté(s).`) + ` Version ${r.version}.`;
+  $("stList").innerHTML = r.checks.map((c) => `<li><span class="st-dot ${c.status}"></span><div><b>${esc(c.name)}</b>${esc(c.detail)}${c.hint ? `<br><code>${esc(c.hint)}</code>` : ""}</div></li>`).join("");
+}
+$("stRefresh").onclick = loadStatus;
+async function loadSecurity() {
+  let d;
+  try { d = await getJSON("/api/security/sessions"); } catch { return; }
+  $("secList").innerHTML = "";
+  for (const s of d.sessions) {
+    const li = document.createElement("li");
+    li.style.cssText = "display:flex;align-items:center;gap:10px";
+    li.innerHTML = `<div style="flex:1"><small>${s.id === d.current ? "cet appareil · " : ""}vu ${esc(new Date(s.last_seen * 1000).toLocaleString("fr-FR"))} · ${esc(s.ip || "")}</small>${esc(s.device || "Appareil")}</div>`;
+    if (s.id !== d.current) {
+      const b = document.createElement("button"); b.className = "btn sm"; b.textContent = "Déconnecter";
+      b.onclick = async () => { await send_(`/api/security/sessions/${s.id}`, "DELETE"); loadSecurity(); };
+      li.appendChild(b);
+    }
+    $("secList").appendChild(li);
+  }
+}
+$("secLogout").onclick = async () => { await fetch("/api/auth/logout", { method: "POST", headers: { "X-Atom": "1" } }); location.reload(); };
+$("secOthers").onclick = async () => {
+  if (!confirm("Déconnecter tous les autres appareils ?")) return;
+  const d = await getJSON("/api/security/sessions");
+  for (const s of d.sessions) if (s.id !== d.current) await send_(`/api/security/sessions/${s.id}`, "DELETE");
+  loadSecurity(); toast("Autres appareils déconnectés.");
+};
+$("secChange").onclick = async () => {
+  try { await send_("/api/security/password", "POST", { current: $("secCur").value, new: $("secNew").value });
+    $("secCur").value = ""; $("secNew").value = ""; toast("<b>Mot de passe changé</b> · les autres appareils sont déconnectés."); loadSecurity(); }
+  catch (e) { toast(esc(e.message)); }
+};
 </script>
 </body>
 </html>

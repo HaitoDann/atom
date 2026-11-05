@@ -2,3 +2,7 @@
 data
 **/__pycache__
 .env
+api/tests
+.github
+backups
+projects

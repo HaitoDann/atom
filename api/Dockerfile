@@ -6,7 +6,9 @@ COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY api/app ./app
 COPY web /srv/web
-ENV ATOM_WEB=/srv/web \
+ARG ATOM_VERSION=dev
+ENV ATOM_VERSION=${ATOM_VERSION} \
+    ATOM_WEB=/srv/web \
     ATOM_DB=/data/atom.db \
     PYTHONUNBUFFERED=1
 EXPOSE 8000
