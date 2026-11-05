@@ -387,6 +387,14 @@ def get_hybrid():
     return hybrid.status()
 
 
+@app.get("/api/hybrid/models")
+async def hybrid_models():
+    try:
+        return {"models": await hybrid.list_models()}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Liste des modèles indisponible : {e}") from e
+
+
 @app.put("/api/hybrid")
 def put_hybrid(body: HybridIn):
     hybrid.save_settings({k: v for k, v in body.model_dump().items() if v is not None})

@@ -745,9 +745,9 @@
         <div class="block">
           <h4>Utilisation aujourd'hui</h4>
           <div class="metric"><div class="l"><span id="hyUseL">—</span><span id="hyUseV"></span></div><div class="bar"><i id="hyUseB"></i></div></div>
-          <label class="lbl">Modèle Mistral</label>
-          <div class="row"><input class="field" id="hyModel" placeholder="mistral-small-latest"><button class="btn" id="hyModelSave">Enregistrer</button></div>
-          <p class="note">mistral-small-latest : rapide et économe · mistral-large-latest : le plus capable · codestral-latest : spécialisé code.</p>
+          <label class="lbl" id="hyModelLbl">Modèle</label>
+          <div class="row"><select class="field" id="hyModelSel"></select><button class="btn" id="hyModelSave">Enregistrer</button></div>
+          <p class="note" id="hyModelNote">Liste des modèles proposés par ton fournisseur.</p>
         </div>
       </section>
 
@@ -2869,7 +2869,21 @@ async function loadHybrid() {
   $("hyUseL").textContent = `${h.used_today} requête${h.used_today > 1 ? "s" : ""} ${h.name} aujourd'hui`;
   $("hyUseV").textContent = `limite ${h.limit}`;
   $("hyUseB").style.width = Math.min(100, 100 * h.used_today / Math.max(1, h.limit)) + "%";
-  $("hyModel").value = h.model_setting || ""; $("hyModel").placeholder = h.model;
+  $("hyModelLbl").textContent = `Modèle ${h.name}`;
+  const sel = $("hyModelSel");
+  sel.innerHTML = `<option>${esc(h.model)}</option>`;
+  if (h.configured) {
+    try {
+      const { models } = await getJSON("/api/hybrid/models");
+      if (models.length) {
+        sel.innerHTML = models.map((m) => `<option ${m === h.model ? "selected" : ""}>${esc(m)}</option>`).join("");
+        if (!models.includes(h.model)) {
+          sel.insertAdjacentHTML("afterbegin", `<option selected>${esc(h.model)}</option>`);
+          $("hyModelNote").innerHTML = `⚠ « ${esc(h.model)} » n'est pas proposé par ${esc(h.name)} : choisis un modèle dans la liste.`;
+        } else $("hyModelNote").textContent = `${models.length} modèles proposés par ${h.name}.`;
+      }
+    } catch (e) { $("hyModelNote").textContent = e.message; }
+  }
 }
 async function saveHybrid(patch) {
   try { hybridState = await (await api("/api/hybrid", { method: "PUT", body: JSON.stringify(patch) })).json(); } catch (e) { toast(esc(e.message)); }
@@ -2878,7 +2892,7 @@ async function saveHybrid(patch) {
 $("hyMem").onchange = () => saveHybrid({ allow_memory: $("hyMem").checked });
 $("hyDocs").onchange = () => saveHybrid({ allow_docs: $("hyDocs").checked });
 $("hyWeb").onchange = () => saveHybrid({ allow_web: $("hyWeb").checked });
-$("hyModelSave").onclick = () => saveHybrid({ model: $("hyModel").value.trim() });
+$("hyModelSave").onclick = async () => { await saveHybrid({ model: $("hyModelSel").value }); toast(`Modèle : <b>${esc($("hyModelSel").value)}</b>`); };
 
 /* ============================================================
    DÉMARRAGE

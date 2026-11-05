@@ -111,6 +111,23 @@ def decide(engine: str, message: str, needs_memory: bool, needs_docs: bool) -> t
     return "local", ""
 
 
+async def list_models() -> list[str]:
+    """Modèles proposés par le fournisseur (endpoint /models, format OpenAI)."""
+    if PROVIDER == "mock":
+        return ["mistral-small-latest", "mistral-large-latest"]
+    if not REMOTE_API_KEY:
+        return []
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.get(f"{REMOTE_URL}/models", headers={"Authorization": f"Bearer {REMOTE_API_KEY}"})
+    if r.status_code != 200:
+        raise RuntimeError(f"{REMOTE_NAME} a répondu {r.status_code}")
+    data = r.json().get("data", [])
+    skip = ("whisper", "tts", "embed", "guard", "moderation", "ocr", "transcri", "speech", "audio", "image", "vision-preview")
+    ids = [m.get("id", "") for m in data if m.get("id") and not any(x in m.get("id", "").lower() for x in skip)
+           and m.get("active", True) is not False]
+    return sorted(set(ids))
+
+
 async def stream(messages: list[dict], model_name: str | None = None) -> AsyncIterator[str]:
     """Flux de texte depuis l'API (format OpenAI : /chat/completions en SSE)."""
     if PROVIDER == "mock":
@@ -130,10 +147,13 @@ async def stream(messages: list[dict], model_name: str | None = None) -> AsyncIt
             if r.status_code != 200:
                 body = (await r.aread()).decode(errors="replace")[:300]
                 if r.status_code == 401:
-                    raise RuntimeError("Clé API Mistral refusée : vérifie ATOM_REMOTE_API_KEY.")
+                    raise RuntimeError(f"clé API {REMOTE_NAME} refusée, vérifie ATOM_REMOTE_API_KEY")
                 if r.status_code == 429:
-                    raise RuntimeError("Limite de l'offre Mistral atteinte pour le moment.")
-                raise RuntimeError(f"Mistral a répondu {r.status_code} : {body}")
+                    raise RuntimeError(f"limite de l'offre {REMOTE_NAME} atteinte pour le moment")
+                if r.status_code == 404 and "model" in body.lower():
+                    raise RuntimeError(f"le modèle « {payload['model']} » n'existe pas chez {REMOTE_NAME} : "
+                                       "choisis-en un dans Réglages → Hybride")
+                raise RuntimeError(f"{REMOTE_NAME} a répondu {r.status_code} : {body}")
             _count()
             usage = {}
             async for line in r.aiter_lines():
