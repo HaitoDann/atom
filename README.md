@@ -86,6 +86,15 @@ Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 - **Boutons rapides** sous la saisie et suggestions à l'ouverture d'une conversation vide.
 - Thème monochrome : la seule couleur vient de l'émotion de l'entité.
 
+### Ergonomie
+
+- **Palette de commandes** (`Ctrl+K`, ou le raccourci affiché dans la recherche) : conversations (titres et contenu), actions, vues, moteur, modèle, thème, réglages, collections, et fichiers du projet en mode Code. Navigation au clavier.
+- **Accueil** : dans une conversation vide, l'entité quitte son panneau et accueille au centre ; elle y retourne à ton premier message (désactivable dans Réglages → Apparence).
+- **Thème clair**, sombre ou automatique (Réglages → Apparence) ; l'entité et le logo s'adaptent.
+- **Sur téléphone** : barre d'onglets en bas (Discussions, Bibliothèque, Code, Atom, Réglages) et gestes — glisser depuis le bord gauche pour les conversations, depuis le bord droit pour l'entité.
+- **Glisser-déposer** partout : dans une conversation, le fichier est joint au message ; dans la bibliothèque, il est ajouté à la collection ; déposé **sur l'entité**, il est rangé dans ta bibliothèque (« nourrir Atom »).
+- **Signaux** : quand Atom cite une source ou utilise un souvenir, un signal lumineux part de l'entité vers l'élément cité.
+
 ### Nouveautés de l'interface
 
 - **Fichiers joints** : trombone, glisser-déposer ou coller. Texte, code, Markdown, CSV, JSON et PDF (texte extrait sur le serveur). Les 12 000 premiers caractères d'un fichier sont lus. Les images ne sont pas encore prises en charge (le modèle actuel ne voit pas).
