@@ -391,17 +391,9 @@
   .side-nav button svg { color: var(--muted); }
   .side-nav .count { margin-left: auto; font: 11px var(--mono); color: var(--faint); }
   .side-sep { height: 1px; background: var(--border); margin: 4px 14px 2px; }
-  .bond { margin: 8px 10px 10px; padding: 11px 12px 10px; border: 1px solid var(--border); border-radius: 12px; background: transparent; cursor: pointer; }
-  .bond:hover { border-color: #444; }
-  .bond-top { display: flex; align-items: center; gap: 10px; }
-  .bond-orb { width: 30px; height: 30px; border-radius: 50%; flex: none; position: relative;
     background: radial-gradient(circle at 40% 38%, rgba(var(--orb),.95) 0 8%, rgba(var(--orb),.35) 30%, rgba(var(--orb),.08) 62%, transparent 70%);
     box-shadow: 0 0 18px rgba(var(--orb), .18); animation: orbBreath 4s ease-in-out infinite; }
   @keyframes orbBreath { 50% { transform: scale(1.08); box-shadow: 0 0 24px rgba(var(--orb), .28); } }
-  .bond b { display: block; font-size: 13.5px; font-weight: 500; color: var(--strong); }
-  .bond small { display: block; font-size: 11.5px; color: var(--muted); }
-  .bond .bar { margin-top: 10px; height: 3px; }
-  .bond .meta { display: flex; justify-content: space-between; margin-top: 7px; font: 10.5px var(--mono); color: var(--faint); }
 
   /* ---------------------------------------------------------------- recherche, réflexion, sources */
   .live { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13.5px; padding: 4px 0; }
@@ -644,7 +636,6 @@
   .sec { animation: msgIn .5s var(--ease-out) both; }
   .sec:nth-of-type(2) { animation-delay: .05s; } .sec:nth-of-type(3) { animation-delay: .1s; } .sec:nth-of-type(4) { animation-delay: .15s; }
   .bar i { background: linear-gradient(90deg, #9a9a9a, #e6e6e6); }
-  .bond .bar i { background: linear-gradient(90deg, rgba(var(--orb), .5), rgb(var(--orb))); box-shadow: 0 0 10px rgba(var(--orb), .5); transition: width 1s var(--ease-out); }
   .stage::after { content: none; }
 
   /* barres de défilement fines qui n'apparaissent qu'au survol */
@@ -728,7 +719,7 @@
   #drop { transition: background .2s; }
   #drop div { animation: popIn .25s var(--ease-out); }
   #drop svg.i { width: 34px; height: 34px; display: block; margin: 0 auto 10px; color: rgb(var(--orb)); }
-  .stage.dropover::before { content: "Lâche pour nourrir Atom"; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: var(--strong); font-size: 13px; background: rgba(var(--orb), .08); border: 1px dashed rgba(var(--orb), .6); }
+  .stage.dropover::before { content: "Lâche pour ranger dans la bibliothèque"; position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; color: var(--strong); font-size: 13px; background: rgba(var(--orb), .08); border: 1px dashed rgba(var(--orb), .6); }
 
   /* ================================================================ passe « calme » */
   /* 1. moins d'effets : pas de grain, pas de lueurs */
@@ -736,7 +727,6 @@
   form#form, form#form:focus-within { box-shadow: none !important; }
   #send:not(:disabled):hover { box-shadow: none !important; transform: none; opacity: .88; }
   .conv.active::before, .side-nav button.on::before { box-shadow: none !important; background: var(--text-2) !important; }
-  .bond .bar i { box-shadow: none !important; background: var(--text-2) !important; }
   .sigfrag { box-shadow: none; width: 5px; height: 5px; background: var(--text); }
   #toast.on { box-shadow: 0 10px 30px rgba(0,0,0,.3); }
   .btn.primary { box-shadow: none; }
@@ -745,7 +735,6 @@
   /* 1. moins de bordures : fonds teintés et espacement */
   .card { border: 0; background: color-mix(in srgb, var(--text) 4%, transparent); }
   .card:hover { background: color-mix(in srgb, var(--text) 7%, transparent); box-shadow: none; transform: none; }
-  .bond { border: 0; background: color-mix(in srgb, var(--text) 3.5%, transparent); }
   .side-new { border: 0; background: color-mix(in srgb, var(--text) 5%, transparent); }
   .side-new:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
 
@@ -938,11 +927,6 @@
     </div>
     <div class="side-sep"></div>
     <nav id="convList"></nav>
-    <div class="bond" id="bond" title="Votre lien">
-      <div class="bond-top"><div><b id="bondStage">Éveil</b><small id="bondText">Atom découvre le monde à travers toi.</small></div></div>
-      <div class="bar"><i id="bondBar"></i></div>
-      <div class="meta"><span id="bondDays">—</span><span id="bondNext"></span></div>
-    </div>
     <div class="side-bottom">
       <div class="status"><span class="dot" id="dot"></span><span id="statusText">Connexion…</span></div>
       <button class="iconbtn" id="openSettings" title="Réglages" data-i="settings"></button>
@@ -1024,16 +1008,9 @@
     <div class="panel-in">
       <div class="stage" id="stage">
         <canvas id="entity"></canvas>
-        <div class="stage-top"><span>Caresse-la · touche-la</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
+        <div class="stage-top"><span>Atom</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
         <div class="stage-meta"><span id="emoName">Veille</span><span id="emoState">en attente</span></div>
       </div>
-      <details class="sec">
-        <summary><h3>Lien</h3></summary>
-        <div class="kv"><span>Stade</span><span id="pStage">—</span></div>
-        <div class="kv"><span>Ensemble depuis</span><span id="pDays">—</span></div>
-        <div class="kv"><span>Caresses</span><span id="pPets">0</span></div>
-        <div class="kv"><span>Nourri (fichiers, recherches)</span><span id="pFed">0</span></div>
-      </details>
       <details class="sec" id="sysSec">
         <summary><h3>Système</h3></summary>
         <div class="metric"><div class="l"><span>Processeur</span><span id="cpuV">—</span></div><div class="bar"><i id="cpuB"></i></div></div>
@@ -1236,15 +1213,6 @@
           <h4>Apparence de l'entité</h4>
           <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine.</p>
           <div class="row" id="styleRow"></div>
-        </div>
-        <div class="block">
-          <h4>Votre lien</h4>
-          <p class="desc">Le lien grandit avec chaque moment partagé : conversations, souvenirs, caresses, fichiers et recherches qui le nourrissent. Il ne diminue jamais. À chaque stade, Atom gagne des fragments, puis un second anneau et un cœur lumineux.</p>
-          <ul id="stagesList" class="list"></ul>
-        </div>
-        <div class="block">
-          <h4>Prendre soin d'Atom</h4>
-          <p class="desc">Caresse la sphère en passant doucement le curseur dessus : ses fragments se resserrent et se réchauffent. Maintiens le clic pour qu'elle se blottisse. Glisse-lui un fichier ou laisse-le chercher sur Internet pour le nourrir.</p>
         </div>
         <div class="block">
           <h4>Tester une émotion</h4>
@@ -1508,10 +1476,8 @@ function setEntityState(t) { $("emoState").textContent = t; }
   for (const k of KEYS) cur[k] = A0[k];
   const gaze = { x: 0, y: 0, tx: 0, ty: 0 };
   const mouse = { x: 0, y: 0, active: false, sx: 0, sy: 0, t: 0 };
-  const CONTENT = { ...DEF, ...ACTIVITIES.content };
 
-  // ---- regard, caresses
-  let lastPetCount = 0, petAccum = 0;
+  // ---- regard
   addEventListener("pointermove", (e) => {
     const r = stage.getBoundingClientRect();
     const cx = entity.screen.x, cy = entity.screen.y;
@@ -1523,34 +1489,10 @@ function setEntityState(t) { $("emoState").textContent = t; }
     mouse.active = inside;
     const sc = entity.screen.scale || 1;
     mouse.x = dx / sc; mouse.y = dy / sc;
-    // Caresse : un mouvement doux sur la sphère (ni immobile, ni brusque).
-    const now = performance.now(), dtm = Math.min(0.1, (now - mouse.t) / 1000);
-    const speed = Math.hypot(e.clientX - mouse.sx, e.clientY - mouse.sy) / Math.max(dtm, 0.001);
-    mouse.sx = e.clientX; mouse.sy = e.clientY; mouse.t = now;
-    if (d < entity.screen.r * 1.25 && speed > 30 && speed < 1800 && entity.fly.p < 0.05) {
-      entity.petting = now;
-      petAccum += dtm;
-      if (petAccum > 2.5) { petAccum = 0; onPetted(); }
-    }
   });
   document.addEventListener("pointerleave", () => { mouse.active = false; entity.hover = false; gaze.tx = gaze.ty = 0; });
 
-  // Appui long : elle se blottit (et ça ne déclenche pas le mode présence).
-  let pressT = 0, pressTimer = 0;
-  stage.addEventListener("pointerdown", () => {
-    pressT = performance.now();
-    pressTimer = setTimeout(() => { entity.snuggling = true; }, 450);
-  });
-  const release = () => { clearTimeout(pressTimer); entity.snuggling = false; };
-  stage.addEventListener("pointerup", release);
-  stage.addEventListener("pointerleave", release);
-  entity.wasLongPress = () => performance.now() - pressT > 450;
-
-  function onPetted() {
-    lastPetCount++;
-    send_("/api/companion/pet", "POST").then((r) => r.json()).then(updateCompanion).catch(() => {});
-    if (lastPetCount === 1 || lastPetCount % 6 === 0) toast("<b>Atom</b> · ses fragments se resserrent contre toi");
-  }
+  entity.wasLongPress = () => false;
 
   const MOOD_NEG = [130, 150, 205], MOOD_POS = [228, 190, 150];
   let nextBlink = 6, nextGlance = 9;
@@ -1579,10 +1521,6 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const isIdle = entity.activity === "idle" || entity.activity === "sleep";
     entity.rippleT += dt;
 
-    // ---- caresses / câlin
-    const petOn = now - entity.petting < 450 || entity.snuggling;
-    entity.pet += ((petOn ? 1 : 0) - entity.pet) * Math.min(1, dt * (petOn ? 3 : 1.2));
-    entity.snuggle += ((entity.snuggling ? 1 : 0) - entity.snuggle) * Math.min(1, dt * 4);
 
     // ---- micro-comportements
     if (isIdle && !typing && entity.pet < 0.1) {
@@ -1612,10 +1550,6 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const T = { r: A.color[0], g: A.color[1], b: A.color[2] };
     for (const k of KEYS) T[k] = A[k];
     const pw = entity.pet;
-    if (pw > 0.01) {
-      T.r += (CONTENT.color[0] - T.r) * pw; T.g += (CONTENT.color[1] - T.g) * pw; T.b += (CONTENT.color[2] - T.b) * pw;
-      for (const k of KEYS) T[k] += (CONTENT[k] - T[k]) * pw;
-    }
     if (isIdle && entity.mood && pw < 0.5) {
       const m = Math.max(-1, Math.min(1, entity.mood)), c = m > 0 ? MOOD_POS : MOOD_NEG, w = Math.abs(m) * 0.35;
       T.r += (c[0] - T.r) * w; T.g += (c[1] - T.g) * w; T.b += (c[2] - T.b) * w;
@@ -1695,8 +1629,8 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const rt = entity.rippleT, rippleOn = rt < 1.6, rippleK = rippleOn ? Math.exp(-rt * 2.2) * 26 : 0, front0 = rt * 1.26;
     const spring = Math.min(1, dt * 4), repel = 160 * dt, RR = 2500;
     const pxSize = 1 / scale;
-    const visible = 0.58 + entity.level * 0.084;          // plus de fragments à chaque stade
-    const ring2 = entity.level >= 3;
+    const visible = 1;
+    const ring2 = false;
     const spK = entity.splitK, nSplit = Math.max(2, entity.split || 2), act = entity.activeCluster % nSplit;
     const scK = entity.scanK, band = R0 * 0.13, scanY = Math.sin(t * 1.4) * R0 * 0.95;
     const glJ = entity.glitch * 9, glBand = entity.glitch > 0.05 ? ((t * 23) | 0) % 9 : -1;
@@ -2744,7 +2678,6 @@ async function sendMessage(text, files = []) {
     presenceSay(content);
     entity.feeding = false; entity.remote = false; entity.scan = false;
     setTimeout(refreshMood, 500);
-    setTimeout(loadCompanion, 800);
     input.focus();
   };
 
@@ -2835,7 +2768,6 @@ async function sendMessage(text, files = []) {
           const lastAtom = [...chat.querySelectorAll(".msg.atom")].pop();
           memoryFlight(lastAtom);
           lastAtom?.querySelector(".acts")?.before(memoryCard(ev.added));
-          setTimeout(loadCompanion, 1500);
           refreshPanel();
           if ($("settings").classList.contains("open")) loadMemories();
         } else if (ev.type === "error") {
@@ -3038,7 +2970,6 @@ const DEMOS = [
   ["Souvenir retenu", () => memoryFlight($("openSettings"))],
   ["Sauvegarde", () => { entity.seal = 1; }],
   ["Secours / erreur", () => { entity.glitch = 1; }],
-  ["Croissance", () => { entity.grow = 1; entity.rippleT = 0; }],
 ];
 const demoRow = document.createElement("div");
 demoRow.className = "emos"; demoRow.style.marginTop = "12px";
@@ -3221,7 +3152,7 @@ function tickClock() {
   const d = new Date();
   $("pClock").textContent = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   $("pDate").textContent = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
-  $("pEmoBig").textContent = ACTIVITIES[entity.activity].label.toLowerCase() + (companion ? " · " + companion.stage.toLowerCase() : "");
+  $("pEmoBig").textContent = ACTIVITIES[entity.activity].label.toLowerCase();
 }
 function presenceSay(text, label = "Atom") {
   if (!text) return;
@@ -3349,36 +3280,6 @@ $("webBtn").onclick = () => { webForce = !webForce; renderWebBtn(); input.focus(
 $("webAuto").checked = settings.webAuto !== false;
 $("webAuto").onchange = () => { settings.webAuto = $("webAuto").checked; saveSettings(); renderWebBtn(); };
 
-/* ============================================================
-   LE LIEN (côté compagnon)
-   ============================================================ */
-let companion = null;
-const STAGE_NAMES = ["Éveil", "Curieux", "Familier", "Complice", "Attaché", "Inséparable"];
-function updateCompanion(c) {
-  if (!c) return;
-  const prev = companion;
-  companion = c;
-  entity.level = c.level;
-  $("bondStage").textContent = c.stage;
-  $("bondText").textContent = c.stage_text;
-  $("bondBar").style.width = Math.round(c.progress * 100) + "%";
-  $("bondDays").textContent = c.days ? `${c.days} jour${c.days > 1 ? "s" : ""} ensemble` : "Premier jour ensemble";
-  $("bondNext").textContent = c.next_stage ? `→ ${c.next_stage}` : "lien complet";
-  $("pStage").textContent = c.stage;
-  $("pDays").textContent = c.days ? `${c.days} j` : "aujourd'hui";
-  $("pPets").textContent = c.pets;
-  $("pFed").textContent = c.fed;
-  $("stagesList").innerHTML = STAGE_NAMES.map((n, i) =>
-    `<li style="display:flex;gap:10px;${i > c.level ? "opacity:.4" : ""}"><span style="width:16px">${i < c.level ? "✓" : i === c.level ? "●" : "○"}</span><span>${n}</span></li>`).join("");
-  if (prev && c.level > prev.level) {
-    entity.grow = 1; entity.rippleT = 0;
-    toast(`<b>Atom a grandi</b> · stade ${esc(c.stage)} — ${esc(c.stage_text)}`);
-  }
-}
-async function loadCompanion() {
-  try { updateCompanion(await getJSON("/api/companion")); } catch {}
-}
-$("bond").onclick = () => openSettings("entity");
 document.querySelectorAll(".side-nav [data-goto]").forEach((b) => { b.onclick = () => openSettings(b.dataset.goto); });
 async function refreshCounts() {
   try { const m = (await getJSON("/api/memories")).memories.length; $("navMem").textContent = m || ""; } catch {}
@@ -4285,7 +4186,6 @@ applyLook();
 renderWebBtn();
 loadHybrid().then(loadWorkshop);
 loadLibrary();
-loadCompanion();
 refreshCounts();
 setInterval(refreshCounts, 60000);
 checkNight();

@@ -11,7 +11,7 @@ from typing import AsyncIterator
 
 import httpx
 
-from . import companion, db, hybrid, library, llm, memory, reminders, search
+from . import db, hybrid, library, llm, memory, reminders, search
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
@@ -157,8 +157,6 @@ async def chat_events(
     saved = False
     text = ""
     sources: list[dict] = []
-    if attachments:
-        companion.bump("fed")
 
     async def tokens_from(messages: list[dict]):
         """Jetons du moteur choisi ; si Mistral échoue avant d'écrire, on repasse en local."""
@@ -231,7 +229,6 @@ async def chat_events(
         except Exception as e:  # noqa: BLE001
             yield dict(type="search", status="error", query=query, message=str(e))
             return
-        companion.bump("fed")
         sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"],
                         "snippet": (r.get("snippet") or r.get("content") or "")[:220]} for r in results)
         yield dict(type="search", status="done", query=query, sources=sources)

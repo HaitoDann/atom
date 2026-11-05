@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, companion, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, auth, backup, db, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -332,20 +332,6 @@ def feedback(mid: int, body: FeedbackIn):
     return {"ok": True}
 
 
-# ---- le lien (côté compagnon)
-
-
-@app.get("/api/companion")
-def get_companion():
-    return companion.state()
-
-
-@app.post("/api/companion/pet")
-def pet():
-    companion.bump("pets")
-    return companion.state()
-
-
 # ---- humeur
 
 
@@ -625,7 +611,6 @@ async def upload_document(cid: int, request: Request, name: str):
     if len(raw) > 100 * 1024 * 1024:
         raise HTTPException(413, "Fichier trop gros (100 Mo max)")
     did = library.add_document_record(cid, name[:200], raw)
-    companion.bump("fed")
     background(library.index_document(did))
     return library.get_document(did)
 

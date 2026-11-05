@@ -92,7 +92,7 @@ Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 - **Accueil** : dans une conversation vide, l'entité quitte son panneau et accueille au centre ; elle y retourne à ton premier message (désactivable dans Réglages → Apparence).
 - **Thème clair**, sombre ou automatique (Réglages → Apparence) ; l'entité et le logo s'adaptent.
 - **Sur téléphone** : barre d'onglets en bas (Discussions, Bibliothèque, Code, Atom, Réglages) et gestes — glisser depuis le bord gauche pour les conversations, depuis le bord droit pour l'entité.
-- **Glisser-déposer** partout : dans une conversation, le fichier est joint au message ; dans la bibliothèque, il est ajouté à la collection ; déposé **sur l'entité**, il est rangé dans ta bibliothèque (« nourrir Atom »).
+- **Glisser-déposer** partout : dans une conversation, le fichier est joint au message ; dans la bibliothèque, il est ajouté à la collection ; déposé **sur l'entité**, il est rangé dans ta bibliothèque.
 - **Signaux** : quand Atom cite une source ou utilise un souvenir, un signal lumineux part de l'entité vers l'élément cité.
 
 ### Nouveautés de l'interface
@@ -188,7 +188,7 @@ Si c'est encore lent, vérifie :
 
 ## Sauvegarde
 
-- **Chaque nuit à 3 h 30**, Atom copie toute sa mémoire (conversations, souvenirs, rappels, lien) dans le dossier `backups/` à côté du `docker-compose.yml`, et garde les **7 dernières**. Si le serveur était éteint, une copie est faite au démarrage.
+- **Chaque nuit à 3 h 30**, Atom copie toute sa mémoire (conversations, souvenirs, rappels) dans le dossier `backups/` à côté du `docker-compose.yml`, et garde les **7 dernières**. Si le serveur était éteint, une copie est faite au démarrage.
 - Réglages → **Sauvegarde** : sauvegarder maintenant, télécharger une copie sur ton PC, restaurer une sauvegarde du serveur ou un fichier `.db`.
 - Avant toute restauration, l'état actuel est sauvegardé automatiquement.
 - Réglables dans `.env` : `ATOM_BACKUP_TIME`, `ATOM_BACKUP_KEEP`.
@@ -264,19 +264,15 @@ Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans p
 
 - **Atom décide** : s'il ne connaît pas la réponse (actualité, prix, météo, horaires…), il lance lui-même une recherche. Réglages → Général → « Atom cherche de lui-même » pour couper ce comportement.
 - **Tu forces** : le bouton globe sous la saisie déclenche une recherche pour ce message.
-- Pendant la recherche, des fragments bleus convergent vers la sphère : elle se nourrit.
+- Pendant la recherche, des fragments bleus convergent vers la sphère.
 - Pour désactiver complètement : `ATOM_SEARXNG_URL=` (vide) dans `.env`.
 
-## Le lien avec Atom
+## L'entité
 
-Un côté « familier » sans contrainte : **rien ne diminue jamais**, pas de faim ni de punition.
-
-- **Le lien grandit** avec les conversations, les souvenirs, les caresses et la « nourriture » (fichiers joints, recherches). Six stades : Éveil, Curieux, Familier, Complice, Attaché, Inséparable. À chaque stade la sphère gagne des fragments, puis un second anneau (stade 4) et un cœur lumineux (stade 5).
-- **Caresser** : passe doucement le curseur sur la sphère ; ses fragments se resserrent, se réchauffent et viennent vers toi au lieu de fuir. **Maintiens le clic** : elle se blottit.
 - **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
 - **Apparence : maillage** (par défaut) — la sphère est un réseau de ~360 nœuds régulièrement répartis et reliés à leurs voisins, l'arrière estompé dans la profondeur, une poussière intérieure discrète, et des **signaux lumineux** qui parcourent les liens (rares au repos, nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA). Toutes les émotions et animations s'appliquent au réseau ; dans l'atelier, les liens entre amas se rompent. Réglages → Entité → « Fragments » pour revenir à la sphère de poussière d'origine.
 - Situations : **consulter une IA distante** (ondes de fragments lavande qui partent de la sphère), **atelier** (la sphère se divise en amas qui tournent ensemble, celui qui travaille s'éclaire, puis ils fusionnent pour la réponse finale), **lecture** de code ou de documents (les fragments se rangent en lignes, un balayage lumineux les parcourt), **indexation** (fragments blancs absorbés), **sauvegarde** (contraction et anneau qui se referme), **secours ou erreur** (brève perturbation par bandes). Toutes prévisualisables dans Réglages → Entité.
-- Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation, le bien-être (après une caresse) les rend chauds et denses avec une vibration fine.
+- Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation.
 
 ## Accéder à Atom hors de chez toi (Tailscale)
 
