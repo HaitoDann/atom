@@ -23,6 +23,16 @@ services:
     entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M} && ollama pull ${ATOM_EMBED_MODEL:-nomic-embed-text}"]
     restart: "no"
 
+  # Moteur de recherche auto-hébergé (interne : pas de port exposé)
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-change-moi-atom-searxng}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+
   # Serveur de notifications push (appli ntfy sur le téléphone)
   ntfy:
     image: binwiederhier/ntfy:v2.11.0
@@ -48,6 +58,7 @@ services:
     depends_on:
       - ollama
       - ntfy
+      - searxng
     ports:
       - "${ATOM_PORT:-8000}:8000"
     environment:
@@ -59,6 +70,7 @@ services:
       - ATOM_NTFY_URL=http://ntfy:80
       - ATOM_NTFY_TOPIC=${ATOM_NTFY_TOPIC:-atom}
       - ATOM_PUBLIC_URL=${ATOM_PUBLIC_URL:-}
+      - ATOM_SEARXNG_URL=${ATOM_SEARXNG_URL-http://searxng:8080}
       - ATOM_TELEGRAM_TOKEN=${ATOM_TELEGRAM_TOKEN:-}
       - ATOM_TELEGRAM_ALLOWED=${ATOM_TELEGRAM_ALLOWED:-}
     volumes:

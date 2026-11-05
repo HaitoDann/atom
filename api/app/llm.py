@@ -127,7 +127,11 @@ async def _mock_stream(messages: list[dict]) -> AsyncIterator[str]:
         f"[{emotion}] (mode test) Tu m'as dit : **« {user} »**.\n\n"
         "| Élément | État |\n|---|---|\n| Streaming | ✅ |\n| Markdown | ✅ |\n"
     )
-    if "rappel" in user.lower():
+    if "cherche" in user.lower() and "Résultats d'une recherche web" not in messages[0]["content"]:
+        reply = f"[[recherche {user[:60]}]]"
+    elif "Résultats d'une recherche web" in messages[0]["content"]:
+        reply = "[curious] (mode test) D'après ma recherche, voici ce que j'ai trouvé [1]."
+    elif "rappel" in user.lower():
         from datetime import timedelta
 
         from .reminders import now_local

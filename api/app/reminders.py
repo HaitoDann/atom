@@ -25,7 +25,7 @@ JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
         "septembre", "octobre", "novembre", "décembre"]
 
-CMD_RE = re.compile(r"\[\[\s*(rappel|annuler_rappel)\s+([^\]]*?)\s*\]\]", re.I)
+CMD_RE = re.compile(r"\[\[\s*(rappel|annuler_rappel|recherche)\s+([^\]]*?)\s*\]\]", re.I)
 
 
 def now_local() -> datetime:

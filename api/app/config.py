@@ -19,7 +19,7 @@ FACT_MIN_SCORE = float(os.getenv("ATOM_FACT_MIN_SCORE", "0.45"))
 RECALL_MIN_SCORE = float(os.getenv("ATOM_RECALL_MIN_SCORE", "0.55"))
 DUPLICATE_SCORE = float(os.getenv("ATOM_DUPLICATE_SCORE", "0.9"))
 
-EMOTIONS = ["idle", "thinking", "talking", "joy", "angry", "sad", "surprise", "fear", "sleep"]
+EMOTIONS = ["idle", "thinking", "talking", "joy", "angry", "sad", "surprise", "fear", "sleep", "curious", "focus"]
 
 DEFAULT_PERSONA = (
     "Tu es Atom, une entité numérique bienveillante, curieuse et concise. "
@@ -47,3 +47,8 @@ TELEGRAM_ALLOWED = {
 NUM_CTX = int(os.getenv("ATOM_NUM_CTX", "8192"))
 # Taille max d'un fichier joint injecté dans le prompt (caractères)
 ATTACH_MAX_CHARS = int(os.getenv("ATOM_ATTACH_MAX_CHARS", "12000"))
+
+# Recherche web (SearXNG auto-hébergé). Vide = désactivée.
+SEARXNG_URL = os.getenv("ATOM_SEARXNG_URL", "").rstrip("/")
+SEARCH_RESULTS = int(os.getenv("ATOM_SEARCH_RESULTS", "5"))
+SEARCH_PAGES = int(os.getenv("ATOM_SEARCH_PAGES", "3"))

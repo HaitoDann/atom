@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import agent, db, llm, memory, notify, reminders, system, telegram
+from . import agent, companion, db, llm, memory, notify, reminders, search, system, telegram
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -66,6 +66,7 @@ class ChatIn(BaseModel):
     model: str | None = None
     persona: str | None = None
     auto_memory: bool = True
+    web: str = Field(default="auto", pattern="^(auto|force|off)$")
 
 
 class MemoryIn(BaseModel):
@@ -85,7 +86,8 @@ class TruncateIn(BaseModel):
 async def health():
     if PROVIDER == "mock":
         return {"ok": True, "provider": PROVIDER, "ollama": True, "model_ready": True,
-                "embeddings": True, "telegram": telegram.enabled(), "default_model": DEFAULT_MODEL}
+                "embeddings": True, "telegram": telegram.enabled(), "search": search.enabled(),
+                "default_model": DEFAULT_MODEL}
     try:
         names = await llm.installed_models()
         ollama_ok = True
@@ -99,6 +101,7 @@ async def health():
         "model_ready": any(n.split(":")[0] != EMBED_MODEL.split(":")[0] for n in names),
         "embeddings": has_embed,
         "telegram": telegram.enabled(),
+        "search": search.enabled(),
         "default_model": DEFAULT_MODEL,
     }
 
@@ -134,6 +137,7 @@ async def chat(body: ChatIn):
             body.auto_memory,
             "",
             [a.model_dump() for a in body.attachments] or None,
+            body.web,
         ),
         media_type="application/x-ndjson",
     )
@@ -202,7 +206,21 @@ def feedback(mid: int, body: FeedbackIn):
     return {"ok": True}
 
 
-# ---- humeur (courbe du panneau)
+# ---- le lien (côté compagnon)
+
+
+@app.get("/api/companion")
+def get_companion():
+    return companion.state()
+
+
+@app.post("/api/companion/pet")
+def pet():
+    companion.bump("pets")
+    return companion.state()
+
+
+# ---- humeur
 
 
 @app.get("/api/mood")
@@ -241,7 +259,7 @@ def truncate(cid: int, body: TruncateIn):
 
 
 @app.get("/api/search")
-def search(q: str):
+def search_conversations(q: str):
     q = q.strip()
     return {"results": db.search(q) if len(q) >= 2 else []}
 

@@ -111,6 +111,24 @@ Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passe
 - **Android / Chrome / Edge** : Réglages d'Atom → Apparence → « Installer l'application », ou menu du navigateur → « Installer ».
 - **iPhone / iPad (Safari)** : bouton Partager → « Sur l'écran d'accueil ».
 
+## Recherche sur Internet
+
+Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans port exposé) : il interroge plusieurs moteurs sans traçage. Atom lit ensuite les meilleures pages et répond en citant ses sources, affichées sous la réponse.
+
+- **Atom décide** : s'il ne connaît pas la réponse (actualité, prix, météo, horaires…), il lance lui-même une recherche. Réglages → Général → « Atom cherche de lui-même » pour couper ce comportement.
+- **Tu forces** : le bouton globe sous la saisie déclenche une recherche pour ce message.
+- Pendant la recherche, des fragments bleus convergent vers la sphère : elle se nourrit.
+- Pour désactiver complètement : `ATOM_SEARXNG_URL=` (vide) dans `.env`.
+
+## Le lien avec Atom
+
+Un côté « familier » sans contrainte : **rien ne diminue jamais**, pas de faim ni de punition.
+
+- **Le lien grandit** avec les conversations, les souvenirs, les caresses et la « nourriture » (fichiers joints, recherches). Six stades : Éveil, Curieux, Familier, Complice, Attaché, Inséparable. À chaque stade la sphère gagne des fragments, puis un second anneau (stade 4) et un cœur lumineux (stade 5).
+- **Caresser** : passe doucement le curseur sur la sphère ; ses fragments se resserrent, se réchauffent et viennent vers toi au lieu de fuir. **Maintiens le clic** : elle se blottit.
+- **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
+- Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation, le bien-être (après une caresse) les rend chauds et denses avec une vibration fine.
+
 ## Accéder à Atom hors de chez toi (Tailscale)
 
 [Tailscale](https://tailscale.com) relie tes appareils dans un réseau privé chiffré : rien n'est exposé sur Internet, aucun port à ouvrir sur la box, et il fournit le HTTPS nécessaire à l'appli installable. C'est gratuit pour un usage personnel.

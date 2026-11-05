@@ -11,14 +11,14 @@ from typing import AsyncIterator
 
 import httpx
 
-from . import db, llm, memory, reminders
+from . import companion, db, llm, memory, reminders, search
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
 _background: set[asyncio.Task] = set()
 
 
-def system_prompt(persona: str, memory_block: str) -> str:
+def system_prompt(persona: str, memory_block: str, web: str = "off", web_block: str = "") -> str:
     s = (
         f"{persona.strip()}\n\n"
         "Tu possèdes un corps : une sphère de fragments lumineux qui exprime ton état.\n\n"
@@ -29,14 +29,25 @@ def system_prompt(persona: str, memory_block: str) -> str:
         "Commence TOUJOURS ta réponse par ton émotion entre crochets, puis ton message. "
         f"Émotions possibles : {', '.join(EMOTIONS)}.\n"
         "(talking = neutre, joy = content, sad = triste, angry = agacé, surprise = étonné, "
-        "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme)\n"
+        "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme, "
+        "curious = intrigué, focus = concentré sur une tâche)\n"
         "Exemple : [joy] Ravi de te revoir !\n"
         "Ne réfléchis pas à voix haute, ne décris pas ton raisonnement : réponds directement.\n"
         "/no_think\n\n"
         + reminders.prompt_block()
     )
+    if web == "auto":
+        s += (
+            "\n\nTu peux chercher sur Internet. Si la question porte sur l'actualité, un prix, la météo, "
+            "un horaire, un résultat, une version récente ou un fait précis que tu ne connais pas avec "
+            "certitude, réponds UNIQUEMENT par la commande suivante, sans autre texte :\n"
+            "[[recherche mots-clés précis]]\n"
+            "Ne cherche pas pour bavarder, ni pour ce que tu sais déjà ou ce qui concerne l'utilisateur."
+        )
     if memory_block:
         s += "\n\n" + memory_block
+    if web_block:
+        s += "\n\n" + web_block
     return s
 
 
@@ -65,6 +76,7 @@ async def chat_events(
     auto_memory: bool,
     title_prefix: str = "",
     attachments: list[dict] | None = None,
+    web: str = "auto",  # "auto" : Atom décide · "force" : chercher · "off" : jamais
 ) -> AsyncIterator[dict]:
     """Événements : meta, context, emotion, token…, reminder…, done, memory — ou error."""
     title_src = message or (attachments[0]["name"] if attachments else "Fichier")
@@ -79,7 +91,9 @@ async def chat_events(
     mem_block, used = await memory.context_for(message or title_src, conversation_id)
     if used["facts"] or used["recall"]:
         yield dict(type="context", used=used)
-    msgs = [{"role": "system", "content": system_prompt(persona, mem_block)}]
+    if not search.enabled():
+        web = "off"
+    msgs = [{"role": "system", "content": system_prompt(persona, mem_block, web if web == "auto" else "off")}]
     msgs += [
         {"role": m["role"], "content": with_attachments(m["content"], m["meta"].get("attachments"))}
         for m in history
@@ -92,12 +106,17 @@ async def chat_events(
 
     emotion: str | None = None
     saved = False
-    cmds = reminders.CommandFilter()
-    head = ""  # tampon tant que le tag d'émotion n'est pas résolu
     text = ""
-    try:
-        async for tok in llm.stream_chat(model, msgs):
-            if emotion is None:
+    sources: list[dict] = []
+    if attachments:
+        companion.bump("fed")
+
+    async def run_pass(messages: list[dict], state: dict):
+        """Un passage du modèle : émotion, jetons, commandes (dans state)."""
+        cmds = reminders.CommandFilter()
+        head, emo, out = "", None, ""
+        async for tok in llm.stream_chat(model, messages):
+            if emo is None:
                 head += tok
                 # Raisonnement interne (modèles "thinking") : on l'écarte.
                 if "</think>" in head:
@@ -111,34 +130,75 @@ async def chat_events(
                     continue  # le tag arrive encore
                 m = TAG_RE.match(stripped)
                 if m and m.group(1).lower() in EMOTIONS:
-                    emotion = m.group(1).lower()
+                    emo = m.group(1).lower()
                     tok = stripped[m.end():]
                 else:
-                    emotion = "talking"
+                    emo = "talking"
                     tok = stripped
-                yield dict(type="emotion", emotion=emotion)
+                yield dict(type="emotion", emotion=emo)
             tok = cmds.feed(tok)
             if tok:
-                text += tok
+                out += tok
+                state["text"] = out
                 yield dict(type="token", text=tok)
-        if emotion is None:  # réponse vide ou tag seul
-            emotion = "talking"
+        if emo is None:  # réponse vide ou tag seul
+            emo = "talking"
             rest = "" if head.lstrip().startswith("<think>") else TAG_RE.sub("", head).strip()
-            cmds.feed(rest)
+            out += cmds.feed(rest)
         rest = cmds.flush()
         if rest:
-            text += rest
+            out += rest
             yield dict(type="token", text=rest)
-        for cmd, arg in cmds.commands:
-            yield reminders.execute(cmd, arg, conversation_id)
+        state.update(text=out, emotion=emo, commands=cmds.commands)
+
+    async def do_search(query: str):
+        yield dict(type="search", status="start", query=query)
+        try:
+            results = await search.search(query)
+        except Exception as e:  # noqa: BLE001
+            yield dict(type="search", status="error", query=query, message=str(e))
+            return
+        companion.bump("fed")
+        sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"]} for r in results)
+        yield dict(type="search", status="done", query=query, sources=sources)
+        today = reminders.now_local().strftime("%d/%m/%Y")
+        msgs[0]["content"] = system_prompt(persona, mem_block, "off", search.prompt_block(query, results, today))
+
+    try:
+        state: dict = {}
+        if web == "force" and search.enabled():
+            async for ev in do_search((message or title_src)[:200]):
+                yield ev
+            if sources:
+                async for ev in run_pass(msgs, state):
+                    yield ev
+        if not state:
+            async for ev in run_pass(msgs, state):
+                yield ev
+            asked = [arg for cmd, arg in state["commands"] if cmd.lower() == "recherche"]
+            if asked and search.enabled() and web != "off":
+                if state["text"].strip():
+                    yield dict(type="reset")
+                async for ev in do_search(asked[0].strip()[:200]):
+                    yield ev
+                state = {}
+                async for ev in run_pass(msgs, state):
+                    yield ev
+        text, emotion = state.get("text", ""), state.get("emotion", "talking")
+        for cmd, arg in state.get("commands", []):
+            if cmd.lower() != "recherche":
+                yield reminders.execute(cmd, arg, conversation_id)
         text = text.strip() or "…"
+        if sources:
+            asst_meta = {**(asst_meta or {}), "sources": sources}
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
         yield dict(type="done", emotion=emotion, id=asst_id)
     except GeneratorExit:
         # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
-        if not saved and text.strip():
-            db.add_message(conversation_id, "assistant", text.strip() + " …", emotion or "talking", meta=asst_meta)
+        partial = (locals().get("state") or {}).get("text", "")
+        if not saved and partial.strip():
+            db.add_message(conversation_id, "assistant", partial.strip() + " …", emotion or "talking", meta=asst_meta)
         raise
     except Exception as e:  # noqa: BLE001 — on renvoie l'erreur à l'interface
         msg = str(e) or e.__class__.__name__
