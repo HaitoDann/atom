@@ -36,7 +36,7 @@
     --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
   body {
     background: var(--bg); color: var(--text);
     font: 15px/1.62 var(--sans);
@@ -334,9 +334,14 @@
   #scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45); display: none; }
 
   /* ---------------------------------------------------------------- grands écrans */
-  @media (min-width: 1900px) { #app, .dialog { zoom: 1.12; } }
-  @media (min-width: 2300px) { #app, .dialog { zoom: 1.28; } }
-  @media (min-width: 3000px) { #app, .dialog { zoom: 1.6; } }
+  /* L'interface grandit sur les grands écrans ; sa hauteur est divisée d'autant
+     pour toujours tenir exactement dans la fenêtre. */
+  @media (min-width: 1900px) { :root { --z: 1.12; } }
+  @media (min-width: 2300px) { :root { --z: 1.28; } }
+  @media (min-width: 3000px) { :root { --z: 1.6; } }
+  #app, .dialog { zoom: var(--z, 1); }
+  #app { height: calc(100dvh / var(--z, 1)); grid-template-rows: minmax(0, 1fr); }
+  #side, #main, #panel { min-height: 0; overflow: hidden; }
 
   /* ---------------------------------------------------------------- carte compagnon (barre latérale) */
   .side-nav { padding: 2px 8px 6px; }
@@ -2455,6 +2460,8 @@ $("benchBtn").onclick = async () => {
    ============================================================ */
 applyLayout();
 setBusy(false);
+// La page elle-même ne doit jamais défiler (seules les zones internes défilent).
+addEventListener("scroll", () => { if (scrollY || scrollX) scrollTo(0, 0); }, { passive: true });
 (async () => {
   const fromLink = parseInt(new URLSearchParams(location.search).get("c"), 10);
   if (fromLink) { settings.conversationId = fromLink; window.history.replaceState(null, "", "/"); }
