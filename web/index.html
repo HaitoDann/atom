@@ -336,6 +336,10 @@
   .pane-wrap { overflow-y: auto; padding: 18px 22px 24px; position: relative; }
   .pane { display: none; }
   .pane.on { display: block; }
+  .pane.on ~ .pane.on { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .pane-title { margin: 0 0 14px; font-size: 11px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+  .set-search { margin: 0 2px 10px; padding: 7px 10px; font-size: 13px; width: auto; }
+  #settings.searching .pane-title { color: var(--muted); }
   .pane h4 { margin: 0 0 4px; font-size: 14px; font-weight: 500; color: var(--strong); }
   .pane .desc { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
   .field { width: 100%; background: var(--surface); border: 1px solid var(--border-2); border-radius: 9px; padding: 8px 11px; outline: 0; font-size: 13.5px; }
@@ -902,6 +906,7 @@
     .dialog { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     .tabs { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px; }
     .tabs h2 { display: none; }
+    .set-search { margin: 0 6px 0 0; min-width: 150px; flex: none; }
     .msg.user .body { max-width: 92%; }
     .fine { display: none; }
     .quick { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
@@ -1037,18 +1042,15 @@
   <div class="dialog">
     <nav class="tabs">
       <h2>Réglages</h2>
-      <button class="tab on" data-tab="general"><span data-i="settings"></span>Général</button>
-      <button class="tab" data-tab="status"><span data-i="pulse"></span>État</button>
-      <button class="tab" data-tab="security"><span data-i="lock"></span>Sécurité</button>
-      <button class="tab" data-tab="memory"><span data-i="memory"></span>Mémoire</button>
-      <button class="tab" data-tab="reminders"><span data-i="clock"></span>Rappels</button>
-      <button class="tab" data-tab="hybrid"><span data-i="spark"></span>Hybride</button>
-      <button class="tab" data-tab="workshop"><span data-i="users"></span>Atelier</button>
-      <button class="tab" data-tab="backup"><span data-i="download"></span>Sauvegarde</button>
-      <button class="tab" data-tab="look"><span data-i="panel"></span>Apparence</button>
-      <button class="tab" data-tab="entity"><span data-i="orb"></span>Entité</button>
+      <input class="field set-search" id="setSearch" placeholder="Chercher un réglage…" autocomplete="off">
+      <button class="tab on" data-tab="atom"><span data-i="orb"></span>Atom</button>
+      <button class="tab" data-tab="discussion"><span data-i="list"></span>Discussion</button>
+      <button class="tab" data-tab="data"><span data-i="memory"></span>Données</button>
+      <button class="tab" data-tab="connections"><span data-i="spark"></span>Connexions</button>
+      <button class="tab" data-tab="system"><span data-i="pulse"></span>Système</button>
     </nav>
     <div class="pane-wrap">
+      <p class="note" id="setEmpty" hidden>Aucun réglage ne correspond.</p>
       <button class="iconbtn" id="closeSettings" style="position:absolute;top:10px;right:10px" title="Fermer" data-i="x"></button>
 
       <section class="pane on" data-pane="general">
@@ -2281,24 +2283,54 @@ function greeting() {
   const h = new Date().getHours();
   return h < 5 ? "Bonne nuit." : h < 12 ? "Bonjour." : h < 18 ? "Bon après-midi." : "Bonsoir.";
 }
-const SUGGESTIONS = [
+// Suggestions d'accueil adaptées à ce qui est configuré (bibliothèque, projets, recherche web).
+const BASE_SUGGESTIONS = [
   { i: "clock", t: "Programmer un rappel", d: "« Rappelle-moi demain à 9 h de… »", fill: "Rappelle-moi demain à 9 h de " },
-  { i: "scale", t: "Comparer deux options", d: "Un tableau clair des avantages", fill: "Compare dans un tableau " },
   { i: "doc", t: "Rédiger un texte", d: "Mail, message, résumé…", fill: "Rédige un mail court pour " },
   { i: "user", t: "Ce que tu sais de moi", d: "Voir ce qu'Atom a retenu", send: "Qu'est-ce que tu sais de moi ?" },
+  { i: "scale", t: "Comparer deux options", d: "Un tableau clair des avantages", fill: "Compare dans un tableau " },
 ];
+function suggestions() {
+  const cols = (typeof library !== "undefined" && library?.collections) || [];
+  const ready = cols.filter((c) => c.status !== "error" && c.chunks > 0);
+  const docs = ready.filter((c) => c.kind !== "code"), code = ready.filter((c) => c.kind === "code");
+  const out = [];
+  if (docs.length) {
+    const c = docs[Math.floor(Math.random() * docs.length)];
+    out.push({ i: "library", t: "Interroger ta bibliothèque", d: `Dans « ${c.name} »`, fill: "D'après mes documents, ", scope: String(c.id) });
+  }
+  if (code.length) {
+    const c = code[Math.floor(Math.random() * code.length)];
+    out.push({ i: "code", t: `Explique ${c.name}`, d: "Architecture et fichiers clés", send: `Explique-moi l'architecture du projet ${c.name} : rôle des dossiers et fichiers principaux.`, scope: String(c.id) });
+  }
+  if (typeof searchAvailable !== "undefined" && searchAvailable)
+    out.push({ i: "globe", t: "Chercher sur Internet", d: "Actualité, prix, horaires…", fill: "Cherche sur Internet ", web: true });
+  for (const s of BASE_SUGGESTIONS) if (out.length < 4) out.push(s);
+  return out;
+}
+
+function renderCards() {
+  const cards = chat.querySelector("#empty .cards");
+  if (!cards) return;
+  cards.innerHTML = "";
+  suggestions().forEach((s, k) => {
+    const b = document.createElement("button");
+    b.className = "card"; b.style.setProperty("--i", k);
+    if (s.scope || s.web) b.dataset.cap = 1;
+    b.innerHTML = `<b>${icon(s.i)}${esc(s.t)}</b><span>${esc(s.d)}</span>`;
+    b.onclick = () => {
+      if (s.scope) setScope(s.scope);
+      if (s.web) { webForce = true; renderWebBtn(); }
+      s.send ? sendMessage(s.send) : fillInput(s.fill);
+    };
+    cards.appendChild(b);
+  });
+}
 
 function renderEmpty() {
   const g = greeting().replace(/\.$/, "");
   chat.innerHTML = `<div id="empty"><div id="heroSlot"></div><h1><span class="orbtxt">${g}</span>.</h1><p>Que puis-je faire pour toi ?</p><div class="cards"></div></div>`;
-  const cards = chat.querySelector(".cards");
-  SUGGESTIONS.forEach((s, k) => {
-    const b = document.createElement("button");
-    b.className = "card"; b.style.setProperty("--i", k);
-    b.innerHTML = `<b>${icon(s.i)}${esc(s.t)}</b><span>${esc(s.d)}</span>`;
-    b.onclick = () => s.send ? sendMessage(s.send) : fillInput(s.fill);
-    cards.appendChild(b);
-  });
+  renderCards();
   requestAnimationFrame(() => enterHero());
 }
 
@@ -2864,22 +2896,54 @@ document.querySelectorAll("[data-goto]").forEach((b) => { b.onclick = () => open
 /* ============================================================
    RÉGLAGES
    ============================================================ */
-function openSettings(tab = "general") {
+// Cinq groupes ; chaque ancien panneau devient une section de son groupe.
+const SET_GROUPS = {
+  atom: ["general", "look", "entity"],
+  discussion: ["workshop"],
+  data: ["memory", "reminders", "backup"],
+  connections: ["hybrid"],
+  system: ["status", "security"],
+};
+const PANE_TITLES = { general: "Général", look: "Apparence", entity: "Entité", workshop: "Atelier multi-IA", memory: "Souvenirs",
+  reminders: "Rappels", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", security: "Sécurité" };
+const PANE_LOAD = { memory: () => loadMemories(), reminders: () => loadReminders(), backup: () => loadBackups(), status: () => loadStatus(),
+  security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop() };
+const setGroupOf = (pane) => Object.keys(SET_GROUPS).find((g) => SET_GROUPS[g].includes(pane)) || pane;
+document.querySelectorAll(".pane").forEach((p) => {
+  const h = document.createElement("h3"); h.className = "pane-title"; h.textContent = PANE_TITLES[p.dataset.pane] || ""; p.prepend(h);
+});
+function openSettings(tab = "atom") {
   $("settings").classList.add("open");
   selectTab(tab);
 }
 function closeSettings() { $("settings").classList.remove("open"); }
 function selectTab(tab) {
-  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === tab));
-  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.dataset.pane === tab));
-  if (tab === "memory") loadMemories();
-  if (tab === "reminders") loadReminders();
-  if (tab === "backup") loadBackups();
-  if (tab === "status") loadStatus();
-  if (tab === "security") loadSecurity();
-  if (tab === "hybrid") loadHybrid();
-  if (tab === "workshop") loadWorkshop();
+  const g = setGroupOf(tab), panes = SET_GROUPS[g] || [];
+  $("setSearch").value = ""; filterSettings("");
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.tab === g));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", panes.includes(p.dataset.pane)));
+  panes.forEach((p) => PANE_LOAD[p] && PANE_LOAD[p]());
+  const target = document.querySelector(`.pane[data-pane="${tab}"]`);
+  if (target && tab !== panes[0]) requestAnimationFrame(() => target.scrollIntoView({ block: "start" }));
+  else document.querySelector(".pane-wrap").scrollTop = 0;
 }
+// Recherche : affiche, tous groupes confondus, les blocs dont le texte correspond.
+const norm = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function filterSettings(q) {
+  q = norm(q.trim());
+  $("settings").classList.toggle("searching", !!q);
+  if (!q) { document.querySelectorAll(".pane .block").forEach((b) => (b.hidden = false)); return; }
+  let any = false;
+  document.querySelectorAll(".pane").forEach((p) => {
+    let hit = false;
+    p.querySelectorAll(".block").forEach((b) => { const m = norm(b.textContent).includes(q); b.hidden = !m; hit = hit || m; });
+    p.classList.toggle("on", hit); any = any || hit;
+    if (hit && PANE_LOAD[p.dataset.pane]) PANE_LOAD[p.dataset.pane]();
+  });
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("on"));
+  $("setEmpty").hidden = any;
+}
+$("setSearch").oninput = () => filterSettings($("setSearch").value);
 document.querySelectorAll(".tab").forEach((t) => { t.onclick = () => selectTab(t.dataset.tab); });
 $("openSettings").onclick = () => openSettings();
 $("closeSettings").onclick = closeSettings;
@@ -2997,7 +3061,7 @@ async function connect(verbose = false) {
       h.telegram ? "Telegram activé." : "Telegram désactivé.",
       h.search ? "Recherche web disponible." : "Recherche web désactivée.",
     ];
-    searchAvailable = !!h.search; renderWebBtn();
+    searchAvailable = !!h.search; renderWebBtn(); if (searchAvailable && !document.querySelector("#empty .card[data-cap]")) renderCards();
     $("webInfo").textContent = h.search ? "" : "Le service de recherche (SearXNG) n'est pas configuré sur le serveur.";
     $("srvInfo").textContent = details.join(" ");
     if (h.ollama) {
@@ -3365,8 +3429,10 @@ $("navCode").onclick = () => showView(currentView === "code" ? "chat" : "code");
 async function loadLibrary() {
   try { library = await getJSON("/api/library"); } catch { return; }
   if (!libSel || !library.collections.some((c) => c.id === libSel)) libSel = library.collections[0]?.id ?? null;
+  const hadCols = !!library.collections.length;
   renderLibrary();
   renderScope();
+  if (hadCols && !document.querySelector("#empty .card[data-cap]")) renderCards();
   const busyIdx = library.collections.some((c) => c.status === "indexing");
   entity.feedColor = busyIdx ? [235, 235, 240] : [110, 170, 255];
   if (!$("libView").hidden || !$("codeView").hidden) entity.feeding = busyIdx;
