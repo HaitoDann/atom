@@ -288,8 +288,11 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                     raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:160]}")
                 count(p.id)
                 usage: dict = {}
+                other: list[str] = []   # lignes hors SSE : certains fournisseurs renvoient un JSON entier
                 async for line in r.aiter_lines():
                     if not line.startswith("data:"):
+                        if line.strip():
+                            other.append(line)
                         continue
                     data = line[5:].strip()
                     if data == "[DONE]":
@@ -298,20 +301,36 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                         chunk = json.loads(data)
                     except ValueError:
                         continue
+                    if chunk.get("error") and not n:
+                        raise Unavailable(f"{p.name} : {str(chunk['error'])[:160]}")
                     usage = chunk.get("usage") or usage
-                    for ch in chunk.get("choices", []):
+                    for ch in chunk.get("choices") or []:
                         text = (ch.get("delta") or {}).get("content") or ""
                         if text:
                             first = first or time.time()
                             n += 1
                             yield text
+                if not n and other:
+                    try:
+                        body = json.loads("\n".join(other))
+                        usage = body.get("usage") or usage
+                        text = ((body.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                        if body.get("error"):
+                            raise Unavailable(f"{p.name} : {str(body['error'])[:160]}")
+                    except ValueError:
+                        text = ""
+                    if text:
+                        first = time.time()
+                        n = 1
+                        yield text
     except httpx.HTTPError as e:
         if not n:
             _cooldown[p.id] = time.time() + 60
             raise Unavailable(f"{p.name} injoignable ({e.__class__.__name__})") from e
         raise
     if not n:
-        raise Unavailable(f"{p.name} n'a rien répondu")
+        log.warning("%s : réponse vide (%s)", p.name, (other[0][:200] if "other" in locals() and other else "aucune donnée"))
+        raise Unavailable(f"{p.name} n'a rien répondu" + (f" ({other[0][:120]})" if "other" in locals() and other else ""))
     dur = time.time() - (first or t0)
     toks = usage.get("completion_tokens", n)
     if stats is not None:

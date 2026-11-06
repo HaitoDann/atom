@@ -3589,11 +3589,16 @@ $("labRun").onclick = async () => {
           if (!q) { q = true; requestAnimationFrame(() => { q = false; box.querySelectorAll("[data-c]").forEach((x) => { const k = x.dataset.c.replace("|", ""); if (texts[k] != null) x.querySelector(".md").innerHTML = md(texts[k].replace(/^\s*\[[a-z_]+\]\s*/i, "")); }); }); }
         } else if (ev.type === "result" && c) {
           c.querySelector(".m").textContent = `${ev.tok_s ?? "—"} tok/s · 1er mot ${ev.first_s} s · total ${ev.wall_s} s` + (ev.load_s > 1 ? ` · chargement ${ev.load_s} s` : "");
+          delete texts[ev.model + ev.prompt];   // plus de rafraîchissement en flux : il effacerait les formules rendues
           setMd(c.querySelector(".md"), ev.text.replace(/^\s*\[[a-z_]+\]\s*/i, ""));
           (agg[ev.model] ||= []).push(ev);
           const a = agg[ev.model], avg = (k) => (a.reduce((s, x) => s + (x[k] || 0), 0) / a.length).toFixed(1).replace(".", ",");
           box.querySelector(`[data-s="${CSS.escape(ev.model)}"]`).textContent = `${avg("tok_s")} tok/s · 1er mot ${avg("first_s")} s`;
-        } else if (ev.type === "error" && c) { c.querySelector(".m").textContent = "Erreur"; c.querySelector(".md").textContent = ev.message; }
+        } else if (ev.type === "error" && c) {
+          delete texts[ev.model + ev.prompt];
+          c.querySelector(".m").textContent = "Erreur"; c.querySelector(".md").textContent = ev.message;
+          box.querySelectorAll(`[data-c^="${CSS.escape(ev.model)}|"]`).forEach((x) => { if (x.querySelector(".m").textContent === "en attente") x.querySelector(".m").textContent = "non lancé (erreur précédente)"; });
+        }
       }
     }
     loadLab();
