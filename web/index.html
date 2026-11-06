@@ -4417,7 +4417,11 @@ function agOpen() {
   const remoteOk = h?.configured && h?.allow_docs;
   $("agEngine").value = remoteOk ? "remote" : "local";
   $("agEngineNote").innerHTML = !h?.configured ? "Aucune API configurée : l'agent tournera en local (lent, moins fiable)."
-    : !h.allow_docs ? "Pour l'API distante, autorise « Ma bibliothèque et mes fichiers » dans Réglages → Connexions." : "";
+    : !h.allow_docs ? 'Le code ne part pas vers l\'API tant que tu ne l\'autorises pas. <button class="btn sm" id="agAllow">Autoriser l\'envoi du code</button>' : "";
+  $("agAllow")?.addEventListener("click", async () => {
+    if (!confirm("Autoriser l'envoi de ta bibliothèque, de tes fichiers et de ton code aux API distantes ?\n\nSeuls les fournisseurs qui acceptent les données privées (pas Gemini ni OpenRouter) les recevront. Réglable dans Réglages → Connexions.")) return;
+    await saveHybrid({ allow_docs: true }); agOpen(); toast("Envoi du code autorisé · l'agent utilisera l'API distante.");
+  });
   $("agInfo").textContent = $("cvProject").selectedOptions[0]?.textContent || "";
   if (!agRun) $("agTask").focus();
 }

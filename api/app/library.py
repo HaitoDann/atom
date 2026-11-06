@@ -481,10 +481,22 @@ def _sync_repo(col: dict) -> Path:
             root.parent.mkdir(parents=True, exist_ok=True)
             r = subprocess.run(["git", "clone", "--depth", "1", _git_url(src), str(root)],
                                capture_output=True, text=True, timeout=600)
+            denied = lambda m: any(x in m for x in ("403", "not granted", "Authentication", "could not read Username", "denied"))
+            if r.returncode != 0 and GITHUB_TOKEN and denied(_git_err(r)):
+                # Jeton limité à d'autres dépôts : un dépôt public se clone sans jeton.
+                shutil.rmtree(root, ignore_errors=True)
+                r2 = subprocess.run(["git", "clone", "--depth", "1", src, str(root)], capture_output=True, text=True, timeout=600,
+                                    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+                if r2.returncode == 0:
+                    r = r2
+                else:
+                    raise RuntimeError("Accès refusé : ton jeton GitHub ne couvre pas ce dépôt (privé). Sur github.com → Settings → "
+                                       "Developer settings → Fine-grained tokens → ton jeton → Repository access : ajoute ce dépôt.")
             if r.returncode != 0:
                 msg = _git_err(r)
-                if "Authentication" in msg or "could not read Username" in msg or "not found" in msg.lower():
-                    msg = "Dépôt introuvable ou privé : ajoute ATOM_GITHUB_TOKEN dans .env pour les dépôts privés."
+                if denied(msg) or "not found" in msg.lower():
+                    msg = ("Dépôt introuvable ou privé : vérifie l'adresse, et pour un dépôt privé ajoute-le à ton jeton "
+                           "(ATOM_GITHUB_TOKEN, Repository access).")
                 raise RuntimeError(msg)
             subprocess.run(["git", "-C", str(root), "remote", "set-url", "origin", src], capture_output=True, timeout=30)
     return root
