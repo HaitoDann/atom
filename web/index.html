@@ -1192,7 +1192,7 @@
         </div>
         <div class="block">
           <h4>Fournisseurs</h4>
-          <p class="desc">Le fournisseur <b>principal</b> répond quand Atom passe en distant. S'il est indisponible (limite, panne, quota du jour), Atom passe automatiquement au suivant, du plus fort au plus faible, puis au local. Ajoute-en d'autres dans <code>.env</code> (<code>ATOM_PROVIDERS=groq,cerebras,gemini</code> et une clé par fournisseur).</p>
+          <p class="desc">Le fournisseur <b>principal</b> répond quand Atom passe en distant. S'il est indisponible (limite, panne, quota du jour), Atom passe automatiquement au suivant, du plus fort au plus faible, puis au local. Ajoute-en d'autres dans <code>.env</code> : une ligne <code>ATOM_GEMINI_API_KEY=…</code> (ou CEREBRAS, OPENROUTER, GITHUB, MISTRAL) suffit.</p>
           <div id="hyProviders" class="prov-list"></div>
           <p class="note">« Sans données privées » : ce fournisseur ne reçoit jamais tes souvenirs, documents ni fichiers, même si tu les autorises plus haut (offres gratuites qui peuvent réutiliser les données). Réglable avec <code>ATOM_&lt;ID&gt;_PRIVATE</code>.</p>
         </div>
@@ -3802,7 +3802,7 @@ async function loadHybrid() {
     box.appendChild(row);
   }
   for (const x of h.skipped || []) box.insertAdjacentHTML("beforeend", `<div class="prov off"><div class="prov-top"><b style="font-weight:500">${esc(x.name)}</b><span class="prov-tags"><span>ignoré</span></span></div><p class="note" style="margin:6px 0 0">${esc(x.reason)} dans .env, puis <code>docker compose up -d atom</code>.</p></div>`);
-  if (!h.providers_env) box.insertAdjacentHTML("beforeend", '<p class="note">Atom ne voit pas de ligne <code>ATOM_PROVIDERS</code> : elle manque dans <code>.env</code>, ou le conteneur n\'a pas été recréé après la modification.</p>');
+  if (!h.providers_env) box.insertAdjacentHTML("beforeend", '<p class="note">Aucun fournisseur supplémentaire : ajoute par exemple <code>ATOM_CEREBRAS_API_KEY=…</code> dans <code>.env</code>, puis <code>docker compose up -d atom</code>.</p>');
 }
 async function saveHybrid(patch) {
   try { hybridState = await (await api("/api/hybrid", { method: "PUT", body: JSON.stringify(patch) })).json(); } catch (e) { toast(esc(e.message)); }

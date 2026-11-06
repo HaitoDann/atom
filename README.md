@@ -225,10 +225,11 @@ Atom répond **en local par défaut**. Il peut s'appuyer sur un modèle Mistral,
 Ajoute-en autant que tu veux dans `.env`, puis `docker compose up -d atom` :
 
 ```
-ATOM_PROVIDERS=cerebras,gemini
 ATOM_CEREBRAS_API_KEY=...
 ATOM_GEMINI_API_KEY=...
 ```
+
+Pour un fournisseur connu, la clé suffit ; `ATOM_PROVIDERS=…` sert pour un fournisseur non listé ou pour imposer l'ordre.
 
 - Fournisseurs connus (adresse, modèle par défaut et famille déjà renseignés) : `groq`, `cerebras`, `gemini`, `openrouter`, `github`, `mistral`. Pour un autre : `ATOM_<ID>_URL` et `ATOM_<ID>_MODEL`.
 - Chacun a son **quota du jour** (`ATOM_<ID>_LIMIT`), sa **famille** de modèles et une **force** estimée (`ATOM_<ID>_STRENGTH`, de 1 à 3).

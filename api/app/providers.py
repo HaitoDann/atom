@@ -2,8 +2,8 @@
 
 Configuration dans .env :
 - le fournisseur principal historique : ATOM_REMOTE_NAME / _URL / _MODEL / _API_KEY / _DAILY_LIMIT ;
-- des fournisseurs en plus : ATOM_PROVIDERS=groq,cerebras,gemini puis, pour chacun,
-  ATOM_<ID>_API_KEY (obligatoire) et au besoin _MODEL, _URL, _LIMIT, _FAMILY, _STRENGTH, _PRIVATE.
+- des fournisseurs en plus : il suffit de ATOM_<ID>_API_KEY pour un fournisseur connu (PRESETS) ;
+  ATOM_PROVIDERS=… sert pour les autres ou pour fixer l'ordre. Pour chacun : ATOM_<ID>_API_KEY (obligatoire) et au besoin _MODEL, _URL, _LIMIT, _FAMILY, _STRENGTH, _PRIVATE.
   Les fournisseurs connus (PRESETS) ont déjà leur adresse, un modèle par défaut et leur famille.
 
 Chaque fournisseur a :
@@ -92,7 +92,10 @@ def _load() -> list[Provider]:
                             os.getenv("ATOM_REMOTE_FAMILY") or family_of(REMOTE_MODEL, pre.get("family", "autre")),
                             int(os.getenv("ATOM_REMOTE_STRENGTH") or pre.get("strength", 2)),
                             _bool(os.getenv("ATOM_REMOTE_PRIVATE", ""), pre.get("private", True))))
-    for pid in [p.strip().lower() for p in os.getenv("ATOM_PROVIDERS", "").split(",") if p.strip()]:
+    listed = [p.strip().lower() for p in os.getenv("ATOM_PROVIDERS", "").split(",") if p.strip()]
+    # Un fournisseur connu dont la clé est présente est activé même sans ATOM_PROVIDERS.
+    listed += [pid for pid in PRESETS if pid not in listed and _env(pid, "API_KEY")]
+    for pid in listed:
         if any(p.id == pid for p in out):
             continue
         pre = PRESETS.get(pid, {})
