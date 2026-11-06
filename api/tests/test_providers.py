@@ -34,7 +34,7 @@ def test_privacy_and_family(three):
 def test_fallback(three, monkeypatch):
     real = providers.stream
 
-    async def fake(p, messages, model=None, stats=None):
+    async def fake(p, messages, model=None, stats=None, max_tokens=None):
         if p.id == "groq":
             raise providers.Unavailable("limite de l'offre Groq atteinte")
             yield  # noqa

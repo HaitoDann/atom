@@ -255,7 +255,8 @@ async def ping(p: Provider) -> str:
     return err
 
 
-async def stream(p: Provider, messages: list[dict], model: str | None = None, stats: dict | None = None) -> AsyncIterator[str]:
+async def stream(p: Provider, messages: list[dict], model: str | None = None, stats: dict | None = None,
+                 max_tokens: int | None = None) -> AsyncIterator[str]:
     """Flux de texte (format OpenAI, SSE). Lève Unavailable si rien n'a été produit."""
     model = model or model_of(p)
     if PROVIDER == "mock":
@@ -268,7 +269,7 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
         if stats is not None:
             stats.clear(); stats.update(tokens=12, tok_s=40.0, provider=p.id, name=p.name, model=model)
         return
-    payload = {"model": model, "messages": messages, "stream": True, "temperature": 0.6, "max_tokens": MAX_TOKENS}
+    payload = {"model": model, "messages": messages, "stream": True, "temperature": 0.6, "max_tokens": max_tokens or MAX_TOKENS}
     headers = {"Authorization": f"Bearer {p.key}", "Accept": "text/event-stream"}
     t0, first, n = time.time(), None, 0
     try:
@@ -339,14 +340,15 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                      prompt_tokens=usage.get("prompt_tokens"), total_s=round(time.time() - t0, 2))
 
 
-async def stream_chain(providers: list[Provider], messages: list[dict], used: dict, model: str | None = None) -> AsyncIterator[str]:
+async def stream_chain(providers: list[Provider], messages: list[dict], used: dict, model: str | None = None,
+                       max_tokens: int | None = None) -> AsyncIterator[str]:
     """Essaie les fournisseurs dans l'ordre ; passe au suivant tant que rien n'a été écrit.
     `used` reçoit le fournisseur qui a répondu (+ stats), et `used["skipped"]` les échecs."""
     errors = []
     for i, p in enumerate(providers):
         got = False
         try:
-            async for t in stream(p, messages, model if i == 0 else None, used.setdefault("stats", {})):
+            async for t in stream(p, messages, model if i == 0 else None, used.setdefault("stats", {}), max_tokens):
                 got = True
                 yield t
             used.update(id=p.id, name=p.name, model=used["stats"].get("model", model_of(p)), skipped=errors)

@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, codeedit, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, agentcode, auth, backup, codeedit, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -757,6 +757,40 @@ def code_revert(cid: int, body: RevertIn):
     except (PermissionError, RuntimeError) as e:
         raise HTTPException(409, str(e)) from e
     return {"ok": True}
+
+
+# ---- mode agent (Code)
+
+
+class AgentIn(BaseModel):
+    task: str = Field(min_length=3, max_length=4000)
+    engine: str = Field(default="remote", pattern="^(remote|local)$")
+
+
+@app.post("/api/agent/{cid}")
+async def agent_run(cid: int, body: AgentIn):
+    if not library.get_collection(cid):
+        raise HTTPException(404, "Projet introuvable")
+    return StreamingResponse((event(**ev) async for ev in agentcode.run(cid, body.task, body.engine)),
+                             media_type="application/x-ndjson")
+
+
+class AgentApplyIn(BaseModel):
+    paths: list[str] = Field(default_factory=list, max_length=500)
+
+
+@app.post("/api/agent/runs/{rid}/apply")
+async def agent_apply(rid: str, body: AgentApplyIn):
+    try:
+        out = agentcode.apply(rid, body.paths)
+    except KeyError as e:
+        raise HTTPException(404, str(e)) from e
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from e
+    cid = agentcode._runs.get(rid, {}).get("cid")
+    if cid and out["applied"]:
+        background(library.index_project(cid))
+    return out
 
 
 # ---- Git (projets clonés par Atom) : chaque action vient d'un bouton
