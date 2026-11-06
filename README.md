@@ -380,10 +380,12 @@ Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans p
 
 - **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
 - **Apparence : maillage** (par défaut) — la sphère est un réseau de ~360 nœuds régulièrement répartis et reliés à leurs voisins, l'arrière estompé dans la profondeur, une poussière intérieure discrète, et des **signaux lumineux** qui parcourent les liens (rares au repos, nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA). Toutes les émotions et animations s'appliquent au réseau ; dans l'atelier, les liens entre amas se rompent. Réglages → Entité → « Fragments » pour revenir à la sphère de poussière d'origine.
-- **Apparence : orbe** : une sphère articulée dessinée en points et traits fins, dans le même style que le maillage. Cinq bandes pivotent indépendamment (des quarts de tour, comme un casse-tête), et des gravures-circuits et des médaillons en relief la recouvrent.
-  - Au repos, elle tourne lentement. Quand Atom travaille, les médaillons s'allument et des impulsions de lumière parcourent les gravures.
-  - Pour les grosses tâches (recherche, atelier, IA distante, agent), la calotte se soulève et projette une carte de points lumineux.
-  - Les émotions passent par la façon de tourner (frénétique en colère, en spirale par curiosité, presque immobile en sommeil, affaissée en tristesse) et par la couleur de la lumière.
+- **Apparence : orbe** : une sphère découpée comme un Rubik's cube, dessinée uniquement en lignes.
+  - Elle est coupée en 3 tranches sur chaque axe. N'importe quelle tranche, horizontale, verticale ou en profondeur, pivote d'un quart de tour, et ses gravures suivent le mouvement.
+  - Les rainures sont doublées entre les tranches. Chaque case porte un cadre, des circuits ramifiés et des médaillons à double anneau.
+  - Des **ondes de couleur** parcourent toutes les rainures, avec une teinte qui varie le long du trajet. Elles sont lentes au repos, plus vives et plus rapides quand Atom travaille. La couleur de base vient de l'émotion : rouge serré en colère, palette plus large en curiosité ou en joie.
+  - Les tranches pivotent plus ou moins souvent selon l'état : à-coups rapides en colère, rotations en séquence sur les trois axes par curiosité, quasi immobile en sommeil.
+  - Pour les grosses tâches, la couronne du haut se soulève et un globe holographique en fil de fer tourne au-dessus.
   - Réglages → Atom → Entité → « Orbe ».
 - Situations : **consulter une IA distante** (ondes de fragments lavande qui partent de la sphère), **atelier** (la sphère se divise en amas qui tournent ensemble, celui qui travaille s'éclaire, puis ils fusionnent pour la réponse finale), **lecture** de code ou de documents (les fragments se rangent en lignes, un balayage lumineux les parcourt), **indexation** (fragments blancs absorbés), **sauvegarde** (contraction et anneau qui se referme), **secours ou erreur** (brève perturbation par bandes). Toutes prévisualisables dans Réglages → Entité.
 - Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation.

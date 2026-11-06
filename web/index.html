@@ -1802,201 +1802,205 @@ function setEntityState(t) { $("emoState").textContent = t; }
      Les émotions passent par la façon de tourner et la couleur de la lumière.
      Grosses tâches (recherche, atelier, IA distante, agent) : l'orbe s'ouvre et projette une carte de points. */
   const orb = (() => {
-    const LAT = [-Math.PI / 2, -0.95, -0.32, 0.32, 0.95, Math.PI / 2];   // limites des 5 bandes
-    const NB = LAT.length - 1;
-    const rot = new Float32Array(NB), from = new Float32Array(NB), to = new Float32Array(NB), mt = new Float32Array(NB).fill(1);
-    let nextMove = 2, spinA = 0, openK = 0, tiltX = 0.38, tiltZ = 0;
-    const R2 = () => Math.random();
-    // décor de chaque bande : médaillons et circuits (coordonnées locales θ, φ)
-    const bands = [];
-    for (let b = 0; b < NB; b++) {
-      const lo = LAT[b], hi = LAT[b + 1], mid = (lo + hi) / 2, h = hi - lo;
-      const med = [], tr = [];
-      const nMed = b === 0 || b === NB - 1 ? 1 : 3 + (b === 2 ? 1 : 0);
-      for (let k = 0; k < nMed; k++) {
-        const th = (k / nMed) * Math.PI * 2 + R2() * 0.6;
-        const ph = b === 0 ? -Math.PI / 2 : b === NB - 1 ? Math.PI / 2 : mid + (R2() - 0.5) * h * 0.25;
-        med.push({ th, ph, r: b === 0 || b === NB - 1 ? 0.3 : 0.13 + R2() * 0.06 });
+    // ---- géométrie : sphère découpée en 3 tranches sur chaque axe (comme un Rubik's cube)
+    const TH = 1 / 3, R2 = Math.random;
+    const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+    const cellOf = (p) => p.map((c) => (c > TH ? 1 : c < -TH ? -1 : 0));
+    const pieces = new Map();   // clé "sx,sy,sz" → { c0, M, anim }
+    const piece = (cell) => {
+      const k = cell.join(",");
+      if (!pieces.has(k)) pieces.set(k, { c0: cell.map((x) => x * 0.66), M: [1, 0, 0, 0, 1, 0, 0, 0, 1] });
+      return pieces.get(k);
+    };
+    // segments : [a, b, pièce, chemin, abscisse, type]  — type 0 rainure de tranche, 1 circuit, 2 médaillon/cadre
+    const segs = [], paths = [];
+    const addPath = (pts, type, nudge) => {
+      const path = { len: 0, type, phase: R2() };
+      paths.push(path);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1], m = norm([(a[0] + b[0]) / 2 + nudge[0], (a[1] + b[1]) / 2 + nudge[1], (a[2] + b[2]) / 2 + nudge[2]]);
+        const cell = cellOf(m); if (!cell.some((x) => x)) cell[0] = 1;
+        const l = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        segs.push({ a, b, pc: piece(cell), path, s: path.len, type });
+        path.len += l;
       }
-      for (let k = 0; k < (b === 0 || b === NB - 1 ? 3 : 7); k++) {   // circuits : tracés à angles droits
-        let th = R2() * Math.PI * 2, ph = lo + h * (0.18 + R2() * 0.64);
-        if (b === 0 || b === NB - 1) ph = mid + (R2() - 0.5) * h * 0.5;
-        const pts = [[th, ph]];
-        for (let s = 0; s < 3; s++) {
-          if (s % 2 === 0) th += (R2() < 0.5 ? -1 : 1) * (0.25 + R2() * 0.45);
-          else ph = Math.max(lo + h * 0.12, Math.min(hi - h * 0.12, ph + (R2() - 0.5) * h * 0.5));
-          pts.push([th, ph]);
-        }
-        tr.push({ pts, pulse: R2(), speed: 0.25 + R2() * 0.35 });
+    };
+    // rainures de tranches : cercles p·axe = ±1/3, attribués à la tranche extérieure
+    for (let ax = 0; ax < 3; ax++) for (const h of [-TH, TH]) {
+      const r = Math.sqrt(1 - h * h), pts = [];
+      for (let k = 0; k <= 96; k++) {
+        const a = (k / 96) * Math.PI * 2, v = [0, 0, 0];
+        v[ax] = h; v[(ax + 1) % 3] = Math.cos(a) * r; v[(ax + 2) % 3] = Math.sin(a) * r; pts.push(v);
       }
-      // nuage de points de surface, réparti uniformément sur la bande (tourne avec elle)
-      const cloud = [];
-      const area = Math.abs(Math.sin(hi) - Math.sin(lo));
-      for (let k = 0; k < Math.round(170 * area); k++) {
-        const u = Math.sin(lo) + (Math.sin(hi) - Math.sin(lo)) * R2();
-        cloud.push([R2() * Math.PI * 2, Math.asin(u), R2()]);
-      }
-      bands.push({ lo, hi, med, tr, cloud, panels: b === 0 || b === NB - 1 ? 3 : 6 + (b % 2) * 2 });
+      const nudge = [0, 0, 0]; nudge[ax] = Math.sign(h) * 0.05;
+      addPath(pts, 0, nudge);
+      // double rainure : un second cercle juste à côté, à l'intérieur de la tranche extérieure
+      const h2 = h + Math.sign(h) * 0.045, r2 = Math.sqrt(1 - h2 * h2), pts2 = [];
+      for (let k = 0; k <= 96; k++) { const a = (k / 96) * Math.PI * 2, v = [0, 0, 0]; v[ax] = h2; v[(ax + 1) % 3] = Math.cos(a) * r2; v[(ax + 2) % 3] = Math.sin(a) * r2; pts2.push(v); }
+      addPath(pts2, 0, nudge);
     }
-    const holo = Array.from({ length: 140 }, () => {   // carte de points projetée
-      const u = R2() * 2 - 1, a = R2() * Math.PI * 2, r = Math.sqrt(1 - u * u);
-      return [Math.cos(a) * r, u, Math.sin(a) * r, R2()];
-    });
-    const easeIO = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+    // décor de chaque case : circuits ramifiés à angles droits, cadres et médaillons
+    const tangent = (n) => { const up = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]; const u = norm([up[1] * n[2] - up[2] * n[1], up[2] * n[0] - up[0] * n[2], up[0] * n[1] - up[1] * n[0]]); return [u, [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]]]; };
+    const at = (n, u, v, x, y) => norm([n[0] + u[0] * x + v[0] * y, n[1] + u[1] * x + v[1] * y, n[2] + u[2] * x + v[2] * y]);
+    const medallions = [];
+    for (let sx = -1; sx <= 1; sx++) for (let sy = -1; sy <= 1; sy++) for (let sz = -1; sz <= 1; sz++) {
+      if (!sx && !sy && !sz) continue;
+      const n = norm([sx, sy, sz]), [u, v] = tangent(n), nz = [sx, sy, sz].filter((x) => x).length;
+      const span = nz === 1 ? 0.3 : nz === 2 ? 0.19 : 0.14;   // taille utile de la case
+      const keep = (p) => cellOf(p).join(",") === [sx, sy, sz].join(",");
+      // cadre intérieur (cases de face)
+      if (nz === 1) {
+        const f = span * 0.92, pts = [];
+        for (const [x, y] of [[-f, -f], [f, -f], [f, f], [-f, f], [-f, -f]]) pts.push(at(n, u, v, x, y));
+        const fine = []; for (let i = 0; i < pts.length - 1; i++) for (let k = 0; k < 6; k++) { const t = k / 6; fine.push(norm(pts[i].map((c, j) => c + (pts[i + 1][j] - c) * t))); }
+        fine.push(pts[0]);
+        addPath(fine, 2, [0, 0, 0]);
+      }
+      // circuits : 2 à 3 tracés qui partent du centre, avec une branche
+      for (let c = 0; c < (nz === 1 ? 6 : nz === 2 ? 4 : 3); c++) {
+        let x = (R2() - 0.5) * span * 0.6, y = (R2() - 0.5) * span * 0.6, dir = (R2() * 4) | 0;
+        const pts = [at(n, u, v, x, y)];
+        for (let st = 0; st < 7; st++) {
+          const L = span * (0.25 + R2() * 0.35), dx = [1, 0, -1, 0][dir] * L, dy = [0, 1, 0, -1][dir] * L;
+          const nx = Math.max(-span * 0.85, Math.min(span * 0.85, x + dx)), ny = Math.max(-span * 0.85, Math.min(span * 0.85, y + dy));
+          for (let k = 1; k <= 4; k++) pts.push(at(n, u, v, x + (nx - x) * k / 4, y + (ny - y) * k / 4));
+          x = nx; y = ny; dir = (dir + (R2() < 0.5 ? 1 : 3)) % 4;
+          if (st === 2 && R2() < 0.7) {   // branche
+            const bd = (dir + 1) % 4, bl = span * 0.3, bp = [pts[pts.length - 1]];
+            for (let k = 1; k <= 4; k++) bp.push(at(n, u, v, x + [1, 0, -1, 0][bd] * bl * k / 4, y + [0, 1, 0, -1][bd] * bl * k / 4));
+            if (bp.every(keep)) addPath(bp, 1, [0, 0, 0]);
+          }
+        }
+        if (pts.every(keep)) addPath(pts, 1, [0, 0, 0]);
+      }
+      // médaillon : deux anneaux concentriques (cases de face et d'arête)
+      if (nz <= 2) {
+        const mr = span * (nz === 1 ? 0.42 : 0.5);
+        for (const rf of [1, 0.55]) {
+          const pts = []; for (let k = 0; k <= 28; k++) { const a = (k / 28) * Math.PI * 2; pts.push(at(n, u, v, Math.cos(a) * mr * rf, Math.sin(a) * mr * rf)); }
+          addPath(pts, 2, [0, 0, 0]);
+        }
+        medallions.push({ n, pc: piece([sx, sy, sz]) });
+      }
+    }
+
+    // ---- mouvements : une tranche pivote d'un quart de tour autour d'un axe x, y ou z
+    let move = null, nextMove = 1.5, yaw = 0, pitch = 0.42, openK = 0, lastAxis = 1;
+    const rotM = (ax, ang) => { const c = Math.cos(ang), s = Math.sin(ang); return ax === 0 ? [1, 0, 0, 0, c, -s, 0, s, c] : ax === 1 ? [c, 0, s, 0, 1, 0, -s, 0, c] : [c, -s, 0, s, c, 0, 0, 0, 1]; };
+    const mul = (A, B) => [0, 1, 2].flatMap((i) => [0, 1, 2].map((j) => A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j]));
+    const app = (M, p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]];
+    const easeIO = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
     function step(dt, st) {
-      // un « coup » : une bande pivote d'un quart (ou d'un huitième) de tour
       nextMove -= dt * st.moveRate;
-      if (nextMove <= 0) {
-        const b = 1 + ((R2() * (NB - 2)) | 0);
-        const dir = st.swirl ? (b % 2 ? 1 : -1) : (R2() < 0.5 ? -1 : 1);
-        from[b] = rot[b]; to[b] = rot[b] + dir * (st.jit ? Math.PI / 4 : Math.PI / 2); mt[b] = 0;
-        nextMove = 1 + R2() * 2.5;
+      if (!move && nextMove <= 0) {
+        const ax = st.swirl ? (lastAxis + 1) % 3 : (R2() * 3) | 0;
+        lastAxis = ax;
+        const layer = [-1, 0, 1][(R2() * 3) | 0], dir = R2() < 0.5 ? -1 : 1;
+        const sel = [...pieces.values()].filter((pc) => Math.round(app(pc.M, pc.c0)[ax] / 0.66) === layer);
+        move = { ax, dir, k: 0, sel, turns: st.jit ? 0.5 : 1 };
+        nextMove = 0.6 + R2() * 2;
       }
-      for (let b = 0; b < NB; b++) {
-        if (mt[b] < 1) { mt[b] = Math.min(1, mt[b] + dt * st.moveSpeed); rot[b] = from[b] + (to[b] - from[b]) * (st.jit ? mt[b] : easeIO(mt[b])); }
-        if (st.swirl) rot[b] += dt * st.swirl * 0.5 * (b - 2) * 0.4;   // curiosité : bandes en spirale
+      if (move) {
+        move.k = Math.min(1, move.k + dt * st.moveSpeed);
+        if (move.k >= 1) {
+          const R = rotM(move.ax, move.dir * Math.PI / 2 * (move.turns === 0.5 ? 1 : 1));
+          for (const pc of move.sel) pc.M = mul(R, pc.M).map((x) => Math.round(x));   // quart de tour exact
+          move = null;
+        }
       }
-      spinA += dt * st.spin;
+      yaw += dt * st.spin;
+      pitch += ((0.42 + st.droop + Math.sin(st.t * 0.23) * 0.12) - pitch) * Math.min(1, dt * 1.5);
       openK += ((st.open ? 1 : 0) - openK) * Math.min(1, dt * 2.2);
-      tiltX += ((0.38 + st.droop) - tiltX) * Math.min(1, dt * 2);
-      tiltZ = Math.sin(st.t * 0.31) * 0.06 + (st.jit ? Math.sin(st.t * 37) * 0.03 * st.jit : 0);
     }
 
-    // projection : point (θ, φ) de la bande b → écran (x, y, profondeur)
-    function P(b, th, ph, R, lift, out) {
-      const a = th + rot[b] + spinA;
-      let x = Math.cos(ph) * Math.cos(a), y = -Math.sin(ph), z = Math.cos(ph) * Math.sin(a);
-      const cx = Math.cos(tiltX), sx = Math.sin(tiltX);
-      const y2 = y * cx - z * sx, z2 = y * sx + z * cx;
-      const cz = Math.cos(tiltZ), sz = Math.sin(tiltZ);
-      out[0] = (x * cz - y2 * sz) * R; out[1] = (x * sz + y2 * cz) * R + lift; out[2] = -z2;
+    // couleur : la teinte de l'émotion, déclinée le long des rainures (±hueSpread)
+    const toHsl = (rgb) => {
+      const [r, g, b] = rgb.split(",").map((x) => +x / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+      if (mx === mn) return [0, 0, l];
+      const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return [h * 60, s, l];
+    };
+    const P3 = [0, 0, 0];
+    function proj(p, R, lift, out) {
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy;
+      const cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const y = p[1] * cp - z * sp, z2 = p[1] * sp + z * cp;
+      out[0] = x * R; out[1] = -y * R - lift; out[2] = z2;   // z2 > 0 : face avant
       return out;
     }
-    const tmp = [0, 0, 0], tmp2 = [0, 0, 0];
 
     function draw(ctx, st) {
-      // Même langage que le maillage et le nuage de points : des points et des traits fins, sans matière.
-      const R = st.R, tint = st.tint, A = st.alpha, lit = st.lit, px = st.px;
-      const gap = openK * R * 0.34;
-      const liftOf = (b) => (b === NB - 1 ? -gap : 0);
-      const depthA = (z) => (z >= 0 ? 0.35 + 0.65 * z : 0.1 * (1 + z));   // l'arrière reste visible, estompé
+      const R = st.R, A = st.alpha, px = st.px, lit = st.lit;
+      const [h0, s0, l0] = toHsl(st.tint);
+      const sat = Math.max(0.35, s0), light = document.documentElement.dataset.theme === "light";
+      const gap = openK * R * 0.38;
+      const mv = move ? rotM(move.ax, move.dir * Math.PI / 2 * easeIO(move.k)) : null;
+      const moving = move ? new Set(move.sel) : null;
+      const pa = [0, 0, 0], pb = [0, 0, 0];
       ctx.save();
-      ctx.fillStyle = `rgb(${tint})`; ctx.strokeStyle = `rgb(${tint})`;
-      const dot = (x, y, a, sz) => { ctx.globalAlpha = Math.min(1, a) * A; const w = sz * px; ctx.fillRect(x - w / 2, y - w / 2, w, w); };
-      // lignes de points le long d'un tracé (θ, φ), espacement régulier
-      const dotted = (b, coords, lift, step, a0, sz) => {
-        for (let k = 0; k < coords.length - 1; k++) {
-          const [t0, p0] = coords[k], [t1, p1] = coords[k + 1];
-          const len = Math.hypot((t1 - t0) * Math.cos((p0 + p1) / 2), p1 - p0);
-          const n = Math.max(1, Math.round(len / step));
-          for (let j = 0; j < n; j++) {
-            const f = j / n; P(b, t0 + (t1 - t0) * f, p0 + (p1 - p0) * f, R, lift, tmp);
-            dot(tmp[0], tmp[1], a0 * depthA(tmp[2]), sz * (0.8 + Math.max(0, tmp[2]) * 0.5));
-          }
-        }
-      };
-      // traits fins (comme les liens du maillage), avant uniquement
-      const line = (b, coords, lift, a0) => {
-        ctx.lineWidth = 0.7 * px; ctx.beginPath(); let pen = false, zs = 0, n = 0;
-        for (const [th, ph] of coords) {
-          P(b, th, ph, R, lift, tmp);
-          if (tmp[2] < 0) { pen = false; continue; }
-          zs += tmp[2]; n++;
-          if (!pen) { ctx.moveTo(tmp[0], tmp[1]); pen = true; } else ctx.lineTo(tmp[0], tmp[1]);
-        }
-        if (!n) return;
-        ctx.globalAlpha = a0 * (0.3 + 0.7 * zs / n) * A; ctx.stroke();
-      };
-      // halo du cœur quand l'orbe s'ouvre
+      ctx.lineCap = "round";
+      // 1) rainures de base (traits fins) + 2) flux de couleur qui les parcourt
+      const flowT = st.t * st.flow;
+      const base = light ? `rgba(40,40,40,` : `rgba(${st.tint},`;
+      for (const sg of segs) {
+        let a = app(sg.pc.M, sg.a), b = app(sg.pc.M, sg.b);
+        if (moving && moving.has(sg.pc)) { a = app(mv, a); b = app(mv, b); }
+        const top = openK > 0.01 && app(sg.pc.M, sg.pc.c0)[1] > 0.3;
+        proj(a, R, top ? gap : 0, pa); proj(b, R, top ? gap : 0, pb);
+        const z = (pa[2] + pb[2]) / 2, front = z > 0;
+        const dA = front ? 0.45 + 0.55 * z : 0.09 * (1 + z);
+        ctx.globalAlpha = A * dA * (sg.type === 0 ? 0.5 : sg.type === 1 ? 0.42 : 0.5);
+        ctx.strokeStyle = base + "1)";
+        ctx.lineWidth = (sg.type === 0 ? 1.1 : 0.85) * px;
+        ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+        if (!front) continue;
+        // onde lumineuse : bandes qui avancent le long du chemin, teinte qui varie avec la position
+        const u = (sg.s / 0.55) - flowT * (sg.type === 0 ? 0.7 : 1.1) + sg.path.phase * 6;
+        const w = Math.pow(Math.max(0, Math.sin(u * Math.PI * 2 / 3)), 10);
+        const I = w * (0.25 + lit * 0.9) * dA;
+        if (I < 0.03) continue;
+        const hue = h0 + Math.sin(sg.s * 2.1 + flowT * 0.35 + sg.path.phase * 4) * st.hueSpread;
+        const L = light ? 42 : Math.min(75, 52 + l0 * 25);
+        ctx.strokeStyle = `hsl(${hue.toFixed(0)},${(sat * 100).toFixed(0)}%,${L}%)`;
+        ctx.globalAlpha = A * Math.min(1, I * 1.2);
+        ctx.lineWidth = (sg.type === 0 ? 1.8 : 1.4) * px;
+        ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+        ctx.globalAlpha = A * I * 0.22; ctx.lineWidth = 5 * px; ctx.stroke();   // halo
+      }
+      // contour : un cercle fin
+      ctx.globalAlpha = A * 0.28; ctx.strokeStyle = base + "1)"; ctx.lineWidth = 0.9 * px;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.stroke();
+      // cœur des médaillons : petit anneau qui pulse quand Atom travaille
+      for (const m of medallions) {
+        let p = app(m.pc.M, m.n);
+        if (moving && moving.has(m.pc)) p = app(mv, p);
+        const top = openK > 0.01 && app(m.pc.M, m.pc.c0)[1] > 0.3;
+        proj(p, R, top ? gap : 0, P3);
+        if (P3[2] < 0.1) continue;
+        const k = lit * (0.5 + 0.5 * Math.sin(st.t * 3 + m.n[0] * 7 + m.n[2] * 5)) * P3[2];
+        if (k < 0.05) continue;
+        ctx.globalAlpha = A * k; ctx.strokeStyle = `hsl(${(h0 + Math.sin(st.t + m.n[1] * 4) * st.hueSpread).toFixed(0)},${(sat * 100).toFixed(0)}%,${light ? 40 : 66}%)`;
+        ctx.lineWidth = 1.4 * px; ctx.beginPath(); ctx.arc(P3[0], P3[1], R * 0.022 * (0.6 + P3[2] * 0.6), 0, Math.PI * 2); ctx.stroke();
+      }
+      // carte holographique : un globe en fil de fer qui tourne au-dessus, relié par un faisceau de lignes
       if (openK > 0.02) {
-        const yC = -Math.sin(LAT[NB - 1]) * R * Math.cos(tiltX) - gap * 0.5;
-        const cg = ctx.createRadialGradient(0, yC, 0, 0, yC, R * 0.7);
-        cg.addColorStop(0, `rgba(${tint},${0.28 * openK})`); cg.addColorStop(1, `rgba(${tint},0)`);
-        ctx.globalAlpha = A; ctx.fillStyle = cg; ctx.fillRect(-R, yC - R * 0.7, R * 2, R * 1.4); ctx.fillStyle = `rgb(${tint})`;
-      }
-      // contour léger de la sphère
-      for (let k = 0; k < 90; k++) { const a = (k / 90) * Math.PI * 2; dot(Math.cos(a) * R, Math.sin(a) * R + (Math.sin(a) < -0.85 ? -gap : 0), 0.22, 1); }
-      for (let b = 0; b < NB; b++) {
-        const B = bands[b], lift = liftOf(b);
-        for (const [th, ph, w] of B.cloud) {   // surface : nuage de points
-          P(b, th, ph, R, lift, tmp);
-          dot(tmp[0], tmp[1], (0.22 + 0.18 * Math.sin(st.t * 0.8 + w * 9)) * depthA(tmp[2]) * 1.4, 1.1 + Math.max(0, tmp[2]) * 0.6);
+        const cyH = -R * 1.32 - gap, HR = R * 0.62, a0 = st.t * 0.4;
+        ctx.globalAlpha = A * openK * 0.55; ctx.lineWidth = 0.7 * px;
+        for (let i = 0; i < 7; i++) {   // méridiens
+          const ang = a0 + (i / 7) * Math.PI;
+          ctx.strokeStyle = `hsl(${(h0 + (i / 7) * st.hueSpread * 2 - st.hueSpread).toFixed(0)},${(sat * 100).toFixed(0)}%,${light ? 45 : 65}%)`;
+          ctx.beginPath(); ctx.ellipse(0, cyH, Math.abs(Math.cos(ang)) * HR, HR * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
         }
-        // limites de bande : lignes de points serrées
-        for (const ph of [B.lo, B.hi]) {
-          if (Math.abs(ph) > 1.5) continue;
-          const c = []; for (let k = 0; k <= 64; k++) c.push([(k / 64) * Math.PI * 2, ph]);
-          dotted(b, c, lift, 0.045, 0.95, 1.5);
+        for (const f of [-0.6, -0.2, 0.2, 0.6]) {   // parallèles
+          ctx.strokeStyle = `rgba(${st.tint},1)`;
+          ctx.beginPath(); ctx.ellipse(0, cyH + f * HR * 0.5, HR * Math.sqrt(1 - f * f), HR * 0.12 * Math.sqrt(1 - f * f), 0, 0, Math.PI * 2); ctx.stroke();
         }
-        // panneaux : méridiens en pointillés plus espacés
-        for (let k = 0; k < B.panels; k++) {
-          const th = (k / B.panels) * Math.PI * 2;
-          dotted(b, [[th, B.lo], [th, B.hi]], lift, 0.085, 0.6, 1.2);
-        }
-        // circuits : traits fins terminés par un point
-        for (const tr of B.tr) {
-          line(b, tr.pts, lift, 0.4);
-          const e = tr.pts[tr.pts.length - 1]; P(b, e[0], e[1], R, lift, tmp);
-          if (tmp[2] > 0) dot(tmp[0], tmp[1], 0.85 * depthA(tmp[2]), 2.6);
-        }
-        // médaillons : anneaux de points (double anneau) + cœur qui s'allume
-        for (const m of B.med) {
-          P(b, m.th, m.ph, R, lift, tmp);
-          const zc = tmp[2];
-          for (const [rf, n, sz] of [[1, 16, 1.5], [0.55, 9, 1.2]]) {
-            for (let k = 0; k < n; k++) {
-              const a = (k / n) * Math.PI * 2, dph = Math.sin(a) * m.r * rf, dth = Math.cos(a) * m.r * rf / Math.max(0.25, Math.cos(m.ph));
-              P(b, m.th + dth, m.ph + dph, R, lift, tmp);
-              dot(tmp[0], tmp[1], 0.9 * depthA(tmp[2]), sz);
-            }
-          }
-          if (zc > 0) {
-            P(b, m.th, m.ph, R, lift, tmp);
-            const k = (0.25 + lit * 0.75 * (0.6 + 0.4 * Math.sin(st.t * 3 + m.th * 5))) * zc;
-            dot(tmp[0], tmp[1], k, 2.4 + lit * 2.2);
-          }
-        }
-      }
-      // poussière intérieure discrète (comme le nuage de points)
-      for (let i = 0; i < holo.length; i += 2) {
-        const [x, y, z, w] = holo[i];
-        const a = spinA * 0.6, ca = Math.cos(a), sa = Math.sin(a), X = (x * ca - z * sa) * 0.82, Z = (x * sa + z * ca) * 0.82;
-        dot(X * R, y * R * 0.82 * Math.cos(tiltX), 0.12 + 0.1 * Math.sin(st.t + w * 7), 1);
-      }
-      // signaux : points lumineux qui glissent le long des circuits
-      for (let b = 0; b < NB; b++) {
-        const lift = liftOf(b);
-        for (const tr of bands[b].tr) {
-          tr.pulse = (tr.pulse + st.dt * tr.speed * st.pulseRate) % 1;
-          const n = tr.pts.length - 1, pos = tr.pulse * n, i0 = Math.floor(pos), f = pos - i0;
-          const a0 = tr.pts[i0], c = tr.pts[Math.min(n, i0 + 1)];
-          P(b, a0[0] + (c[0] - a0[0]) * f, a0[1] + (c[1] - a0[1]) * f, R, lift, tmp);
-          if (tmp[2] < 0) continue;
-          const k = (0.3 + lit * 0.7) * (0.4 + 0.6 * tmp[2]);
-          dot(tmp[0], tmp[1], k, 3.2);
-          dot(tmp[0], tmp[1], k * 0.25, 7);
-        }
-      }
-      // carte holographique projetée au-dessus
-      if (openK > 0.02) {
-        const yCut = -Math.sin(LAT[NB - 1]) * R * Math.cos(tiltX);
-        const hy = -R * 1.25 - gap * 1.6, HR = R * 0.95, a0 = st.t * 0.35;
-        const prj = [];
-        for (const [x, y, z, w] of holo) {
-          const ca = Math.cos(a0), sa = Math.sin(a0), X = x * ca - z * sa, Z = x * sa + z * ca;
-          const sx = X * HR, sy = hy + y * HR * 0.42 - Z * HR * 0.08, d = (Z + 1.4) / 2.4;
-          prj.push([sx, sy]);
-          dot(sx, sy, openK * (0.25 + 0.75 * d) * (0.6 + 0.4 * Math.sin(st.t * 2 + w * 9)), 0.8 + d * 1.6);
-        }
-        ctx.globalAlpha = A * openK * 0.18; ctx.lineWidth = 0.5 * px; ctx.beginPath();
-        for (let i = 0; i < prj.length; i += 3) { const p = prj[i], q = prj[(i * 7 + 5) % prj.length]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) < R * 0.5) { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); } }
-        ctx.stroke();
-        // faisceau en pointillés
-        for (let k = 0; k < 26; k++) {
-          const f = k / 25, side = k % 2 ? 1 : -1, y = yCut - gap * 0.4 + (hy - (yCut - gap * 0.4)) * f;
-          dot(side * (R * 0.15 + (HR - R * 0.15) * f), y, openK * 0.35 * (1 - f * 0.6), 1.2);
-        }
+        const yTop = -R * 0.55 - gap * 0.4;
+        ctx.globalAlpha = A * openK * 0.3; ctx.strokeStyle = `rgba(${st.tint},1)`;
+        for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sgn * R * 0.2, yTop); ctx.lineTo(sgn * HR, cyH + HR * 0.25); ctx.stroke(); }
       }
       ctx.restore();
     }
@@ -2149,12 +2153,14 @@ function setEntityState(t) { $("emoState").textContent = t; }
       const big = entity.feeding || entity.remoteK > 0.3 || entity.splitK > 0.3 || entity.scan;
       const st = {
         t, dt, R: R0 * rad * (1 + entity.tokenKick * 0.01), px: pxSize, tint, alpha: globalA,
-        lit: Math.max(0.1, cur.dim) * Math.min(1, (busy ? 0.75 : 0.18) + entity.tokenKick * 0.5 + (a === "angry" ? 0.6 : 0) + (a === "joy" ? 0.4 : 0) + entity.absorb * 0.6 + entity.seal * 0.5) * (a === "sleep" ? 0.2 : 1),
-        spin: (a === "sleep" ? 0.03 : 0.12) * cur.spin * (a === "surprise" ? 3 : 1) + gaze.x * 0.002,
-        moveRate: a === "sleep" ? 0 : a === "angry" ? 2.6 : a === "joy" ? 1.4 : busy ? 1.1 : a === "sad" ? 0.12 : 0.28,
-        moveSpeed: a === "angry" ? 4.5 : a === "sad" ? 0.7 : a === "joy" ? 2.2 : 1.4,
-        jit: cur.jitter, swirl: a === "curious" ? 1 : cur.swirl, pulseRate: (busy ? 2.2 : 0.6) * (a === "angry" ? 2.5 : 1) * (a === "sleep" ? 0.2 : 1),
-        droop: (a === "sad" ? 0.25 : a === "sleep" ? 0.18 : 0) + gaze.y * 0.004 + (a === "fear" ? Math.sin(t * 30) * 0.01 : 0), open: big,
+        lit: Math.max(0.1, cur.dim) * Math.min(1, (busy ? 0.8 : 0.2) + entity.tokenKick * 0.5 + (a === "angry" ? 0.6 : 0) + (a === "joy" ? 0.4 : 0) + entity.absorb * 0.6 + entity.seal * 0.5) * (a === "sleep" ? 0.25 : 1),
+        flow: (a === "sleep" ? 0.15 : busy ? 1.6 : 0.55) * (a === "angry" ? 2.4 : a === "joy" ? 1.4 : a === "sad" ? 0.5 : 1),
+        hueSpread: a === "angry" ? 14 : a === "joy" ? 45 : a === "curious" ? 70 : a === "sleep" ? 10 : a === "sad" ? 18 : 38,
+        spin: (a === "sleep" ? 0.03 : 0.11) * cur.spin * (a === "surprise" ? 3 : 1) + gaze.x * 0.002,
+        moveRate: a === "sleep" ? 0 : a === "angry" ? 3 : a === "joy" ? 1.6 : busy ? 1.2 : a === "sad" ? 0.12 : 0.35,
+        moveSpeed: a === "angry" ? 5 : a === "sad" ? 0.7 : a === "joy" ? 2.4 : 1.5,
+        jit: cur.jitter, swirl: a === "curious", 
+        droop: (a === "sad" ? 0.3 : a === "sleep" ? 0.2 : 0) + gaze.y * 0.004, open: big,
       };
       orb.step(dt, st);
       orb.draw(ctx, st);
