@@ -252,6 +252,14 @@ Réglages → Système → **Modèles locaux** :
 
 Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub ou dossier du serveur), et faire proposer des modifications.
 
+**Disposition** (inspirée de VS Code et Zed)
+- **Barre d'activité** à gauche : **Fichiers**, **Recherche** dans le code (Ctrl+Maj+F), **Git** (Ctrl+Maj+G) et **Tests**. Un seul panneau s'affiche à la fois, et un point signale des modifications ou des tests en échec.
+- **Onglet Agent** épinglé, qui sert d'accueil du projet : la saisie de la tâche, des idées en un clic (expliquer le projet, trouver des bugs, ajouter des tests, documenter, revue de sécurité…) et les tâches récentes.
+- **Ouverture rapide** : **Ctrl+P**, puis quelques lettres du nom. Les fichiers récents apparaissent en premier.
+- **Barre d'état** : branche, nombre de modifications, commits à pousser et état des tests à gauche ; fichier actif, nombre de lignes et sélection à droite. Un clic ouvre le panneau correspondant.
+- Le panneau de l'entité est replié par défaut dans cette vue, et le bouton en haut à droite le rouvre.
+- L'agent lit automatiquement les **consignes du projet** s'il y en a à la racine : `AGENTS.md`, `CLAUDE.md`, `.cursorrules` ou `.github/copilot-instructions.md`.
+
 - **Arborescence** repliable, **filtre** par nom de fichier, et **recherche dans le contenu** (loupe) avec les lignes trouvées — un clic ouvre le fichier à la bonne ligne.
 - **Onglets** (8 fichiers ouverts au plus), **numéros de ligne**, **coloration syntaxique** par langage (Python, JS/TS, Go, Rust, C/C++, Java, PHP, Shell, SQL, YAML, TOML, JSON, HTML, CSS…), **aperçu** des fichiers Markdown.
 - **Demander à Atom** : clique sur un numéro de ligne (Maj+clic pour une plage), puis **Expliquer**, **Relire** (bugs, cas oubliés) ou **Demander…** — le passage est joint à une nouvelle conversation ciblée sur le projet. « Expliquer le fichier » fait de même pour tout le fichier.

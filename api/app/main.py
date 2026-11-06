@@ -837,6 +837,11 @@ class SandboxRun(BaseModel):
 def sandbox_info(cid: int):
     with db.conn() as c:
         files = [r["path"] for r in c.execute("SELECT path FROM documents WHERE collection_id = ?", (cid,))]
+    col = library.get_collection(cid)
+    if col and col["kind"] == "code":   # les fichiers de projet (go.mod, Cargo.toml…) ne sont pas tous indexés
+        root = library._code_root(col)
+        if root.is_dir():
+            files += [p.name for p in root.iterdir() if p.is_file()]
     return {**sandbox.status(), "command": sandbox.default_command(cid, files), "lang": sandbox.detect(files)}
 
 

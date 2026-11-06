@@ -498,10 +498,18 @@ async def run(cid: int, task: str, engine: str = "remote", rid: str | None = Non
     yield dict(type="start", id=rid, engine=eng, info=why, writable=_writable(ws.col))
     listing = ws.all_paths()
     files = "\n".join(listing[:150]) + (f"\n… ({len(listing)} fichiers au total)" if len(listing) > 150 else "")
+    # Consignes du projet (comme Claude Code / Cursor) : lues automatiquement si présentes à la racine.
+    rules = []
+    for name in ("AGENTS.md", "CLAUDE.md", ".cursorrules", ".github/copilot-instructions.md", "CONVENTIONS.md"):
+        t = ws.text(name)
+        if t:
+            rules.append(f"--- {name} ---\n{t[:3000]}")
     sb = sandbox.enabled()
     system = SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)",
                            test_tool=TEST_TEXT if sb else "",
-                           test_note=TEST_NOTE.format(cmd=sandbox.default_command(cid, listing) or "à préciser") if sb else "")
+                           test_note=TEST_NOTE.format(cmd=sandbox.default_command(cid, listing + [p.name for p in ws.root.iterdir() if p.is_file()]) or "à préciser") if sb else "")
+    if rules:
+        system += "\n\nConsignes du projet (à respecter en priorité) :\n" + "\n\n".join(rules)[:6000]
     summary, finished = "", False
     step = 0
     if eng == "remote":

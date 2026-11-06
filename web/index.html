@@ -483,7 +483,7 @@
   #engineBtn.on { color: var(--strong); border-color: #555; }
 
   /* ---------------------------------------------------------------- mode code */
-  #codeView { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); border-top: 1px solid var(--border); }
+  #codeView { flex: 1; min-height: 0; display: grid; grid-template-columns: 44px 270px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); border-top: 1px solid var(--border); }
   #codeView[hidden] { display: none; }
   .cv-side { border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; min-height: 0; }
   .cv-side .field { padding: 6px 9px; font-size: 13px; }
@@ -503,6 +503,7 @@
   .cv-hit mark { background: rgba(255,214,102,.25); color: var(--strong); border-radius: 2px; }
   .cv-main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   .cv-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .ag { flex: 1; }
   .cv-wrap[hidden] { display: none; }
   .cv-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--border); background: transparent; min-height: 37px; scrollbar-width: none; }
   .cv-tab { display: flex; align-items: center; gap: 6px; padding: 0 6px 0 12px; height: 36px; border-right: 1px solid var(--border); color: var(--muted); font-size: 12.5px; cursor: pointer; white-space: nowrap; }
@@ -636,7 +637,46 @@
   pre.cv .tk-f { color: #82b8ff; text-decoration: none; }
   pre.cv .tk-d { color: #e8c76a; }
   .cv-md { padding: 24px 32px; max-width: 860px; }
-  @media (max-width: 760px) { #codeView { grid-template-columns: 1fr; } .cv-side { max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--border); } }
+  @media (max-width: 760px) { #codeView { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); } .cv-rail { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--border); padding: 4px 8px; } .cv-side { max-height: 38vh; border-right: 0; border-bottom: 1px solid var(--border); } .cv-status #stFile { display: none; } }
+  .cv-rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; border-right: 1px solid var(--border); }
+  .cv-rail button { position: relative; width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--faint); }
+  .cv-rail button:hover { color: var(--text); background: var(--surface); }
+  .cv-rail button.on { color: var(--strong); background: var(--surface-2); }
+  .cv-rail button svg { width: 18px; height: 18px; }
+  .cv-rail .dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--text-2); }
+  .cv-rail .dot.ko { background: var(--danger, #e66); }
+  .cv-pane-title { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin: 4px 2px 8px; }
+  .cv-side[data-show="files"] [data-cvpane]:not([data-cvpane~="files"]), .cv-side[data-show="search"] [data-cvpane]:not([data-cvpane~="search"]),
+  .cv-side[data-show="git"] [data-cvpane]:not([data-cvpane~="git"]), .cv-side[data-show="tests"] [data-cvpane]:not([data-cvpane~="tests"]) { display: none !important; }
+  .cv-tab.home { gap: 7px; padding-right: 12px; color: var(--text-2); }
+  .cv-tab.home svg { width: 13px; height: 13px; }
+  .cv-status { display: flex; align-items: center; gap: 14px; height: 26px; padding: 0 12px; border-top: 1px solid var(--border); font: 11px var(--mono); color: var(--faint); white-space: nowrap; overflow: hidden; }
+  .cv-status span:empty { display: none; }
+  .cv-status button { background: none; border: 0; color: var(--faint); font: inherit; padding: 0 4px; border-radius: 4px; }
+  .cv-status button:hover, .cv-status .lnk:hover { color: var(--text); }
+  .cv-status .lnk { cursor: pointer; }
+  .cv-status .ok { color: var(--text-2); }
+  .cv-status .ko { color: var(--danger, #e66); }
+  .qo { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.35); display: flex; justify-content: center; padding-top: 12vh; }
+  .qo[hidden] { display: none; }
+  .qo-box { width: min(600px, 92vw); background: var(--surface); border: 1px solid var(--border-2); border-radius: 12px; padding: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.45); align-self: flex-start; }
+  .qo-box .field { width: 100%; font-size: 14px; }
+  .qo-list { max-height: 50vh; overflow: auto; margin-top: 6px; }
+  .qo-list button { display: flex; gap: 10px; width: 100%; align-items: baseline; padding: 6px 10px; border: 0; background: none; border-radius: 7px; text-align: left; color: var(--text); font: 13px var(--sans); }
+  .qo-list button small { color: var(--faint); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qo-list button.on, .qo-list button:hover { background: var(--surface-2); }
+  .qo-list b { font-weight: 600; color: var(--strong); }
+  .ag-home { padding: 4px 14px 16px; }
+  .ag-form, .ag-home, .ag-log, .ag-res { width: 100%; max-width: 980px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+  .ag-form { border-bottom: 0; }
+  .ag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ag-chips button { padding: 6px 11px; border-radius: 999px; border: 1px solid var(--border); background: none; color: var(--text-2); font-size: 12.5px; }
+  .ag-chips button:hover { color: var(--strong); border-color: var(--border-2); }
+  .ag-home h6 { margin: 16px 0 6px; font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+  .ag-recent button { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--text); font-size: 13px; }
+  .ag-recent button:hover { background: var(--surface); }
+  .ag-recent small { color: var(--faint); font-size: 11.5px; }
+  .ag-recent .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ---------------------------------------------------------------- atelier */
   #wsBtn.on { color: #e8c76a; background: rgba(255,214,102,.1); }
@@ -1052,21 +1092,30 @@
     </div>
     <div id="scroller"><div id="chat"></div></div>
     <section id="codeView" hidden>
+      <nav class="cv-rail" id="cvRail">
+        <button data-pane="files" class="on" title="Fichiers (Ctrl+P pour ouvrir vite)" data-i="folder"></button>
+        <button data-pane="search" title="Chercher dans le code (Ctrl+Maj+F)" data-i="search"></button>
+        <button data-pane="git" title="Git" data-i="list"><i class="dot" id="railGitDot" hidden></i></button>
+        <button data-pane="tests" title="Tests" data-i="check"><i class="dot" id="railTestDot" hidden></i></button>
+      </nav>
       <aside class="cv-side">
-        <div class="row" style="gap:6px"><select class="field" id="cvProject" style="flex:1;min-width:0"></select><button class="iconbtn" id="cvAgent" title="Agent : confier une tâche sur tout le projet" data-i="spark"></button><button class="iconbtn" id="cvSync" title="Mettre à jour le projet" data-i="refresh"></button><button class="iconbtn" id="cvAdd" title="Ajouter un projet" data-i="plus"></button></div>
+        <div class="row" style="gap:6px"><select class="field" id="cvProject" style="flex:1;min-width:0"></select><button class="iconbtn" id="cvSync" title="Mettre à jour le projet" data-i="refresh"></button><button class="iconbtn" id="cvAdd" title="Ajouter un projet" data-i="plus"></button></div>
         <p class="note" id="cvInfo" style="margin:6px 2px 8px"></p>
-        <div class="cv-changes" id="cvChanges" hidden></div>
-        <div class="cv-changes sb-box" id="cvTests" hidden>
+        <div class="cv-pane-title" id="cvPaneTitle">Fichiers</div>
+        <div class="cv-changes" id="cvChanges" data-cvpane="git" hidden></div>
+        <p class="note" id="cvGitNote" data-cvpane="git" hidden>Ce projet vient d'un dossier du serveur, en lecture seule : Git n'est disponible que pour les dépôts clonés par Atom.</p>
+        <div class="cv-changes sb-box" id="cvTests" data-cvpane="tests" hidden>
           <div class="h"><span>Tests</span><button id="sbEdit" title="Changer la commande">modifier</button></div>
           <code class="sb-cmd" id="sbCmd"></code>
           <input class="field sb-cmd-in" id="sbCmdIn" hidden spellcheck="false">
           <div class="git-acts"><button class="btn sm" id="sbRun">▶ Lancer les tests</button></div>
           <div class="sb-out" id="sbOut"></div>
         </div>
-        <div class="row" style="gap:6px;margin-bottom:6px"><input class="field" id="cvFilter" placeholder="Filtrer les fichiers…" autocomplete="off"><button class="iconbtn" id="cvGrep" title="Chercher dans le contenu des fichiers" data-i="search"></button></div>
-        <div class="cv-tree" id="cvTree"></div>
+        <div class="row" data-cvpane="files search" style="gap:6px;margin-bottom:6px"><input class="field" id="cvFilter" placeholder="Filtrer les fichiers…" autocomplete="off"><button class="iconbtn" id="cvGrep" hidden title="Chercher dans le contenu des fichiers" data-i="search"></button></div>
+        <div class="cv-tree" id="cvTree" data-cvpane="files search"></div>
       </aside>
       <div class="cv-main">
+        <div class="cv-tabs" id="cvTabs"></div>
         <div id="cvEmpty" class="cv-placeholder" hidden>Aucun projet de code pour l'instant.<small>Ajoute un dépôt GitHub ou un dossier du serveur pour le parcourir ici.</small><button class="btn primary" id="cvAdd2" style="margin-top:14px">Ajouter un projet</button></div>
         <div id="cvAgentView" class="ag" hidden>
           <div class="ag-head"><b>Agent</b><span class="note" id="agInfo"></span><span class="spacer"></span><select class="field" id="agHistory" hidden style="max-width:300px;font-size:12px"></select><button class="iconbtn" id="agNew" title="Nouvelle tâche" data-i="plus"></button><button class="iconbtn" id="agClose" title="Fermer" data-i="x"></button></div>
@@ -1075,13 +1124,18 @@
             <div class="row"><select class="field" id="agEngine" style="max-width:240px"><option value="remote">API distante (recommandé)</option><option value="local">Modèle local</option></select>
               <span class="note" id="agEngineNote"></span><span class="spacer"></span><button class="btn primary" id="agRun">Lancer</button></div>
             <p class="note" id="agParentNote" hidden>Suite de la tâche affichée : l'agent garde son contexte et les modifications non appliquées. <button class="btn sm" id="agParentCancel">Nouvelle tâche à la place</button></p>
-            <p class="note">L'agent tourne sur le serveur : tu peux recharger ou fermer la page, il continue. Il lit, cherche et prépare des modifications sur plusieurs fichiers, puis te les présente. Rien n'est écrit tant que tu n'as pas validé. Il n'exécute aucune commande.</p>
+            <p class="note">Rien n'est écrit sans ta validation · l'agent continue même si tu fermes la page · Ctrl+Entrée pour lancer</p>
+          </div>
+          <div class="ag-home" id="agHome">
+            <h6>Idées</h6>
+            <div class="ag-chips" id="agChips"></div>
+            <h6 id="agRecentTitle" hidden>Tâches récentes</h6>
+            <div class="ag-recent" id="agRecent"></div>
           </div>
           <div class="ag-log" id="agLog"></div>
           <div class="ag-res" id="agRes" hidden></div>
         </div>
         <div id="cvMainWrap" class="cv-wrap">
-          <div class="cv-tabs" id="cvTabs"></div>
           <div class="cv-bar" id="cvBar" hidden>
             <span class="cv-path" id="cvPath"></span><span class="cv-meta" id="cvMeta"></span><span class="spacer"></span>
             <button class="btn sm" id="cvMd" hidden>Aperçu</button>
@@ -1102,8 +1156,10 @@
             <button class="btn sm" id="cvDiffDrop">Abandonner</button><button class="btn sm" id="cvDiffPatch"><span data-i="download"></span>Patch</button><button class="btn sm primary" id="cvDiffApply"><span data-i="check"></span>Appliquer</button></div>
           <div class="cv-editor" id="cvEditor"></div>
         </div>
+        <footer class="cv-status" id="cvStatus"><span id="stBranch"></span><span id="stChanges"></span><span id="stTests"></span><span class="spacer"></span><span id="stFile"></span><button id="stQuick" title="Ouvrir un fichier (Ctrl+P)">Ctrl+P</button></footer>
       </div>
     </section>
+    <div id="quickOpen" class="qo" hidden><div class="qo-box"><input class="field" id="qoIn" placeholder="Ouvrir un fichier… (tape une partie du nom)" spellcheck="false" autocomplete="off"><div id="qoList" class="qo-list"></div></div></div>
     <section id="libView" hidden>
       <aside class="lib-side">
         <div class="lib-cols" id="libCols"></div>
@@ -2222,25 +2278,28 @@ const app = $("app");
 const narrow = () => matchMedia("(max-width: 760px)").matches;
 const medium = () => matchMedia("(max-width: 1180px)").matches;
 
+// En mode Code, le panneau de l'entité est replié par défaut (réglage séparé) pour laisser la place au code.
+const panelKey = () => (app.dataset.view === "code" ? "panelCode" : "panel");
 function applyLayout() {
+  const on = app.dataset.view === "code" ? !!settings.panelCode : settings.panel;
   app.classList.toggle("no-side", !settings.side);
-  app.classList.toggle("no-panel", !settings.panel);
+  app.classList.toggle("no-panel", !on);
   $("sideOpen").style.display = (!settings.side || narrow()) ? "" : "none";
-  $("panelBtn").classList.toggle("on", medium() ? app.classList.contains("panel-open") : settings.panel);
+  $("panelBtn").classList.toggle("on", medium() ? app.classList.contains("panel-open") : on);
 }
 $("sideClose").onclick = () => { if (narrow()) app.classList.remove("side-open"); else { settings.side = false; saveSettings(); applyLayout(); } };
 $("sideOpen").onclick = () => { if (narrow()) app.classList.add("side-open"); else { settings.side = true; saveSettings(); applyLayout(); } };
 $("panelBtn").onclick = () => {
   if (medium()) app.classList.toggle("panel-open");
-  else { settings.panel = !settings.panel; saveSettings(); }
+  else { settings[panelKey()] = !(app.dataset.view === "code" ? settings.panelCode : settings.panel); saveSettings(); }
   applyLayout();
   refreshPanel();
   refreshSystem();
 };
-$("panelClose").onclick = () => { if (medium()) app.classList.remove("panel-open"); else { settings.panel = false; saveSettings(); } applyLayout(); };
+$("panelClose").onclick = () => { if (medium()) app.classList.remove("panel-open"); else { settings[panelKey()] = false; saveSettings(); } applyLayout(); };
 $("scrim").onclick = () => { app.classList.remove("side-open", "panel-open"); applyLayout(); };
 addEventListener("resize", applyLayout);
-const panelVisible = () => medium() ? app.classList.contains("panel-open") : settings.panel;
+const panelVisible = () => medium() ? app.classList.contains("panel-open") : (app.dataset.view === "code" ? !!settings.panelCode : settings.panel);
 
 /* ============================================================
    CONVERSATIONS
@@ -3674,7 +3733,7 @@ let scope = store.get("scope", "auto");   // "auto" | "none" | "3,5"
 
 let currentView = "chat";
 function showView(v) {
-  currentView = v; store.set("view", v);
+  currentView = v; store.set("view", v); app.dataset.view = v; applyLayout();
   $("libView").hidden = v !== "library";
   $("codeView").hidden = v !== "code";
   $("scroller").hidden = v !== "chat";
@@ -4086,7 +4145,7 @@ function highlightLang(src, lang) {
 let codeRestored = false;
 function saveCodeState() {
   if (!codeRestored) return;
-  store.set("codeState", { project: code.project, open: code.open.map((f) => f.path), active: code.active, agent: !$("cvAgentView").hidden });
+  store.set("codeState", { project: code.project, open: code.open.map((f) => f.path), active: code.active, pane: cvPane });
 }
 async function loadCodeProjects() {
   try { library = await getJSON("/api/library"); } catch { return; }
@@ -4103,14 +4162,15 @@ async function loadCodeProjects() {
   await loadCodeFiles();
   if (saved && saved.project === code.project && !code.open.length) {
     for (const path of (saved.open || []).slice(-8)) if (code.files.some((f) => f.path === path)) await openFile(path);
+    if (saved.pane) cvSetPane(saved.pane);
     if (saved.active && code.open.some((f) => f.path === saved.active)) { code.active = saved.active; renderTabs(); renderEditor(); renderTree(); }
+    else { codeRestored = true; agOpen(); }
     codeRestored = true;
-    if (saved.agent) agOpen();
-  }
+  } else if (!code.open.length) agOpen();
   codeRestored = true;
   if (projects.some((p) => p.status === "indexing")) { clearTimeout(libTimer); libTimer = setTimeout(loadLibrary, 2000); }
 }
-$("cvProject").onchange = async () => { if (!$("cvAgentView").hidden) agClose(); agRun = null; $("agLog").innerHTML = ""; $("agRes").hidden = true; code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.gitSel = null; code.gitKnown = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); saveCodeState(); };
+$("cvProject").onchange = async () => { if (!$("cvAgentView").hidden) agClose(); agRun = null; $("agLog").innerHTML = ""; $("agRes").hidden = true; code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.gitSel = null; code.gitKnown = null; code.active = "__agent"; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); agOpen(); saveCodeState(); };
 
 async function loadCodeFiles() {
   const d = await getJSON(`/api/library/collections/${code.project}/documents`);
@@ -4198,12 +4258,18 @@ async function openFile(path, line) {
 }
 function closeTab(path) {
   code.open = code.open.filter((x) => x.path !== path);
-  if (code.active === path) code.active = code.open.at(-1)?.path || null;
+  if (code.active === path) code.active = code.open.at(-1)?.path || "__agent";
   code.sel = null; renderTabs(); renderEditor(); renderTree(); saveCodeState();
 }
 function renderTabs() {
   const t = $("cvTabs");
   t.innerHTML = "";
+  const home = document.createElement("div");
+  home.className = "cv-tab home" + (code.active === "__agent" || !code.active ? " on" : "");
+  home.title = "Agent : confier une tâche ou poser une question sur le projet";
+  home.innerHTML = `${icon("spark")}<span>Agent</span>`;
+  home.onclick = () => agOpen();
+  t.appendChild(home);
   for (const f of code.open) {
     const b = document.createElement("div");
     b.className = "cv-tab" + (f.path === code.active ? " on" : "");
@@ -4217,6 +4283,10 @@ function renderTabs() {
 }
 const MAX_LINES = 8000;
 function renderEditor(scrollLine) {
+  const isHome = code.active === "__agent" || !code.active;
+  $("cvAgentView").hidden = !isHome; $("cvMainWrap").hidden = isHome;
+  cvStatusUpdate();
+  if (isHome) return;
   const f = code.open.find((x) => x.path === code.active);
   $("cvBar").hidden = !f; $("cvSelBar").hidden = true;
   if (code.proposal && code.proposal.path === f?.path) return renderDiff();
@@ -4238,7 +4308,7 @@ function renderEditor(scrollLine) {
     code.sel = e.shiftKey && code.sel ? [Math.min(code.sel[0], l), Math.max(code.sel[1], l)] : [l, l];
     paintSel();
   };
-  paintSel();
+  paintSel(); cvStatusUpdate();
   if (scrollLine) requestAnimationFrame(() => { const lh = lineH(); ed.scrollTop = Math.max(0, (scrollLine - 6) * lh); });
 }
 const lineH = () => parseFloat(getComputedStyle(document.querySelector(".cv") || document.body).lineHeight) || 19;
@@ -4350,8 +4420,8 @@ function agoFr(ts) {
 async function loadChanges() {
   const box = $("cvChanges");
   let g;
-  try { g = await getJSON(`/api/git/${code.project}/status`); } catch { box.hidden = true; code.git = null; return; }
-  code.git = g; box.hidden = false;
+  try { g = await getJSON(`/api/git/${code.project}/status`); } catch { box.hidden = true; code.git = null; $("cvGitNote").hidden = false; cvStatusUpdate(); return; }
+  code.git = g; box.hidden = false; $("cvGitNote").hidden = true; cvStatusUpdate();
   const sel = code.gitSel || (code.gitSel = new Set());
   for (const f of g.files) if (!code.gitKnown?.has(f.path)) sel.add(f.path);   // nouveaux fichiers cochés par défaut
   code.gitKnown = new Set(g.files.map((f) => f.path));
@@ -4447,7 +4517,8 @@ async function loadChanges() {
 let agRun = null;
 const AG_ICON = { list: "folder", read: "doc", search: "search", edit: "edit", write: "plus", done: "check" };
 function agOpen() {
-  $("cvAgentView").hidden = false; $("cvMainWrap").hidden = true;
+  code.active = "__agent"; code.sel = null;
+  renderTabs(); $("cvAgentView").hidden = false; $("cvMainWrap").hidden = true; cvStatusUpdate(); renderTree();
   const h = typeof hybridState !== "undefined" ? hybridState : null;
   const remoteOk = h?.configured && h?.allow_docs;
   $("agEngine").value = remoteOk ? "remote" : "local";
@@ -4458,14 +4529,18 @@ function agOpen() {
     await saveHybrid({ allow_docs: true }); agOpen(); toast("Envoi du code autorisé · l'agent utilisera l'API distante.");
   });
   $("agInfo").textContent = $("cvProject").selectedOptions[0]?.textContent || "";
+  $("agClose").hidden = !code.open.length;
   loadAgHistory();
   const last = store.get(agKey(), null);
   if (last && (!agState || agState.id !== last)) agFollow(last, true);
   else if (!agRun) $("agTask").focus();
   saveCodeState();
 }
-function agClose() { clearTimeout(agPoll); $("cvAgentView").hidden = true; $("cvMainWrap").hidden = false; saveCodeState(); }
-$("cvAgent").onclick = () => ($("cvAgentView").hidden ? agOpen() : agClose());
+function agClose() {
+  const last = code.open.at(-1);
+  if (!last) return;
+  code.active = last.path; renderTabs(); renderEditor(); renderTree(); saveCodeState();
+}
 $("agClose").onclick = agClose;
 $("agNew").onclick = () => { agReset(); agParent = null; $("agParentNote").hidden = true; store.set(agKey(), null); $("agTask").value = ""; $("agTask").focus(); loadAgHistory(); };
 $("agParentCancel").onclick = () => { agParent = null; $("agParentNote").hidden = true; };
@@ -4473,7 +4548,7 @@ $("agTask").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctr
 function agStep(cls, ic, html) {
   const d = document.createElement("div"); d.className = "ag-step " + cls;
   d.innerHTML = `<span class="ic">${icon(ic)}</span><div>${html}</div>`;
-  $("agLog").appendChild(d); d.scrollIntoView({ block: "nearest" });
+  $("agLog").appendChild(d); $("agHome").hidden = true; d.scrollIntoView({ block: "nearest" });
   return d;
 }
 const agArgs = (t, a) => t === "read" ? `${a.path || ""}${a.start ? ` (l. ${a.start}${a.end ? "-" + a.end : ""})` : ""}` : t === "search" ? `« ${a.query || ""} »`
@@ -4482,7 +4557,7 @@ const AG_VERB = { list: "Liste", read: "Lit", search: "Cherche", edit: "Modifie"
 // Les tâches tournent sur le serveur : la page ne fait que suivre (et peut être rechargée).
 let agPoll = 0, agState = null;   // { id, after, first, lastAction, thinking }
 const agKey = () => `agent:last:${code.project}`;
-function agReset() { $("agLog").innerHTML = ""; $("agRes").hidden = true; agRun = null; agState = null; clearTimeout(agPoll); }
+function agReset() { $("agLog").innerHTML = ""; $("agRes").hidden = true; agRun = null; agState = null; clearTimeout(agPoll); agHomeUpdate(); }
 function agBusy(on) {
   const btn = $("agRun"); btn.textContent = on ? "Arrêter" : "Lancer"; btn.classList.toggle("primary", !on);
   if (on) { setEmotion("focus"); entity.scan = true; } else { setEmotion("idle"); entity.scan = false; }
@@ -4547,6 +4622,7 @@ async function loadAgHistory() {
   const sel = $("agHistory");
   let d; try { d = await getJSON(`/api/agent/${code.project}/runs`); } catch { return; }
   const ST = { running: "en cours", done: "terminée", error: "erreur", stopped: "arrêtée", interrupted: "interrompue" };
+  agHomeUpdate(d.runs);
   sel.innerHTML = '<option value="">Historique…</option>' + d.runs.map((r) =>
     `<option value="${r.id}" ${agState?.id === r.id ? "selected" : ""}>${esc(new Date(r.created_at * 1000).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))} · ${esc(r.task.slice(0, 60))} · ${ST[r.status] || r.status}${r.files ? ` · ${r.files} fichier(s)` : ""}</option>`).join("");
   sel.hidden = !d.runs.length;
@@ -4636,6 +4712,7 @@ async function sbRun(body, out, btn) {
           add("res " + (ok ? "ok" : "ko"), ok ? `✓ Tests réussis · ${ev.duration} s` : ev.code === -1 ? "Bac à sable indisponible" : `✗ Échec (code ${ev.code}) · ${ev.duration} s`);
           add("", `<pre>${esc((ev.output || "").replace(/\x1b\[[0-9;]*m/g, "") || "(aucune sortie)")}</pre>`);
           if (ok) entity.seal = 1; else entity.glitch = 1;
+          if (ev.code !== -1 && !body.run_id) { sbLast = { ok }; cvStatusUpdate(); }
         }
       }
     }
@@ -4643,6 +4720,105 @@ async function sbRun(body, out, btn) {
   finally { btn.disabled = false; btn.innerHTML = label; setEmotion("idle"); entity.scan = false; }
 }
 $("sbRun").onclick = () => sbRun({}, $("sbOut"), $("sbRun"));
+
+/* ---- barre d'activité, barre d'état, ouverture rapide (inspiré de VS Code / Zed) */
+let cvPane = "files";
+const PANE_NAMES = { files: "Fichiers", search: "Recherche dans le code", git: "Git", tests: "Tests" };
+function cvSetPane(name) {
+  cvPane = PANE_NAMES[name] ? name : "files";
+  document.querySelector(".cv-side").dataset.show = cvPane;
+  document.querySelectorAll("#cvRail button").forEach((b) => b.classList.toggle("on", b.dataset.pane === cvPane));
+  $("cvPaneTitle").textContent = PANE_NAMES[cvPane];
+  const grep = cvPane === "search";
+  if (code.grep !== grep) { code.grep = grep; $("cvFilter").value = ""; }
+  $("cvFilter").placeholder = grep ? "Texte à chercher dans tous les fichiers…" : "Filtrer par nom de fichier…";
+  if (cvPane === "files" || cvPane === "search") { renderTree(); setTimeout(() => $("cvFilter").focus(), 0); }
+  $("cvGitNote").hidden = !!code.git;
+  saveCodeState();
+}
+document.querySelectorAll("#cvRail button").forEach((b) => { b.onclick = () => cvSetPane(b.dataset.pane); });
+document.querySelector(".cv-side").dataset.show = "files";
+let sbLast = null;   // dernier résultat de tests
+function cvStatusUpdate() {
+  const g = code.git;
+  $("stBranch").innerHTML = g ? `<span class="lnk" data-go="git">⎇ ${esc(g.branch)}</span>` : "";
+  const n = g?.files.length || 0;
+  $("stChanges").innerHTML = g ? `<span class="lnk" data-go="git">${n ? `${n} modif.` : "propre"}${g.ahead ? ` · ↑${g.ahead}` : ""}</span>` : "";
+  $("stTests").innerHTML = sbLast ? `<span class="lnk ${sbLast.ok ? "ok" : "ko"}" data-go="tests">${sbLast.ok ? "✓ tests" : "✗ tests"}</span>` : "";
+  $("railGitDot").hidden = !n;
+  $("railTestDot").hidden = !sbLast; $("railTestDot").classList.toggle("ko", !!sbLast && !sbLast.ok);
+  const f = code.open.find((x) => x.path === code.active);
+  $("stFile").textContent = f ? `${f.path} · ${f.content.split("\n").length} lignes · ${LANG(f.path).toUpperCase()}${code.sel ? ` · sél. ${code.sel[0]}-${code.sel[1]}` : ""}` : (code.active === "__agent" ? "Agent" : "");
+  $("cvStatus").querySelectorAll("[data-go]").forEach((x) => { x.onclick = () => cvSetPane(x.dataset.go); });
+}
+// Ouverture rapide : recherche floue sur le nom et le chemin
+let qoSel = 0, qoItems = [];
+function qoScore(q, path) {
+  const name = path.split("/").pop().toLowerCase(), p = path.toLowerCase();
+  if (!q) return 1;
+  if (name.startsWith(q)) return 100 - name.length / 100;
+  if (name.includes(q)) return 80 - name.indexOf(q);
+  if (p.includes(q)) return 50 - p.indexOf(q) / 10;
+  let i = 0; for (const ch of p) if (ch === q[i]) i++;
+  return i === q.length ? 20 - p.length / 100 : 0;
+}
+function qoRender() {
+  const q = $("qoIn").value.trim().toLowerCase();
+  const recent = code.open.map((f) => f.path).reverse();
+  qoItems = (q ? code.files.map((f) => f.path) : [...new Set([...recent, ...code.files.map((f) => f.path)])])
+    .map((p) => [p, qoScore(q, p) + (recent.includes(p) ? 5 : 0)]).filter((x) => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 40).map((x) => x[0]);
+  qoSel = Math.min(qoSel, Math.max(0, qoItems.length - 1));
+  $("qoList").innerHTML = qoItems.map((p, i) => {
+    const name = p.split("/").pop(), dir = p.slice(0, -name.length);
+    const k = q ? name.toLowerCase().indexOf(q) : -1;
+    const nm = k >= 0 ? esc(name.slice(0, k)) + `<b>${esc(name.slice(k, k + q.length))}</b>` + esc(name.slice(k + q.length)) : esc(name);
+    return `<button data-i="${i}" class="${i === qoSel ? "on" : ""}"><span>${nm}</span><small>${esc(dir)}</small></button>`;
+  }).join("") || '<p class="note" style="padding:8px">Aucun fichier.</p>';
+  $("qoList").querySelectorAll("button").forEach((b) => { b.onclick = () => qoPick(+b.dataset.i); });
+}
+function qoOpen() { if (!code.project) return; $("quickOpen").hidden = false; $("qoIn").value = ""; qoSel = 0; qoRender(); $("qoIn").focus(); }
+function qoClose() { $("quickOpen").hidden = true; }
+function qoPick(i) { const p = qoItems[i]; qoClose(); if (p) openFile(p); }
+$("qoIn").oninput = () => { qoSel = 0; qoRender(); };
+$("qoIn").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") { qoSel = Math.min(qoItems.length - 1, qoSel + 1); qoRender(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { qoSel = Math.max(0, qoSel - 1); qoRender(); e.preventDefault(); }
+  else if (e.key === "Enter") qoPick(qoSel);
+  else if (e.key === "Escape") qoClose();
+});
+$("quickOpen").onclick = (e) => { if (e.target.id === "quickOpen") qoClose(); };
+$("stQuick").onclick = qoOpen;
+document.addEventListener("keydown", (e) => {
+  if ($("codeView").hidden) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && !e.shiftKey && e.key.toLowerCase() === "p") { e.preventDefault(); qoOpen(); }
+  else if (mod && e.shiftKey && e.key.toLowerCase() === "f") { e.preventDefault(); cvSetPane("search"); }
+  else if (mod && e.shiftKey && e.key.toLowerCase() === "g") { e.preventDefault(); cvSetPane("git"); }
+  else if (mod && e.key === "Enter" && code.active === "__agent" && document.activeElement !== $("agTask")) { e.preventDefault(); $("agTask").focus(); }
+});
+// Accueil de l'agent : idées de tâches et tâches récentes
+const AG_IDEAS = [
+  ["Expliquer le projet", "Explique-moi ce projet : à quoi il sert, son architecture, les fichiers clés et comment ils s'articulent."],
+  ["Trouver des bugs", "Relis le code et trouve les bugs probables ou les cas non gérés. Pour chacun : fichier, ligne, risque, et propose une correction."],
+  ["Ajouter des tests", "Ajoute des tests unitaires pour les fonctions principales qui n'en ont pas, puis lance-les."],
+  ["Documenter", "Ajoute des commentaires de documentation sur les fonctions publiques qui n'en ont pas, sans changer le code."],
+  ["Gestion des erreurs", "Repère les erreurs ignorées ou mal remontées et améliore leur gestion, sans changer le comportement normal."],
+  ["Mettre à jour le README", "Mets à jour le README : présentation, installation, utilisation, structure du projet — d'après le code actuel."],
+  ["Sécurité", "Fais une revue de sécurité du projet (entrées non validées, secrets, exécution de commandes, chemins) et propose des corrections."],
+];
+$("agChips").innerHTML = AG_IDEAS.map(([t], i) => `<button data-k="${i}">${esc(t)}</button>`).join("");
+$("agChips").querySelectorAll("button").forEach((b) => { b.onclick = () => { $("agTask").value = AG_IDEAS[+b.dataset.k][1]; $("agTask").focus(); }; });
+function agHomeUpdate(runs) {
+  const showing = !!$("agLog").children.length;
+  $("agHome").hidden = showing;
+  if (!runs) return;
+  const ST = { running: "en cours", done: "terminée", error: "erreur", stopped: "arrêtée", interrupted: "interrompue" };
+  const list = runs.slice(0, 6);
+  $("agRecentTitle").hidden = !list.length;
+  $("agRecent").innerHTML = list.map((r) => `<button data-id="${r.id}"><span class="t">${esc(r.task)}</span><small>${ST[r.status] || r.status}</small>
+    <small class="t">${esc(r.summary || "")}</small><small>${new Date(r.created_at * 1000).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}${r.files ? ` · ${r.files} fichier(s)` : ""}</small></button>`).join("");
+  $("agRecent").querySelectorAll("button").forEach((b) => { b.onclick = () => { agReset(); store.set(agKey(), b.dataset.id); agFollow(b.dataset.id, true); }; });
+}
 
 /* ============================================================
    ATELIER MULTI-IA
