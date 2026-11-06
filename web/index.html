@@ -395,6 +395,20 @@
   .side-nav button svg { color: var(--muted); }
   .side-nav .count { margin-left: auto; font: 11px var(--mono); color: var(--faint); }
   .side-sep { height: 1px; background: var(--border); margin: 4px 14px 2px; }
+  .spaces { padding: 2px 8px 0; }
+  .sp-h { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 2px 8px; font-size: 11.5px; color: var(--faint); font-weight: 500; }
+  .sp-h .iconbtn { width: 22px; height: 22px; } .sp-h .iconbtn svg { width: 13px; height: 13px; }
+  #spList button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 6px 10px; border-radius: 8px; border: 0; background: none; color: var(--text-2); font-size: 13px; text-align: left; }
+  #spList button:hover { background: var(--surface); color: var(--text); }
+  #spList button .ini { width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; font: 600 10px var(--sans); background: var(--surface-2); color: var(--text-2); flex: none; }
+  #spList button .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #spList button .c { font: 11px var(--mono); color: var(--faint); }
+  .sp-active { display: flex; align-items: center; gap: 6px; margin: 6px 8px 0; padding: 6px 6px 6px 4px; border-radius: 8px; background: var(--surface); }
+  .sp-active[hidden] { display: none; }
+  .sp-active #spBack { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; padding: 0 6px; }
+  .sp-active b { flex: 1; min-width: 0; font-weight: 500; font-size: 13px; color: var(--strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sp-active .iconbtn { width: 24px; height: 24px; }
+  .conv .sp-tag { font: 10.5px var(--mono); color: var(--faint); margin-left: 6px; }
     background: radial-gradient(circle at 40% 38%, rgba(var(--orb),.95) 0 8%, rgba(var(--orb),.35) 30%, rgba(var(--orb),.08) 62%, transparent 70%);
     box-shadow: 0 0 18px rgba(var(--orb), .18); animation: orbBreath 4s ease-in-out infinite; }
   @keyframes orbBreath { 50% { transform: scale(1.08); box-shadow: 0 0 24px rgba(var(--orb), .28); } }
@@ -667,6 +681,42 @@
   .qo-list button.on, .qo-list button:hover { background: var(--surface-2); }
   .qo-list b { font-weight: 600; color: var(--strong); }
   .ag-home { padding: 4px 14px 16px; }
+  .ag-rules { display: grid; gap: 3px; }
+  .ag-rules div { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-2); padding: 3px 0; }
+  .ag-rules div::before { content: "—"; color: var(--faint); }
+  .ag-rules div span { flex: 1; }
+  .ag-rules button { background: none; border: 0; color: var(--faint); font-size: 11.5px; }
+  .ag-rules button:hover { color: var(--text); }
+  .cvs { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 62vw); z-index: 40; background: var(--bg); border-left: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: -20px 0 50px rgba(0,0,0,.25); }
+  .cvs[hidden] { display: none; }
+  @media (max-width: 760px) { .cvs { width: 100vw; } }
+  .cvs-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .cvs-title { flex: 1; min-width: 0; border: 0; background: none; color: var(--strong); font-size: 15px; font-weight: 500; outline: 0; }
+  .cvs-head select { max-width: 170px; font-size: 12px; padding: 5px 8px; }
+  .cvs-body { flex: 1; min-height: 0; display: flex; }
+  .cvs-body textarea { flex: 1; resize: none; border: 0; outline: 0; background: none; color: var(--text); padding: 22px 28px; font: 15px/1.7 var(--sans); }
+  .cvs.code .cvs-body textarea { font: 13px/1.6 var(--mono); }
+  .cvs-view { flex: 1; overflow: auto; padding: 22px 28px; }
+  .cvs-foot { border-top: 1px solid var(--border); padding: 10px 12px; display: grid; gap: 8px; }
+  .cvs-ask { display: flex; gap: 6px; align-items: center; }
+  .cvs-ask .field { flex: 1; }
+  .cvs-ask .note { white-space: nowrap; }
+  .cvs.busy textarea { opacity: .55; }
+  .an-imgs { display: grid; gap: 10px; margin: 10px 0; }
+  .an-imgs img { max-width: 100%; border-radius: 8px; background: #fff; cursor: zoom-in; }
+  .an-code summary, .rs-live summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+  .an-code pre { font: 11.5px/1.5 var(--mono); max-height: 360px; overflow: auto; }
+  .rs-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint); margin-bottom: 6px; }
+  .rs-tag svg { width: 13px; height: 13px; }
+  .rs-live { margin-bottom: 8px; }
+  .rs-live .st { font-size: 12.5px; color: var(--muted); padding: 2px 0; }
+  .rs-live .st:last-child { color: var(--text-2); }
+  .mm-box { margin: 10px 0; border-radius: 10px; background: color-mix(in srgb, var(--text) 3%, transparent); padding: 12px; overflow-x: auto; }
+  .mm svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  .mm-wait { font: 11.5px var(--mono); color: var(--faint); white-space: pre-wrap; margin: 0; }
+  .mm-acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+  .mm-acts button { background: none; border: 0; color: var(--faint); font-size: 11.5px; padding: 0; }
+  .mm-acts button:hover { color: var(--text); }
   .ag-form, .ag-home, .ag-log, .ag-res { width: 100%; max-width: 980px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
   .ag-form { border-bottom: 0; }
   .ag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1071,6 +1121,11 @@
       <button data-goto="reminders"><span data-i="clock"></span>Rappels<span class="count" id="navRem"></span></button>
     </div>
     <div class="side-sep"></div>
+    <div class="spaces" id="spaces">
+      <div class="sp-h"><span>Espaces</span><button class="iconbtn" id="spNew" title="Nouvel espace" data-i="plus"></button></div>
+      <div id="spList"></div>
+    </div>
+    <div class="sp-active" id="spActive" hidden><button id="spBack" title="Toutes les conversations">‹</button><b id="spName"></b><button class="iconbtn" id="spEdit" title="Modifier l'espace" data-i="settings"></button></div>
     <nav id="convList"></nav>
     <div class="side-bottom">
       <div class="status"><span class="dot" id="dot"></span><span id="statusText">Connexion…</span></div>
@@ -1129,6 +1184,9 @@
           <div class="ag-home" id="agHome">
             <h6>Idées</h6>
             <div class="ag-chips" id="agChips"></div>
+            <h6>Règles du projet <span class="note" style="text-transform:none;letter-spacing:0">· l'agent les respecte à chaque tâche</span></h6>
+            <div class="ag-rules" id="agRules"></div>
+            <div class="row" style="gap:6px;margin-top:4px"><input class="field" id="agRuleIn" placeholder="Ex. « Utiliser des tabulations » ou « Toujours écrire les tests avec testify »" style="font-size:12.5px"><button class="btn sm" id="agRuleAdd">Ajouter</button></div>
             <h6 id="agRecentTitle" hidden>Tâches récentes</h6>
             <div class="ag-recent" id="agRecent"></div>
           </div>
@@ -1178,6 +1236,7 @@
           <div class="cbar">
             <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF)" data-i="clip"></button>
             <button class="iconbtn" id="webBtn" type="button" title="Rechercher sur Internet pour ce message" data-i="globe"></button>
+            <button class="iconbtn" id="deepBtn" type="button" title="Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé" data-i="library"></button>
             <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA pour ce message" data-i="users" style="display:none"></button>
             <span class="cbar-sep"></span>
             <div class="scope-wrap" id="engineWrap" style="display:none"><button type="button" class="sel" id="engineBtn" title="Quel modèle répond"></button><div class="scope-menu" id="engineMenu"></div></div>
@@ -1459,6 +1518,34 @@
     <button class="btn primary" id="loginBtn" type="submit">Se connecter</button>
     <p class="note" id="loginNote" style="text-align:center"></p>
   </form>
+</div>
+<aside id="canvasPane" class="cvs" hidden>
+  <div class="cvs-head">
+    <input class="cvs-title" id="cvsTitle" placeholder="Titre" maxlength="120">
+    <select class="field" id="cvsVersions" title="Versions"></select>
+    <button class="iconbtn" id="cvsPreview" title="Aperçu / édition" data-i="panel"></button>
+    <button class="iconbtn" id="cvsCopy" title="Copier" data-i="copy"></button>
+    <button class="iconbtn" id="cvsDownload" title="Télécharger" data-i="download"></button>
+    <button class="iconbtn" id="cvsClose" title="Fermer" data-i="x"></button>
+  </div>
+  <div class="cvs-body"><textarea id="cvsText" spellcheck="true"></textarea><div class="cvs-view md" id="cvsView" hidden></div></div>
+  <div class="cvs-foot">
+    <div class="ag-chips" id="cvsQuick"></div>
+    <div class="cvs-ask"><span class="note" id="cvsSel"></span><input class="field" id="cvsInstr" placeholder="Demande à Atom de modifier… (sélectionne un passage pour ne changer que lui)"><button class="btn primary" id="cvsGo">Modifier</button></div>
+  </div>
+</aside>
+<div class="modal" id="spaceDlg">
+  <div class="modal-in">
+    <h4 id="spDlgTitle">Nouvel espace</h4>
+    <p class="desc">Un espace regroupe des conversations sur un sujet, avec ses propres consignes et ses documents. Dans un espace, Atom suit ces consignes et cherche d'abord dans ces collections.</p>
+    <label class="lbl">Nom</label>
+    <input class="field" id="spDlgName" placeholder="Ex. Leyo Shell, Administratif, Santé…" maxlength="80">
+    <label class="lbl">Consignes pour Atom (facultatif)</label>
+    <textarea class="field" id="spDlgInstr" rows="4" placeholder="Ex. « Je développe un shell en Go pour Windows. Réponds de façon technique, avec du code Go idiomatique. »"></textarea>
+    <label class="lbl">Collections de la bibliothèque (facultatif)</label>
+    <div class="lab-pick" id="spDlgCols"></div>
+    <div class="row" style="justify-content:space-between;margin-top:16px"><button class="btn" id="spDlgDel">Supprimer l'espace</button><span><button class="btn" id="spDlgCancel">Annuler</button> <button class="btn primary" id="spDlgOk">Enregistrer</button></span></div>
+  </div>
 </div>
 <div class="modal" id="codeDlg">
   <div class="modal-in">
@@ -2202,6 +2289,7 @@ function loadKatex() {
   return katexLoading;
 }
 function renderMath(el) {
+  renderMermaid(el);
   const nodes = el.querySelectorAll(".math[data-tex]");
   if (!nodes.length) return;
   loadKatex().then(() => nodes.forEach((n) => {
@@ -2209,6 +2297,39 @@ function renderMath(el) {
   })).catch(() => {});
 }
 function setMd(el, text) { el.innerHTML = md(text); renderMath(el); }
+// Schémas Mermaid : chargés à la demande, rendus en monochrome selon le thème.
+let mermaidLoading = null, mmSeq = 0;
+function loadMermaid() {
+  if (window.mermaid) return Promise.resolve();
+  if (mermaidLoading) return mermaidLoading;
+  mermaidLoading = new Promise((res, rej) => {
+    const sc = document.createElement("script");
+    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js";
+    sc.onload = () => res(); sc.onerror = rej; document.head.appendChild(sc);
+  });
+  return mermaidLoading;
+}
+function renderMermaid(el) {
+  const nodes = [...el.querySelectorAll(".mm[data-src]")];
+  if (!nodes.length) return;
+  loadMermaid().then(async () => {
+    const light = document.documentElement.dataset.theme === "light";
+    window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", fontFamily: getComputedStyle(document.body).fontFamily,
+      themeVariables: light ? { primaryColor: "#f1f1ee", primaryBorderColor: "#9a9a96", primaryTextColor: "#1b1b1b", lineColor: "#8a8a86", fontSize: "13px" }
+        : { primaryColor: "#262626", primaryBorderColor: "#4a4a4a", primaryTextColor: "#e6e6e6", lineColor: "#6a6a6a", secondaryColor: "#222", tertiaryColor: "#1e1e1e", background: "#1b1b1b", fontSize: "13px" } });
+    for (const n of nodes) {
+      const src = n.dataset.src; n.removeAttribute("data-src");
+      try { const { svg } = await window.mermaid.render("mm" + (++mmSeq), src); n.innerHTML = svg; n.dataset.code = src; }
+      catch { n.innerHTML = `<pre class="mm-wait">${esc(src)}</pre><p class="note">Schéma illisible : voici son code.</p>`; }
+    }
+  }).catch(() => {});
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mmcode], [data-mmsvg]"); if (!b) return;
+  const box = b.closest(".mm-box"), mm = box.querySelector(".mm");
+  if (b.hasAttribute("data-mmcode")) { copyText(mm.dataset.code || mm.textContent); toast("Code du schéma copié."); }
+  else { const svg = mm.querySelector("svg"); if (!svg) return; const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([svg.outerHTML], { type: "image/svg+xml" })); a.download = "schema.svg"; a.click(); }
+});
 const isRow = (l) => /^\s*\|.*\|\s*$/.test(l);
 const isSep = (l) => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
 const cells = (l) => l.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
@@ -2230,6 +2351,9 @@ function mdRaw(src) {
       i++;
       while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]);
       i++;
+      if ((m[1] || "").toLowerCase() === "mermaid") {
+        out += `<div class="mm-box"><div class="mm" data-src="${esc(buf.join("\n"))}"><pre class="mm-wait">${esc(buf.join("\n"))}</pre></div><div class="mm-acts"><button data-mmcode>Voir le code</button><button data-mmsvg>Télécharger (SVG)</button></div></div>`;
+      } else
       out += `<div class="code"><div class="code-h"><span>${esc(m[1] || "code")}</span><button data-copy>${icon("copy")}Copier</button></div><pre><code>${highlight(buf.join("\n"))}</code></pre></div>`;
       continue;
     }
@@ -2330,6 +2454,10 @@ function convItem(c, snippet) {
   const t = document.createElement("div");
   t.className = "t"; t.title = c.title;
   t.textContent = c.title;
+  if (c.space_id && !(typeof activeSpace === "function" && activeSpace())) {
+    const sp = (typeof spacesList !== "undefined" ? spacesList : []).find((x) => x.id === c.space_id);
+    if (sp) { const g = document.createElement("span"); g.className = "sp-tag"; g.textContent = sp.name; t.appendChild(g); }
+  }
   if (snippet) { const s = document.createElement("span"); s.className = "snip"; s.textContent = snippet; t.appendChild(s); }
   t.onclick = () => { openConversation(c.id); app.classList.remove("side-open"); };
   t.ondblclick = () => renameInline(el, c);
@@ -2352,6 +2480,8 @@ function convItem(c, snippet) {
 
 let convAnimated = false;
 function renderConversations(list, search = false) {
+  const sp = typeof activeSpace === "function" ? activeSpace() : null;
+  if (sp && !search) list = list.filter((c) => c.space_id === sp.id);
   const nav = $("convList");
   nav.innerHTML = "";
   const animate = !convAnimated || search; convAnimated = true;
@@ -2359,7 +2489,7 @@ function renderConversations(list, search = false) {
   const _append = nav.appendChild.bind(nav);
   nav.appendChild = (el) => { if (animate && el.classList?.contains("conv")) { el.classList.add("in"); el.style.setProperty("--i", k++); } return _append(el); };
   if (!list.length) {
-    nav.innerHTML = `<div class="side-empty">${search ? "Aucun résultat." : "Aucune conversation pour l'instant."}</div>`;
+    nav.innerHTML = `<div class="side-empty">${search ? "Aucun résultat." : sp ? "Aucune conversation dans cet espace : écris un message pour commencer." : "Aucune conversation pour l'instant."}</div>`;
     return;
   }
   if (search) {
@@ -2569,6 +2699,8 @@ function msgEl(m, idx, fresh = false) {
   if (!isUser && m.meta?.workshop) el.insertBefore(workshopEl(m.meta.workshop), body);
   if (!isUser && m.meta?.docs?.length) el.appendChild(docsEl(m.meta.docs));
   if (!isUser && m.meta?.reminders?.length) for (const r of m.meta.reminders) el.appendChild(reminderCard(r));
+  if (!isUser && m.meta?.analysis) el.appendChild(analysisEl(m.meta.analysis));
+  if (!isUser && m.meta?.research) body.insertAdjacentHTML("beforebegin", `<div class="rs-tag">${icon("library")}Recherche approfondie · ${m.meta.research.queries?.length || 0} recherches · ${m.meta.sources?.length || 0} sources${m.meta.research.engine ? ` · ${esc(m.meta.research.engine)}` : ""}</div>`);
   if (!isUser && m.meta?.sources?.length) el.appendChild(sourcesEl(m.meta.sources));
   if (!isUser && m.meta?.used) el.appendChild(usedEl(m.meta.used));
   if (!m.error) el.appendChild(actions(m, idx));
@@ -2578,7 +2710,7 @@ function msgEl(m, idx, fresh = false) {
 function fileChip(a, onRemove) {
   const c = document.createElement("span");
   c.className = "file" + (a.loading ? " loading" : "");
-  const size = a.loading ? "lecture…" : a.pages ? `${a.pages} p.` : `${Math.max(1, Math.round((a.chars ?? a.text?.length ?? 0) / 1000))} k car.`;
+  const size = a.loading ? "lecture…" : a.data ? "analyse Python" : a.pages ? `${a.pages} p.` : `${Math.max(1, Math.round((a.chars ?? a.text?.length ?? 0) / 1000))} k car.`;
   c.innerHTML = `${icon("doc")}<b>${esc(a.name)}</b><small>${size}</small>`;
   if (onRemove) {
     const x = document.createElement("button");
@@ -2705,6 +2837,7 @@ function actions(m, idx) {
     if (m.id) btn("edit", "Modifier", () => editMessage(idx));
   } else {
     btn("copy", "Copier", (e) => flashCopy(e.currentTarget, m.content));
+    btn("doc", "Ouvrir dans le canevas (modifier avec Atom)", () => canvasFromMessage(m));
     if (idx === history.length - 1) btn("refresh", "Régénérer", () => regenerate());
     if (idx === history.length - 1 && !m.meta?.provider && hybridState?.configured) btn("spark", `Réponse approfondie (${hybridState.name})`, () => regenerate("mistral"));
     if (m.id) {
@@ -2845,7 +2978,10 @@ form.addEventListener("submit", (e) => {
     const files = pending.slice();
     pending = []; renderTray();
     input.value = ""; clearDraft(); autoGrow();
-    if (workshopNext && text && !files.length) sendWorkshop(text);
+    const dataFile = files.find((f) => f.data);
+    if (dataFile) sendSpecial("analyze", text || "", { name: dataFile.name, data: dataFile.b64, question: text || "" }, dataFile.name);
+    else if (deepNext && text && !files.length) sendSpecial("research", text, { message: text });
+    else if (workshopNext && text && !files.length) sendWorkshop(text);
     else sendMessage(text, files);
   }
 });
@@ -2938,6 +3074,7 @@ async function sendMessage(text, files = []) {
         web: webMode,
         scope,
         engine: engineUsed,
+        space_id: settings.conversationId ? null : (settings.space || null),
       }),
     });
     const reader = r.body.getReader();
@@ -3325,6 +3462,15 @@ async function addFiles(list) {
   for (const file of list) {
     if (pending.length >= 5) { toast("5 fichiers maximum par message."); break; }
     if (file.size > 15 * 1024 * 1024) { toast(`<b>${esc(file.name)}</b> · trop gros (15 Mo max).`); continue; }
+    if (/\.(csv|tsv|xlsx|xls|json|parquet)$/i.test(file.name) && sbGlobal?.enabled) {
+      // fichier de données : analysé par Python dans le bac à sable (le fichier ne quitte pas le serveur)
+      const item = { name: file.name, text: "", loading: true, data: true, chars: file.size };
+      pending.push(item); renderTray();
+      try { item.b64 = await toBase64(file); item.loading = false; } catch { pending.splice(pending.indexOf(item), 1); }
+      renderTray();
+      if (pending.filter((f) => f.data).length === 1) toast(`<b>${esc(file.name)}</b> · pose ta question : Atom l'analysera avec Python (graphiques compris).`);
+      continue;
+    }
     const item = { name: file.name, text: "", loading: true };
     pending.push(item); renderTray();
     try {
@@ -4530,7 +4676,7 @@ function agOpen() {
   });
   $("agInfo").textContent = $("cvProject").selectedOptions[0]?.textContent || "";
   $("agClose").hidden = !code.open.length;
-  loadAgHistory();
+  loadAgHistory(); loadAgRules();
   const last = store.get(agKey(), null);
   if (last && (!agState || agState.id !== last)) agFollow(last, true);
   else if (!agRun) $("agTask").focus();
@@ -4613,8 +4759,10 @@ $("agRun").onclick = async () => {
   agReset();
   try {
     const { id } = await (await send_(`/api/agent/${code.project}`, "POST", { task, engine: $("agEngine").value, parent: agParent || undefined })).json();
+    const wasFollowUp = !!agParent;
     agParent = null; $("agParentNote").hidden = true;
-    store.set(agKey(), id); agBusy(true); agFollow(id);
+    store.set(agKey(), id); agBusy(true); await agFollow(id);
+    if (wasFollowUp || CORRECTION.test(task)) agSuggestRule(task);
   } catch (e) { toast(`<b>Agent</b> · ${esc(e.message)}`); }
 };
 let agParent = null;
@@ -4820,6 +4968,29 @@ function agHomeUpdate(runs) {
   $("agRecent").querySelectorAll("button").forEach((b) => { b.onclick = () => { agReset(); store.set(agKey(), b.dataset.id); agFollow(b.dataset.id, true); }; });
 }
 
+/* ---- règles retenues par projet (comme les règles de Cursor) */
+let agRules = [];
+async function loadAgRules() {
+  try { agRules = (await getJSON(`/api/agent/${code.project}/rules`)).rules; } catch { agRules = []; }
+  $("agRules").innerHTML = agRules.length ? agRules.map((r, i) => `<div><span>${esc(r)}</span><button data-rm="${i}" title="Supprimer">retirer</button></div>`).join("")
+    : '<p class="note" style="margin:0">Aucune règle. Quand tu corriges l\'agent (« utilise plutôt… », « jamais… »), il te propose de la retenir.</p>';
+  $("agRules").querySelectorAll("[data-rm]").forEach((b) => { b.onclick = () => saveAgRules(agRules.filter((_, i) => i !== +b.dataset.rm)); });
+}
+async function saveAgRules(list) {
+  try { agRules = (await (await send_(`/api/agent/${code.project}/rules`, "PUT", { rules: list })).json()).rules; } catch (e) { toast(esc(e.message)); }
+  loadAgRules();
+}
+$("agRuleAdd").onclick = () => { const v = $("agRuleIn").value.trim(); if (!v) return; $("agRuleIn").value = ""; saveAgRules([...agRules, v]); toast("Règle ajoutée au projet."); };
+$("agRuleIn").addEventListener("keydown", (e) => { if (e.key === "Enter") $("agRuleAdd").click(); });
+// Une correction ressemble souvent à une règle durable : on propose de la retenir.
+const CORRECTION = /\b(toujours|jamais|ne (?:pas|plus|jamais)|n'utilise|utilise plutôt|plutôt que|au lieu de|on utilise|je préfère|préfère|évite|interdit|convention|style)\b/i;
+function agSuggestRule(task) {
+  const sentence = task.split(/(?<=[.!?])\s+/).find((x) => CORRECTION.test(x));
+  if (!sentence || agRules.includes(sentence.trim())) return;
+  const d = agStep("plan", "check", `<span class="t">Retenir comme règle du projet ? « ${esc(sentence.trim())} » <button class="btn sm" data-keep>Retenir</button></span>`);
+  d.querySelector("[data-keep]").onclick = (e) => { saveAgRules([...agRules, sentence.trim()]); e.currentTarget.replaceWith(document.createTextNode("✓ retenue")); };
+}
+
 /* ============================================================
    ATELIER MULTI-IA
    ============================================================ */
@@ -4959,6 +5130,212 @@ async function sendWorkshop(text) {
 }
 
 /* ============================================================
+   ESPACES — conversations, consignes et documents par sujet
+   ============================================================ */
+let spacesList = [], spEditing = null;
+const activeSpace = () => spacesList.find((x) => x.id === settings.space) || null;
+async function loadSpaces() {
+  try { spacesList = (await getJSON("/api/spaces")).spaces; } catch { spacesList = []; }
+  if (settings.space && !activeSpace()) { settings.space = null; saveSettings(); }
+  renderSpaces();
+}
+function renderSpaces() {
+  const sp = activeSpace();
+  $("spaces").hidden = !!sp;
+  $("spActive").hidden = !sp;
+  if (sp) $("spName").textContent = sp.name;
+  $("spList").innerHTML = spacesList.map((x) => `<button data-sp="${x.id}" title="${esc(x.instructions || x.name)}"><span class="ini">${esc((x.name[0] || "?").toUpperCase())}</span><span class="n">${esc(x.name)}</span><span class="c">${x.conversations || ""}</span></button>`).join("");
+  $("spList").querySelectorAll("[data-sp]").forEach((b) => { b.onclick = () => enterSpace(+b.dataset.sp); });
+  renderConversations(conversations);
+}
+function enterSpace(id) {
+  settings.space = id; saveSettings(); renderSpaces();
+  const c = currentConv();
+  if (!c || c.space_id !== id) newConversation();
+}
+$("spBack").onclick = () => { settings.space = null; saveSettings(); renderSpaces(); };
+$("spNew").onclick = () => openSpaceDlg(null);
+$("spEdit").onclick = () => openSpaceDlg(activeSpace());
+function openSpaceDlg(sp) {
+  spEditing = sp;
+  $("spDlgTitle").textContent = sp ? "Modifier l'espace" : "Nouvel espace";
+  $("spDlgName").value = sp?.name || ""; $("spDlgInstr").value = sp?.instructions || "";
+  $("spDlgDel").hidden = !sp;
+  const cols = (library?.collections || []);
+  $("spDlgCols").innerHTML = cols.length ? cols.map((c) => `<label><input type="checkbox" value="${c.id}" ${sp?.collections.includes(c.id) ? "checked" : ""}>${esc(c.name)}${c.kind === "code" ? " · code" : ""}</label>`).join("")
+    : '<p class="note">Aucune collection : ajoute des documents dans la Bibliothèque.</p>';
+  $("spaceDlg").classList.add("open"); $("spDlgName").focus();
+}
+$("spDlgCancel").onclick = () => $("spaceDlg").classList.remove("open");
+$("spaceDlg").addEventListener("click", (e) => { if (e.target.id === "spaceDlg") $("spaceDlg").classList.remove("open"); });
+$("spDlgOk").onclick = async () => {
+  const name = $("spDlgName").value.trim();
+  if (!name) { $("spDlgName").focus(); return; }
+  const body = { name, instructions: $("spDlgInstr").value, collections: [...$("spDlgCols").querySelectorAll("input:checked")].map((i) => +i.value) };
+  try {
+    const sp = await (await send_(spEditing ? `/api/spaces/${spEditing.id}` : "/api/spaces", spEditing ? "PATCH" : "POST", body)).json();
+    $("spaceDlg").classList.remove("open");
+    await loadSpaces();
+    if (!spEditing) enterSpace(sp.id);
+    toast(spEditing ? "Espace mis à jour." : `Espace <b>${esc(sp.name)}</b> créé.`);
+  } catch (e) { toast(esc(e.message)); }
+};
+$("spDlgDel").onclick = async () => {
+  if (!spEditing || !confirm(`Supprimer l'espace « ${spEditing.name} » ? Ses conversations sont conservées.`)) return;
+  await send_(`/api/spaces/${spEditing.id}`, "DELETE");
+  $("spaceDlg").classList.remove("open");
+  if (settings.space === spEditing.id) settings.space = null;
+  saveSettings(); await loadSpaces(); loadConversations();
+};
+async function moveToSpace(spaceId) {
+  const c = currentConv(); if (!c) { toast("Ouvre d'abord une conversation."); return; }
+  await send_(`/api/conversations/${c.id}/space`, "PUT", { space_id: spaceId });
+  await loadConversations(); await loadSpaces();
+  toast(spaceId ? `Conversation rangée dans <b>${esc(spacesList.find((x) => x.id === spaceId)?.name || "")}</b>.` : "Conversation retirée de l'espace.");
+}
+
+/* ============================================================
+   RECHERCHE APPROFONDIE et ANALYSE DE DONNÉES — même déroulé :
+   étapes en direct, puis réponse finale, enregistrée dans la conversation
+   ============================================================ */
+let deepNext = false, sbGlobal = null, palCanvases = [];
+setInterval(() => getJSON("/api/canvas").then((d) => { palCanvases = d.canvases.slice(0, 12); }).catch(() => {}), 60000);
+getJSON("/api/canvas").then((d) => { palCanvases = d.canvases.slice(0, 12); }).catch(() => {});
+getJSON("/api/sandbox").then((d) => { sbGlobal = d; }).catch(() => {});
+function renderDeepBtn() {
+  const b = $("deepBtn"); if (!b) return;
+  b.style.display = searchAvailable ? "" : "none";
+  b.classList.toggle("on", deepNext);
+  b.title = deepNext ? "Recherche approfondie activée pour le prochain message (clic pour annuler)" : "Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé";
+}
+$("deepBtn").onclick = () => { deepNext = !deepNext; if (deepNext) { webForce = false; renderWebBtn(); } renderDeepBtn(); input.focus(); if (deepNext) toast("Recherche approfondie : compte 1 à 3 minutes. Atom lit plusieurs sources et rédige un rapport."); };
+setInterval(renderDeepBtn, 3000); renderDeepBtn();
+function analysisEl(a) {
+  const d = document.createElement("div");
+  d.innerHTML = (a.images?.length ? `<div class="an-imgs">${a.images.map((f) => `<img src="/api/analysis/${encodeURIComponent(f)}" alt="Graphique" loading="lazy">`).join("")}</div>` : "")
+    + `<details class="an-code"><summary>Script Python${a.ok ? "" : " (en échec)"} · ${esc(a.file || "")}</summary><pre><code>${highlightLang(a.code || "", "py")}</code></pre>${a.output ? `<pre>${esc(a.output)}</pre>` : ""}</details>`;
+  d.querySelectorAll("img").forEach((im) => { im.onclick = () => window.open(im.src, "_blank"); });
+  return d;
+}
+async function sendSpecial(kind, text, body, fileName) {
+  exitHero(); $("empty")?.remove();
+  deepNext = false; renderDeepBtn();
+  setBusy(true);
+  const userMsg = { role: "user", content: text || (fileName ? `Analyse ${fileName}` : ""), meta: fileName ? { attachments: [{ name: fileName, text: "" }] } : undefined };
+  history.push(userMsg); chat.appendChild(msgEl(userMsg, history.length - 1));
+  setEmotion(kind === "research" ? "curious" : "focus"); setEntityState(kind === "research" ? "recherche approfondie…" : "analyse…");
+  const el = document.createElement("div"); el.className = "msg atom";
+  el.innerHTML = `<details class="rs-live" open><summary>${kind === "research" ? "Recherche approfondie en cours…" : "Analyse en cours…"}</summary><div class="lv"></div></details><div class="body md"></div>`;
+  chat.appendChild(el); scroller.scrollTop = scroller.scrollHeight;
+  const lv = el.querySelector(".lv"), out = el.querySelector(".body"), sum = el.querySelector("summary");
+  let final = "", q = false;
+  controller = new AbortController();
+  if (kind === "research") { entity.feeding = true; entity.feedColor = [110, 170, 255]; } else entity.scan = true;
+  try {
+    const r = await api(`/api/${kind}`, { method: "POST", signal: controller.signal, body: JSON.stringify({ ...body, conversation_id: settings.conversationId }) });
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1); if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "meta") { if (settings.conversationId !== ev.conversation_id) { settings.conversationId = ev.conversation_id; saveSettings(); loadConversations(); } }
+        else if (ev.type === "progress") { const d = document.createElement("div"); d.className = "st"; d.textContent = ev.text; lv.appendChild(d); sum.textContent = ev.text; entity.tokenKick = 1; scroller.scrollTop = scroller.scrollHeight; }
+        else if (ev.type === "token") {
+          if (!final) { el.querySelector(".rs-live").open = false; setEmotion("talking"); entity.feeding = false; }
+          final += ev.text; entity.tokenKick = 1;
+          if (!q) { q = true; requestAnimationFrame(() => { q = false; out.innerHTML = md(final.replace(/^\s*\[[a-z_]+\]\s*/i, "")); scroller.scrollTop = scroller.scrollHeight; }); }
+        } else if (ev.type === "error") throw new Error(ev.message);
+      }
+    }
+    setBusy(false);
+    await openConversation(settings.conversationId);
+    setEmotion("joy");
+  } catch (err) {
+    setBusy(false); entity.glitch = 1;
+    if (err.name === "AbortError") { toast("Arrêté."); await openConversation(settings.conversationId); }
+    else { el.replaceWith(msgEl({ role: "assistant", content: err.message, error: true }, -1)); setEmotion("fear"); }
+  } finally {
+    controller = null; entity.feeding = false; entity.scan = false; setBusy(false); scheduleRest(); loadConversations();
+  }
+}
+
+/* ============================================================
+   CANEVAS — un document modifié à deux, avec ses versions
+   ============================================================ */
+let cvs = null, cvsTimer = 0, cvsPreview = false;
+const CVS_QUICK = [["Corriger", "Corrige l'orthographe, la grammaire et la ponctuation, sans changer le style."], ["Raccourcir", "Raccourcis d'environ un tiers en gardant l'essentiel."],
+  ["Développer", "Développe avec plus de détails et d'exemples concrets."], ["Plus formel", "Rends le ton plus formel et professionnel."], ["Plus simple", "Simplifie : phrases courtes, mots simples."],
+  ["En anglais", "Traduis en anglais."], ["Structurer", "Structure avec des titres, des listes et des paragraphes courts."]];
+$("cvsQuick").innerHTML = CVS_QUICK.map(([t], i) => `<button data-q="${i}">${t}</button>`).join("");
+$("cvsQuick").querySelectorAll("button").forEach((b) => { b.onclick = () => canvasAsk(CVS_QUICK[+b.dataset.q][1]); });
+function cvsRender() {
+  $("canvasPane").classList.toggle("code", cvs.kind === "code");
+  $("cvsTitle").value = cvs.title; $("cvsText").value = cvs.content;
+  $("cvsVersions").innerHTML = cvs.versions.map((v) => `<option value="${v.i}" ${v.i === cvs.versions.length - 1 ? "selected" : ""}>v${v.i + 1} · ${esc(v.by)} · ${new Date(v.at * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}${v.note ? " · " + esc(v.note.slice(0, 30)) : ""}</option>`).reverse().join("");
+  cvsShowView();
+}
+function cvsShowView() {
+  $("cvsText").hidden = cvsPreview; $("cvsView").hidden = !cvsPreview;
+  if (cvsPreview) cvs.kind === "code" ? ($("cvsView").innerHTML = `<pre><code>${esc($("cvsText").value)}</code></pre>`) : setMd($("cvsView"), $("cvsText").value);
+}
+async function openCanvas(id) {
+  try { cvs = await getJSON(`/api/canvas/${id}`); } catch (e) { toast(esc(e.message)); return; }
+  cvsPreview = false; $("canvasPane").hidden = false; cvsRender(); $("cvsText").focus();
+}
+async function newCanvas(title, content, kind = "doc") {
+  const c = await (await send_("/api/canvas", "POST", { title, content, kind, conversation_id: settings.conversationId })).json();
+  openCanvas(c.id);
+}
+function canvasFromMessage(m) {
+  let text = (m.content || "").replace(/^\s*\[[a-z_]+\]\s*/i, "").trim(), kind = "doc";
+  const code = text.match(/^```[\w+#.-]*\n([\s\S]*?)\n?```$/);
+  if (code) { text = code[1]; kind = "code"; }
+  const title = (text.match(/^#+\s*(.+)$/m)?.[1] || currentConv()?.title || "Document").slice(0, 80);
+  newCanvas(title, text, kind);
+}
+function cvsSave() {
+  clearTimeout(cvsTimer);
+  cvsTimer = setTimeout(async () => {
+    if (!cvs) return;
+    try { cvs = await (await send_(`/api/canvas/${cvs.id}`, "PUT", { content: $("cvsText").value, title: $("cvsTitle").value })).json(); cvsRenderVersions(); } catch {}
+  }, 1200);
+}
+function cvsRenderVersions() { const keepText = $("cvsText").value; const t = $("cvsTitle").value; cvsRender(); $("cvsText").value = keepText; $("cvsTitle").value = t; }
+$("cvsText").addEventListener("input", cvsSave);
+$("cvsTitle").addEventListener("input", cvsSave);
+const cvsSelection = () => { const t = $("cvsText"); return t.selectionEnd > t.selectionStart ? t.value.slice(t.selectionStart, t.selectionEnd) : ""; };
+["select", "keyup", "mouseup"].forEach((ev) => $("cvsText").addEventListener(ev, () => { const s = cvsSelection(); $("cvsSel").textContent = s ? `${s.length} car. sélectionnés` : ""; }));
+async function canvasAsk(instruction) {
+  instruction = (instruction || $("cvsInstr").value).trim(); if (!cvs || instruction.length < 2) { $("cvsInstr").focus(); return; }
+  const selection = cvsSelection();
+  clearTimeout(cvsTimer);
+  $("canvasPane").classList.add("busy"); $("cvsGo").disabled = true; $("cvsGo").innerHTML = '<span class="spin"></span>'; setEmotion("focus");
+  try {
+    await send_(`/api/canvas/${cvs.id}`, "PUT", { content: $("cvsText").value, title: $("cvsTitle").value });
+    cvs = await (await send_(`/api/canvas/${cvs.id}/edit`, "POST", { instruction, selection })).json();
+    cvsRender(); $("cvsInstr").value = ""; entity.absorb = 1; toast(selection ? "Passage modifié par Atom." : "Document modifié par Atom · version précédente dans le menu des versions.");
+  } catch (e) { toast(`<b>Canevas</b> · ${esc(e.message)}`); }
+  finally { $("canvasPane").classList.remove("busy"); $("cvsGo").disabled = false; $("cvsGo").textContent = "Modifier"; setEmotion("idle"); }
+}
+$("cvsGo").onclick = () => canvasAsk();
+$("cvsInstr").addEventListener("keydown", (e) => { if (e.key === "Enter") canvasAsk(); });
+$("cvsVersions").onchange = async (e) => {
+  const i = +e.target.value; if (i === cvs.versions.length - 1) return;
+  if (!confirm(`Revenir à la version ${i + 1} ? (la version actuelle reste dans l'historique)`)) { cvsRender(); return; }
+  const { content } = await getJSON(`/api/canvas/${cvs.id}/versions/${i}`);
+  cvs = await (await send_(`/api/canvas/${cvs.id}`, "PUT", { content })).json(); cvsRender();
+};
+$("cvsPreview").onclick = () => { cvsPreview = !cvsPreview; cvsShowView(); };
+$("cvsCopy").onclick = (e) => flashCopy(e.currentTarget, $("cvsText").value);
+$("cvsDownload").onclick = () => {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([$("cvsText").value], { type: "text/plain" }));
+  a.download = ($("cvsTitle").value || "document").replace(/[^\w\- ]+/g, "").trim() + (cvs?.kind === "code" ? ".txt" : ".md"); a.click();
+};
+$("cvsClose").onclick = () => { clearTimeout(cvsTimer); if (cvs) send_(`/api/canvas/${cvs.id}`, "PUT", { content: $("cvsText").value, title: $("cvsTitle").value }).catch(() => {}); $("canvasPane").hidden = true; cvs = null; };
+
+/* ============================================================
    THÈME
    ============================================================ */
 const darkMQ = matchMedia("(prefers-color-scheme: dark)");
@@ -4985,6 +5362,12 @@ function palActions() {
   const list = [
     A("Actions", "plus", "Nouvelle conversation", () => newConversation(), "Ctrl ⇧ O"),
     A("Actions", "orb", "Mode présence", () => enterPresence()),
+    A("Canevas", "doc", "Nouveau canevas (document vide)", () => newCanvas("Nouveau document", "")),
+    ...(palCanvases || []).map((c) => A("Canevas", "doc", `Ouvrir le canevas « ${c.title} »`, () => openCanvas(c.id))),
+    A("Espaces", "folder", "Nouvel espace…", () => openSpaceDlg(null)),
+    ...spacesList.map((x) => A("Espaces", "folder", `Ouvrir l'espace « ${x.name} »`, () => enterSpace(x.id))),
+    ...(currentConv() ? spacesList.map((x) => A("Espaces", "folder", `Ranger cette conversation dans « ${x.name} »`, () => moveToSpace(x.id))) : []),
+    ...(currentConv()?.space_id ? [A("Espaces", "folder", "Retirer cette conversation de son espace", () => moveToSpace(null))] : []),
     A("Actions", "globe", webForce ? "Ne plus forcer la recherche web" : "Rechercher sur Internet pour le prochain message", () => { webForce = !webForce; renderWebBtn(); }),
     A("Actions", "download", "Exporter la conversation en Markdown", () => $("exportBtn").click()),
     A("Aller à", "list", "Discussion", () => showView("chat")),
@@ -5157,6 +5540,7 @@ applyLook();
 renderWebBtn();
 loadHybrid().then(loadWorkshop);
 loadLibrary();
+loadSpaces();
 if (store.get("view", "chat") === "code" || store.get("view", "chat") === "library") showView(store.get("view", "chat"));
 refreshCounts();
 setInterval(refreshCounts, 60000);

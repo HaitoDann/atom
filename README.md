@@ -282,6 +282,33 @@ Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub o
   - Il faut un jeton GitHub **fine-grained** limité à tes dépôts avec **Contents: Read and write** dans `ATOM_GITHUB_TOKEN` (`.env`), et `ATOM_GIT_NAME` / `ATOM_GIT_EMAIL` pour signer les commits. Le jeton n'est jamais écrit dans les dépôts clonés.
 - **Mettre à jour** récupère les derniers changements du dépôt (si un fichier modifié localement change aussi sur GitHub, annule d'abord ta modification).
 
+## Espaces, canevas, recherche approfondie, analyse de données, schémas
+
+**Espaces** (comme les Projets de ChatGPT et Claude). Barre latérale → **Espaces** → ＋ : un nom, des **consignes** (« je développe un shell en Go, réponds en technique ») et, si tu veux, des **collections** de la bibliothèque.
+- Dans un espace, la liste ne montre que ses conversations, et les nouvelles conversations y sont rangées.
+- Atom suit les consignes de l'espace et cherche d'abord dans ses collections.
+- Ctrl+K permet de ranger la conversation ouverte dans un espace, ou de l'en retirer. Supprimer un espace garde ses conversations.
+
+**Canevas** (comme Canvas et Artifacts). Sous une réponse, l'icône **document** ouvre son contenu dans un panneau d'édition à droite. Tu peux aussi faire Ctrl+K → « Nouveau canevas ».
+- Tu écris directement : l'enregistrement est automatique.
+- Tu peux demander à Atom de modifier **tout le document** ou **seulement la partie sélectionnée**, avec une consigne libre ou en un clic : corriger, raccourcir, développer, plus formel, plus simple, en anglais, structurer.
+- Chaque modification crée une **version** : le menu en haut permet de revenir en arrière. Il y a aussi un aperçu Markdown, la copie et le téléchargement.
+
+**Recherche approfondie** (comme Deep Research). Bouton **bibliothèque** à côté du globe, puis ta question.
+- Atom établit un plan de 3 à 6 recherches, lit les pages, prend des notes sourcées, fait une passe de vérification (ce qui manque ou se contredit), puis rédige un **rapport** : en bref, des sections, des sources citées [n] et les points d'attention.
+- Compte 1 à 3 minutes, avec les étapes affichées en direct.
+- Seules la question et des pages publiques partent vers l'API distante.
+
+**Analyse de données** (comme Code Interpreter), qui demande le bac à sable. Joins un **CSV, Excel, JSON ou Parquet**, puis pose ta question (« total des ventes par mois, avec un graphique »).
+- Atom lit le fichier, écrit un script Python (pandas, matplotlib), l'exécute **sans réseau** dans le bac à sable, le corrige s'il échoue (2 essais), puis explique les résultats.
+- Les **graphiques** s'affichent dans la réponse, et le script reste consultable.
+- Le fichier ne quitte pas le serveur : seuls un aperçu et les résultats chiffrés partent vers le modèle, et vers une API distante seulement si tu as autorisé l'envoi des fichiers.
+- Les bibliothèques Python (environ 100 Mo) sont téléchargées une seule fois.
+
+**Schémas**. Atom dessine les architectures, processus, cartes mentales et chronologies avec **Mermaid**, rendus aux couleurs du thème. Sous chaque schéma : copier le code ou télécharger le SVG.
+
+**Règles de projet** (mode Code, comme les règles de Cursor). Dans l'onglet Agent, **Règles du projet** liste ce que l'agent doit toujours respecter (« utiliser des tabulations », « tests avec testify »). Quand tu corriges l'agent (« jamais… », « utilise plutôt… »), il te propose de **retenir** la consigne. Les fichiers `AGENTS.md` et `CLAUDE.md` du dépôt sont aussi lus.
+
 ## Bac à sable : exécuter les tests (mode Code)
 
 Atom peut lancer les tests d'un projet dans un **conteneur Docker jetable**, et l'agent peut vérifier lui-même que son code compile et passe les tests.
