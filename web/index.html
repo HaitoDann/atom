@@ -548,6 +548,8 @@
   .ag[hidden] { display: none; }
   .ag-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
   .ag-head b { font-weight: 500; color: var(--strong); }
+  .ag-head .note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ag-head .spacer { display: none; }
   .ag-form { padding: 12px 14px; display: grid; gap: 8px; border-bottom: 1px solid var(--border); }
   .ag-form .row { display: flex; align-items: center; gap: 8px; }
   .ag-form textarea { resize: vertical; font-size: 13.5px; }
@@ -1051,12 +1053,13 @@
       <div class="cv-main">
         <div id="cvEmpty" class="cv-placeholder" hidden>Aucun projet de code pour l'instant.<small>Ajoute un dépôt GitHub ou un dossier du serveur pour le parcourir ici.</small><button class="btn primary" id="cvAdd2" style="margin-top:14px">Ajouter un projet</button></div>
         <div id="cvAgentView" class="ag" hidden>
-          <div class="ag-head"><b>Agent</b><span class="note" id="agInfo"></span><span class="spacer"></span><button class="iconbtn" id="agClose" title="Fermer" data-i="x"></button></div>
+          <div class="ag-head"><b>Agent</b><span class="note" id="agInfo"></span><span class="spacer"></span><select class="field" id="agHistory" hidden style="max-width:300px;font-size:12px"></select><button class="iconbtn" id="agNew" title="Nouvelle tâche" data-i="plus"></button><button class="iconbtn" id="agClose" title="Fermer" data-i="x"></button></div>
           <div class="ag-form" id="agForm">
             <textarea class="field" id="agTask" rows="3" placeholder="Décris la tâche, ex. « Ajoute une validation de l'e-mail dans le formulaire d'inscription et un message d'erreur clair »"></textarea>
             <div class="row"><select class="field" id="agEngine" style="max-width:240px"><option value="remote">API distante (recommandé)</option><option value="local">Modèle local</option></select>
               <span class="note" id="agEngineNote"></span><span class="spacer"></span><button class="btn primary" id="agRun">Lancer</button></div>
-            <p class="note">L'agent lit, cherche et prépare des modifications sur plusieurs fichiers, puis te les présente. Rien n'est écrit tant que tu n'as pas validé. Il n'exécute aucune commande.</p>
+            <p class="note" id="agParentNote" hidden>Suite de la tâche affichée : l'agent garde son contexte et les modifications non appliquées. <button class="btn sm" id="agParentCancel">Nouvelle tâche à la place</button></p>
+            <p class="note">L'agent tourne sur le serveur : tu peux recharger ou fermer la page, il continue. Il lit, cherche et prépare des modifications sur plusieurs fichiers, puis te les présente. Rien n'est écrit tant que tu n'as pas validé. Il n'exécute aucune commande.</p>
           </div>
           <div class="ag-log" id="agLog"></div>
           <div class="ag-res" id="agRes" hidden></div>
@@ -2329,6 +2332,7 @@ $("search").addEventListener("input", () => {
 
 function currentConv() { return conversations.find((c) => c.id === settings.conversationId); }
 function updateTitle() {
+  if (typeof currentView !== "undefined" && currentView !== "chat") { $("title").textContent = currentView === "code" ? "Code" : "Bibliothèque"; return; }
   const c = currentConv();
   $("title").textContent = c ? c.title : "Nouvelle conversation";
   $("pinBtn").style.display = c ? "" : "none";
@@ -3654,7 +3658,7 @@ let scope = store.get("scope", "auto");   // "auto" | "none" | "3,5"
 
 let currentView = "chat";
 function showView(v) {
-  currentView = v;
+  currentView = v; store.set("view", v);
   $("libView").hidden = v !== "library";
   $("codeView").hidden = v !== "code";
   $("scroller").hidden = v !== "chat";
@@ -4062,9 +4066,17 @@ function highlightLang(src, lang) {
   return out + esc(src.slice(last));
 }
 
+// État du mode Code conservé entre deux chargements (F5) : projet, onglets, fichier actif, agent ouvert.
+let codeRestored = false;
+function saveCodeState() {
+  if (!codeRestored) return;
+  store.set("codeState", { project: code.project, open: code.open.map((f) => f.path), active: code.active, agent: !$("cvAgentView").hidden });
+}
 async function loadCodeProjects() {
   try { library = await getJSON("/api/library"); } catch { return; }
   const projects = library.collections.filter((c) => c.kind === "code");
+  const saved = !codeRestored ? store.get("codeState", null) : null;
+  if (saved && projects.some((p) => p.id === saved.project)) code.project = saved.project;
   const sel = $("cvProject");
   sel.innerHTML = projects.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
   $("cvEmpty").hidden = projects.length > 0;
@@ -4073,9 +4085,16 @@ async function loadCodeProjects() {
   if (!projects.some((p) => p.id === code.project)) code.project = projects[0].id;
   sel.value = code.project;
   await loadCodeFiles();
+  if (saved && saved.project === code.project && !code.open.length) {
+    for (const path of (saved.open || []).slice(-8)) if (code.files.some((f) => f.path === path)) await openFile(path);
+    if (saved.active && code.open.some((f) => f.path === saved.active)) { code.active = saved.active; renderTabs(); renderEditor(); renderTree(); }
+    codeRestored = true;
+    if (saved.agent) agOpen();
+  }
+  codeRestored = true;
   if (projects.some((p) => p.status === "indexing")) { clearTimeout(libTimer); libTimer = setTimeout(loadLibrary, 2000); }
 }
-$("cvProject").onchange = async () => { if (!$("cvAgentView").hidden) agClose(); agRun = null; $("agLog").innerHTML = ""; $("agRes").hidden = true; code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.gitSel = null; code.gitKnown = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
+$("cvProject").onchange = async () => { if (!$("cvAgentView").hidden) agClose(); agRun = null; $("agLog").innerHTML = ""; $("agRes").hidden = true; code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.gitSel = null; code.gitKnown = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); saveCodeState(); };
 
 async function loadCodeFiles() {
   const d = await getJSON(`/api/library/collections/${code.project}/documents`);
@@ -4158,13 +4177,13 @@ async function openFile(path, line) {
     if (code.open.length > 8) code.open.shift();
   }
   code.active = path; code.sel = line ? [line, line] : null;
-  renderTabs(); renderEditor(line); renderTree();
+  renderTabs(); renderEditor(line); renderTree(); saveCodeState();
   entity.scan = true; clearTimeout(openFile._t); openFile._t = setTimeout(() => { entity.scan = false; }, 1400);
 }
 function closeTab(path) {
   code.open = code.open.filter((x) => x.path !== path);
   if (code.active === path) code.active = code.open.at(-1)?.path || null;
-  code.sel = null; renderTabs(); renderEditor(); renderTree();
+  code.sel = null; renderTabs(); renderEditor(); renderTree(); saveCodeState();
 }
 function renderTabs() {
   const t = $("cvTabs");
@@ -4409,7 +4428,7 @@ async function loadChanges() {
 }
 
 /* ---- agent : une tâche sur tout le projet, modifications validées à la fin */
-let agCtl = null, agRun = null;
+let agRun = null;
 const AG_ICON = { list: "folder", read: "doc", search: "search", edit: "edit", write: "plus", done: "check" };
 function agOpen() {
   $("cvAgentView").hidden = false; $("cvMainWrap").hidden = true;
@@ -4423,11 +4442,17 @@ function agOpen() {
     await saveHybrid({ allow_docs: true }); agOpen(); toast("Envoi du code autorisé · l'agent utilisera l'API distante.");
   });
   $("agInfo").textContent = $("cvProject").selectedOptions[0]?.textContent || "";
-  if (!agRun) $("agTask").focus();
+  loadAgHistory();
+  const last = store.get(agKey(), null);
+  if (last && (!agState || agState.id !== last)) agFollow(last, true);
+  else if (!agRun) $("agTask").focus();
+  saveCodeState();
 }
-function agClose() { if (agCtl) agCtl.abort(); $("cvAgentView").hidden = true; $("cvMainWrap").hidden = false; }
+function agClose() { clearTimeout(agPoll); $("cvAgentView").hidden = true; $("cvMainWrap").hidden = false; saveCodeState(); }
 $("cvAgent").onclick = () => ($("cvAgentView").hidden ? agOpen() : agClose());
 $("agClose").onclick = agClose;
+$("agNew").onclick = () => { agReset(); agParent = null; $("agParentNote").hidden = true; store.set(agKey(), null); $("agTask").value = ""; $("agTask").focus(); loadAgHistory(); };
+$("agParentCancel").onclick = () => { agParent = null; $("agParentNote").hidden = true; };
 $("agTask").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("agRun").click(); });
 function agStep(cls, ic, html) {
   const d = document.createElement("div"); d.className = "ag-step " + cls;
@@ -4438,55 +4463,92 @@ function agStep(cls, ic, html) {
 const agArgs = (t, a) => t === "read" ? `${a.path || ""}${a.start ? ` (l. ${a.start}${a.end ? "-" + a.end : ""})` : ""}` : t === "search" ? `« ${a.query || ""} »`
   : t === "list" ? (a.dir || "racine") : a.path || "";
 const AG_VERB = { list: "Liste", read: "Lit", search: "Cherche", edit: "Modifie", write: "Écrit", done: "Terminé" };
+// Les tâches tournent sur le serveur : la page ne fait que suivre (et peut être rechargée).
+let agPoll = 0, agState = null;   // { id, after, first, lastAction, thinking }
+const agKey = () => `agent:last:${code.project}`;
+function agReset() { $("agLog").innerHTML = ""; $("agRes").hidden = true; agRun = null; agState = null; clearTimeout(agPoll); }
+function agBusy(on) {
+  const btn = $("agRun"); btn.textContent = on ? "Arrêter" : "Lancer"; btn.classList.toggle("primary", !on);
+  if (on) { setEmotion("focus"); entity.scan = true; } else { setEmotion("idle"); entity.scan = false; }
+}
+function agHandle(ev, live) {
+  const st = agState, proj = $("cvProject").selectedOptions[0]?.textContent || "";
+  if (ev.type === "start") { $("agInfo").textContent = `${proj} · ${ev.info}`; agRun = { ...(agRun || {}), id: ev.id, writable: ev.writable }; }
+  else if (ev.type === "engine") { $("agInfo").textContent = `${proj} · ${ev.name}`; }
+  else if (ev.type === "thinking") { st.thinking?.remove(); st.thinking = live ? agStep("", "spark", '<span class="t"><span class="spin"></span> réfléchit…</span>') : null; if (live) entity.tokenKick = 1; }
+  else if (ev.type === "thought") { st.thinking?.remove(); agStep("", "spark", `<span class="t">${esc(ev.text)}</span>`); }
+  else if (ev.type === "action") {
+    st.thinking?.remove();
+    if (ev.thought) agStep(st.first ? "plan" : "", "spark", `<span class="t">${esc(ev.thought)}</span>`);
+    st.first = false;
+    if (ev.tool !== "done") {
+      st.lastAction = agStep("", AG_ICON[ev.tool] || "spark", `<span class="a">${AG_VERB[ev.tool] || esc(ev.tool)} ${esc(agArgs(ev.tool, ev.args))}</span><div class="r"></div>`);
+      st.lastAction.querySelector(".a").onclick = (e) => e.currentTarget.closest(".ag-step").classList.toggle("open");
+      if (live && (ev.tool === "edit" || ev.tool === "write")) entity.absorb = 1;
+    }
+  } else if (ev.type === "result" && st.lastAction) {
+    st.lastAction.querySelector(".r").textContent = ev.text; if (!ev.ok) st.lastAction.classList.add("ko");
+  } else if (ev.type === "info") agStep("", "spark", `<span class="t">${esc(ev.message)}</span>`);
+  else if (ev.type === "error") { st.thinking?.remove(); agStep("ko", "x", `<span class="t">${esc(ev.message)}</span>`); if (live) entity.glitch = 1; }
+  else if (ev.type === "done") { st.thinking?.remove(); agRun = { ...(agRun || {}), id: ev.id, files: ev.files, summary: ev.summary, applied: ev.applied || [] }; agResults(); }
+}
+async function agFollow(rid, live = true) {
+  clearTimeout(agPoll);
+  if (!agState || agState.id !== rid) {
+    $("agLog").innerHTML = ""; $("agRes").hidden = true;
+    agState = { id: rid, after: 0, first: true };
+  }
+  let r;
+  try { r = await getJSON(`/api/agent/runs/${rid}?after=${agState.after}`); }
+  catch { agBusy(false); store.set(agKey(), null); return; }
+  if (agState.after === 0) {
+    agStep("plan", "users", `<span class="t"><b>${esc(r.task)}</b>${r.parent ? ' <span class="note">· suite d\'une tâche précédente</span>' : ""}</span>`);
+  }
+  for (const ev of r.events) agHandle(ev, live && r.status === "running");
+  agState.after += r.events.length;
+  const running = r.status === "running";
+  agBusy(running);
+  if (running) agPoll = setTimeout(() => agFollow(rid, true), 900);
+  else {
+    if (r.status === "interrupted") agStep("ko", "x", '<span class="t">Tâche interrompue par un redémarrage du serveur.</span>');
+    if (r.status === "stopped" && !agRun?.files) agStep("ko", "x", '<span class="t">Arrêtée.</span>');
+    loadAgHistory();
+  }
+}
 $("agRun").onclick = async () => {
-  if (agCtl) { agCtl.abort(); return; }
+  if (agState && $("agRun").textContent === "Arrêter") { try { await send_(`/api/agent/runs/${agState.id}/stop`, "POST"); } catch {} return; }
   const task = $("agTask").value.trim();
   if (task.length < 3) { $("agTask").focus(); return; }
-  $("agLog").innerHTML = ""; $("agRes").hidden = true; agRun = null;
-  const btn = $("agRun"); btn.textContent = "Arrêter"; btn.classList.remove("primary");
-  agCtl = new AbortController(); setEmotion("focus"); entity.scan = true;
-  let thinking = null, lastAction = null, first = true;
+  agReset();
   try {
-    const r = await api(`/api/agent/${code.project}`, { method: "POST", signal: agCtl.signal, body: JSON.stringify({ task, engine: $("agEngine").value }) });
-    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
-    for (;;) {
-      const { value, done } = await reader.read(); if (done) break;
-      buf += dec.decode(value, { stream: true }); let nl;
-      while ((nl = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1); if (!line) continue;
-        const ev = JSON.parse(line);
-        if (ev.type === "start") { $("agInfo").textContent = `${$("cvProject").selectedOptions[0]?.textContent || ""} · ${ev.info}`; agRun = { id: ev.id, writable: ev.writable }; }
-        else if (ev.type === "engine") { $("agInfo").textContent = `${$("cvProject").selectedOptions[0]?.textContent || ""} · ${ev.name}`; }
-        else if (ev.type === "thinking") { thinking = agStep("", "spark", '<span class="t"><span class="spin"></span> réfléchit…</span>'); entity.tokenKick = 1; }
-        else if (ev.type === "thought") { thinking?.remove(); agStep("", "spark", `<span class="t">${esc(ev.text)}</span>`); }
-        else if (ev.type === "action") {
-          thinking?.remove();
-          if (ev.thought) agStep(first ? "plan" : "", "spark", `<span class="t">${esc(ev.thought)}</span>`);
-          first = false;
-          if (ev.tool !== "done") {
-            lastAction = agStep("", AG_ICON[ev.tool] || "spark", `<span class="a">${AG_VERB[ev.tool] || esc(ev.tool)} ${esc(agArgs(ev.tool, ev.args))}</span><div class="r"></div>`);
-            lastAction.querySelector(".a").onclick = (e) => e.currentTarget.closest(".ag-step").classList.toggle("open");
-            if (ev.tool === "edit" || ev.tool === "write") entity.absorb = 1;
-          }
-        } else if (ev.type === "result" && lastAction) {
-          lastAction.querySelector(".r").textContent = ev.text; if (!ev.ok) lastAction.classList.add("ko");
-        } else if (ev.type === "info") agStep("", "spark", `<span class="t">${esc(ev.message)}</span>`);
-        else if (ev.type === "error") { thinking?.remove(); agStep("ko", "x", `<span class="t">${esc(ev.message)}</span>`); entity.glitch = 1; }
-        else if (ev.type === "done") { thinking?.remove(); agRun = { ...(agRun || {}), id: ev.id, files: ev.files, summary: ev.summary }; agResults(); }
-      }
-    }
-  } catch (e) {
-    if (e.name === "AbortError") agStep("ko", "x", '<span class="t">Arrêté. Les modifications déjà préparées sont perdues.</span>');
-    else agStep("ko", "x", `<span class="t">${esc(e.message)}</span>`);
-  } finally {
-    agCtl = null; btn.textContent = "Lancer"; btn.classList.add("primary"); setEmotion("idle"); entity.scan = false;
-  }
+    const { id } = await (await send_(`/api/agent/${code.project}`, "POST", { task, engine: $("agEngine").value, parent: agParent || undefined })).json();
+    agParent = null; $("agParentNote").hidden = true;
+    store.set(agKey(), id); agBusy(true); agFollow(id);
+  } catch (e) { toast(`<b>Agent</b> · ${esc(e.message)}`); }
 };
+let agParent = null;
+async function loadAgHistory() {
+  const sel = $("agHistory");
+  let d; try { d = await getJSON(`/api/agent/${code.project}/runs`); } catch { return; }
+  const ST = { running: "en cours", done: "terminée", error: "erreur", stopped: "arrêtée", interrupted: "interrompue" };
+  sel.innerHTML = '<option value="">Historique…</option>' + d.runs.map((r) =>
+    `<option value="${r.id}" ${agState?.id === r.id ? "selected" : ""}>${esc(new Date(r.created_at * 1000).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))} · ${esc(r.task.slice(0, 60))} · ${ST[r.status] || r.status}${r.files ? ` · ${r.files} fichier(s)` : ""}</option>`).join("");
+  sel.hidden = !d.runs.length;
+}
+$("agHistory").onchange = (e) => { const id = e.target.value; if (!id) return; agReset(); store.set(agKey(), id); agFollow(id, true); };
+function agContinue() {
+  agParent = agRun?.id || null;
+  $("agParentNote").hidden = !agParent;
+  $("agTask").value = ""; $("agTask").placeholder = "Que doit faire l'agent ensuite ? Ex. « Ajoute maintenant des tests pour Parse »";
+  $("agTask").focus(); $("agForm").scrollIntoView({ block: "nearest" });
+}
 function agResults() {
   const box = $("agRes"), r = agRun; box.hidden = false;
   if (!r.files?.length) {
-    box.innerHTML = r.summary ? `<h5>Réponse de l'agent</h5><div class="sum md"></div><p class="note">Aucun fichier modifié.</p>` : "<h5>Aucune modification proposée</h5>";
+    box.innerHTML = (r.summary ? `<h5>Réponse de l'agent</h5><div class="sum md"></div>` : "<h5>Aucune modification proposée</h5>")
+      + `<p class="note">${r.applied?.length ? `Appliqué : ${esc(r.applied.join(", "))}. Pense au commit dans le panneau Git.` : "Aucun fichier modifié."}</p><div class="ag-acts"><button class="btn" id="agMore">Poursuivre…</button></div>`;
     if (r.summary) setMd(box.querySelector(".sum"), r.summary);
+    $("agMore").onclick = agContinue;
     return;
   }
   const add = r.files.reduce((s, f) => s + f.added, 0), rem = r.files.reduce((s, f) => s + f.removed, 0);
@@ -4494,12 +4556,17 @@ function agResults() {
     ${r.summary ? `<div class="sum md">${md(r.summary)}</div>` : ""}
     ${r.files.map((f, i) => `<details class="ag-file"><summary><input type="checkbox" data-ag="${i}" checked><span>${esc(f.path)}</span>${f.new_file ? "<em>nouveau</em>" : ""}<em>+${f.added} −${f.removed}</em></summary>
       <div class="cv-diff">${f.diff.split("\n").filter((l, k) => !(k < 2 && (l.startsWith("---") || l.startsWith("+++")))).map((l) => `<div class="${l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : ""}">${esc(l)}</div>`).join("")}</div></details>`).join("")}
-    <div class="ag-acts">${r.writable ? '<button class="btn primary" id="agApply">Appliquer la sélection</button>' : '<span class="note">Projet en lecture seule : télécharge le patch.</span>'}
-      <button class="btn" id="agPatch">${icon("download")}Patch</button><button class="btn" id="agDrop">Abandonner</button></div>`;
+    <div class="ag-acts">${r.writable !== false ? '<button class="btn primary" id="agApply">Appliquer la sélection</button>' : '<span class="note">Projet en lecture seule : télécharge le patch.</span>'}
+      <button class="btn" id="agPatch">${icon("download")}Patch</button><button class="btn" id="agMore">Poursuivre…</button><button class="btn" id="agDrop">Abandonner</button></div>`;
+  $("agMore").onclick = agContinue;
   box.querySelectorAll(".ag-file input").forEach((c) => { c.onclick = (e) => e.stopPropagation(); });
   const picked = () => [...box.querySelectorAll("[data-ag]:checked")].map((c) => r.files[+c.dataset.ag]);
   $("agPatch").onclick = () => downloadPatch(picked().map((f) => f.diff).join(""), "atom-agent.patch");
-  $("agDrop").onclick = () => { agRun = null; box.hidden = true; $("agLog").innerHTML = ""; };
+  $("agDrop").onclick = async () => {
+    if (!confirm("Abandonner ces modifications et effacer cette tâche de l'historique ?")) return;
+    try { await send_(`/api/agent/runs/${r.id}`, "DELETE"); } catch {}
+    store.set(agKey(), null); agReset(); loadAgHistory();
+  };
   if ($("agApply")) $("agApply").onclick = async () => {
     const files = picked(); if (!files.length) { toast("Coche au moins un fichier."); return; }
     try {
@@ -4508,7 +4575,8 @@ function agResults() {
       entity.seal = 1;
       code.open = code.open.filter((x) => !d.applied.includes(x.path));
       r.files = r.files.filter((f) => !d.applied.includes(f.path));
-      agResults(); loadChanges(); setTimeout(loadCodeFiles, 1500);
+      r.applied = [...(r.applied || []), ...d.applied];
+      agResults(); loadChanges(); setTimeout(loadCodeFiles, 1500); saveCodeState();
     } catch (e) { toast(`<b>Agent</b> · ${esc(e.message)}`); }
   };
 }
@@ -4850,6 +4918,7 @@ applyLook();
 renderWebBtn();
 loadHybrid().then(loadWorkshop);
 loadLibrary();
+if (store.get("view", "chat") === "code" || store.get("view", "chat") === "library") showView(store.get("view", "chat"));
 refreshCounts();
 setInterval(refreshCounts, 60000);
 checkNight();

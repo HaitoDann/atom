@@ -27,7 +27,6 @@ from .config import DEFAULT_MODEL, PROVIDER
 
 MAX_STEPS = 25
 READ_LINES = 250
-_runs: dict[str, dict] = {}
 
 SYSTEM = """Tu es l'agent de code d'Atom. Tu travailles sur le projet « {name} » pour réaliser la tâche de l'utilisateur.
 Tu ne vois le projet qu'à travers des outils. Rien n'est écrit sur le disque : tes modifications seront montrées à
@@ -80,6 +79,7 @@ class Workspace:
         self.changes: dict[str, str] = {}     # chemin → nouveau contenu
         self.original: dict[str, str | None] = {}   # chemin → contenu d'origine (None = nouveau fichier)
         self.read_ok: set[str] = set()
+        self.stopped = lambda: False
 
     def _safe(self, rel: str) -> str:
         rel = (rel or "").strip().replace("\\", "/")
@@ -342,6 +342,10 @@ async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> A
     announced, nudges = None, 0
     for step in range(1, MAX_STEPS + 1):
         state["step"] = step
+        if ws.stopped():
+            state["finished"] = True
+            yield dict(type="info", message="Arrêté à ta demande.")
+            return
         yield dict(type="thinking", step=step)
         msg, errors, waits = None, [], []
         for attempt in range(4):
@@ -420,6 +424,9 @@ async def _run_text(ws: "Workspace", system: str, task: str, state: dict) -> Asy
     messages = [{"role": "system", "content": system}, {"role": "user", "content": f"Tâche : {task.strip()}{note}"}]
     bad = 0
     for step in range(state.get("step", 0) + 1, MAX_STEPS + 1):
+        if ws.stopped():
+            yield dict(type="info", message="Arrêté à ta demande.")
+            return
         yield dict(type="thinking", step=step)
         try:
             if PROVIDER == "mock":
@@ -452,10 +459,19 @@ async def _run_text(ws: "Workspace", system: str, task: str, state: dict) -> Asy
     yield dict(type="info", message=f"Limite de {MAX_STEPS} étapes atteinte : voici ce qui a été fait.")
 
 
-async def run(cid: int, task: str, engine: str = "remote") -> AsyncIterator[dict]:
+async def run(cid: int, task: str, engine: str = "remote", rid: str | None = None,
+              parent: dict | None = None) -> AsyncIterator[dict]:
     ws = Workspace(cid)
+    rid = rid or secrets.token_hex(8)
+    ws.stopped = lambda: rid in _stop
+    if parent:   # « Poursuivre » : on repart des modifications déjà préparées (non appliquées)
+        for path, (old, new) in (parent.get("files") or {}).items():
+            ws.original[path], ws.changes[path] = old, new
+            ws.read_ok.add(path)
+        task = (f"Tâche précédente : {parent.get('task', '')}\nCe que tu avais conclu : {(parent.get('summary') or '')[:3000]}\n"
+                + (f"Fichiers déjà modifiés (en attente de validation) : {', '.join(sorted(parent.get('files') or {}))}\n" if parent.get("files") else "")
+                + f"\nNouvelle demande : {task}")
     eng, why = engine_for(engine)
-    rid = secrets.token_hex(8)
     yield dict(type="start", id=rid, engine=eng, info=why, writable=_writable(ws.col))
     listing = ws.all_paths()
     files = "\n".join(listing[:150]) + (f"\n… ({len(listing)} fichiers au total)" if len(listing) > 150 else "")
@@ -477,11 +493,106 @@ async def run(cid: int, task: str, engine: str = "remote") -> AsyncIterator[dict
             yield ev
         summary = state.get("summary", "")
     files = ws.diffs()
-    _runs[rid] = {"cid": cid, "files": {f["path"]: (ws.original.get(f["path"]), ws.changes[f["path"]]) for f in files},
-                  "at": time.time()}
-    for k in [k for k, v in _runs.items() if time.time() - v["at"] > 3 * 3600]:
-        _runs.pop(k, None)
-    yield dict(type="done", id=rid, summary=summary, files=files)
+    store = {f["path"]: (ws.original.get(f["path"]), ws.changes[f["path"]]) for f in files}
+    yield dict(type="done", id=rid, summary=summary, files=files, _store=store)
+
+
+# ---------------------------------------------------------------- tâches en arrière-plan (survivent à F5)
+
+_stop: set[str] = set()
+_live: dict[str, dict] = {}   # rid → {"events": [...], "task": asyncio.Task}
+
+
+def init() -> None:
+    with db.conn() as c:
+        c.execute("""CREATE TABLE IF NOT EXISTS agent_runs (
+            id TEXT PRIMARY KEY, collection_id INTEGER NOT NULL, task TEXT NOT NULL, engine TEXT,
+            status TEXT NOT NULL, summary TEXT, events TEXT, files TEXT, parent TEXT,
+            created_at REAL NOT NULL, updated_at REAL NOT NULL)""")
+        # tâches interrompues par un redémarrage du serveur
+        c.execute("UPDATE agent_runs SET status = 'interrupted' WHERE status = 'running'")
+
+
+def _save(rid: str, **fields) -> None:
+    fields["updated_at"] = time.time()
+    cols = ", ".join(f"{k} = ?" for k in fields)
+    with db.conn() as c:
+        c.execute(f"UPDATE agent_runs SET {cols} WHERE id = ?", (*fields.values(), rid))
+
+
+def get_run(rid: str) -> dict | None:
+    with db.conn() as c:
+        r = c.execute("SELECT * FROM agent_runs WHERE id = ?", (rid,)).fetchone()
+    if not r:
+        return None
+    d = dict(r)
+    live = _live.get(rid)
+    d["events"] = live["events"] if live else json.loads(d["events"] or "[]")
+    d["files"] = json.loads(d["files"] or "{}")
+    return d
+
+
+def list_runs(cid: int, limit: int = 30) -> list[dict]:
+    with db.conn() as c:
+        rows = c.execute("SELECT id, task, status, summary, parent, created_at, updated_at, files FROM agent_runs "
+                         "WHERE collection_id = ? ORDER BY created_at DESC LIMIT ?", (cid, limit)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["files"] = len(json.loads(d["files"] or "{}"))
+        d["summary"] = (d["summary"] or "")[:200]
+        out.append(d)
+    return out
+
+
+def delete_run(rid: str) -> None:
+    with db.conn() as c:
+        c.execute("DELETE FROM agent_runs WHERE id = ?", (rid,))
+
+
+def start(cid: int, task: str, engine: str, parent_id: str | None = None) -> str:
+    import asyncio
+
+    parent = get_run(parent_id) if parent_id else None
+    rid = secrets.token_hex(8)
+    now = time.time()
+    with db.conn() as c:
+        c.execute("INSERT INTO agent_runs (id, collection_id, task, engine, status, events, files, parent, created_at, updated_at) "
+                  "VALUES (?, ?, ?, ?, 'running', '[]', '{}', ?, ?, ?)", (rid, cid, task.strip(), engine, parent_id, now, now))
+    live = _live[rid] = {"events": []}
+
+    async def job():
+        status, summary, files = "done", "", {}
+        last_save = time.time()
+        try:
+            async for ev in run(cid, task, engine, rid, parent):
+                if ev["type"] == "done":
+                    files = ev.pop("_store", {})
+                    summary = ev.get("summary", "")
+                if ev["type"] == "error":
+                    status = "error"
+                live["events"].append(ev)
+                if time.time() - last_save > 3:
+                    _save(rid, events=json.dumps(live["events"], ensure_ascii=False))
+                    last_save = time.time()
+        except Exception as e:  # noqa: BLE001
+            status = "error"
+            live["events"].append(dict(type="error", message=f"Agent interrompu : {e}"))
+            live["events"].append(dict(type="done", id=rid, summary="", files=[]))
+        if rid in _stop:
+            status = "stopped"
+            _stop.discard(rid)
+        _save(rid, status=status, summary=summary, events=json.dumps(live["events"], ensure_ascii=False),
+              files=json.dumps({k: list(v) for k, v in files.items()}, ensure_ascii=False))
+        _live.pop(rid, None)
+
+    live["task"] = asyncio.create_task(job())
+    return rid
+
+
+def stop(rid: str) -> None:
+    if rid in _live:
+        _stop.add(rid)
 
 
 def _writable(col: dict) -> bool:
@@ -490,18 +601,19 @@ def _writable(col: dict) -> bool:
 
 
 def apply(rid: str, paths: list[str]) -> dict:
-    r = _runs.get(rid)
-    if not r:
-        raise KeyError("Résultat expiré : relance l'agent.")
-    col = library.get_collection(r["cid"])
+    r = get_run(rid)
+    if not r or not r["files"]:
+        raise KeyError("Rien à appliquer pour cette tâche.")
+    col = library.get_collection(r["collection_id"])
     if not col or not _writable(col):
         raise PermissionError("Projet en lecture seule (dossier serveur) : télécharge le patch.")
     root = library._code_root(col).resolve()
+    files = dict(r["files"])
     done, conflicts = [], []
     for rel in paths:
-        if rel not in r["files"]:
+        if rel not in files:
             continue
-        old, new = r["files"][rel]
+        old, new = files[rel]
         p = (root / rel).resolve()
         if not str(p).startswith(str(root) + "/"):
             continue
@@ -512,5 +624,15 @@ def apply(rid: str, paths: list[str]) -> dict:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(new, "utf-8")
         done.append(rel)
-        r["files"].pop(rel)
-    return {"applied": done, "conflicts": conflicts}
+        files.pop(rel)
+    _save(rid, files=json.dumps(files, ensure_ascii=False))
+    # les diffs restants dans l'événement final, pour l'affichage après rechargement
+    with db.conn() as c:
+        row = c.execute("SELECT events FROM agent_runs WHERE id = ?", (rid,)).fetchone()
+    evs = json.loads(row["events"] or "[]") if row else []
+    for ev in evs:
+        if ev.get("type") == "done":
+            ev["files"] = [f for f in ev.get("files", []) if f["path"] in files]
+            ev["applied"] = sorted(set(ev.get("applied", [])) | set(done))
+    _save(rid, events=json.dumps(evs, ensure_ascii=False))
+    return {"applied": done, "conflicts": conflicts, "collection_id": r["collection_id"]}

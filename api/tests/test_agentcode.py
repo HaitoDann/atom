@@ -1,5 +1,6 @@
 import json
 import subprocess
+import time
 
 from app import agentcode, library
 
@@ -16,9 +17,19 @@ def _project():
     return cid, root
 
 
+def _go(client, cid, **body):
+    rid = client.post(f"/api/agent/{cid}", json=body).json()["id"]
+    for _ in range(100):
+        r = client.get(f"/api/agent/runs/{rid}").json()
+        if r["status"] != "running":
+            return rid, r["events"]
+        time.sleep(0.05)
+    raise AssertionError("agent trop long")
+
+
 def test_agent_run_and_apply(client):
     cid, root = _project()
-    lines = [json.loads(l) for l in client.post(f"/api/agent/{cid}", json={"task": "ajoute un commentaire", "engine": "local"}).text.splitlines()]
+    rid, lines = _go(client, cid, task="ajoute un commentaire", engine="local")
     kinds = [l["type"] for l in lines]
     assert kinds[0] == "start" and "action" in kinds and kinds[-1] == "done"
     done = lines[-1]
@@ -26,6 +37,14 @@ def test_agent_run_and_apply(client):
     assert (root / "app.py").read_text() == "print('hello')\n"        # rien d'écrit avant validation
     r = client.post(f"/api/agent/runs/{done['id']}/apply", json={"paths": ["app.py"]}).json()
     assert r["applied"] == ["app.py"] and (root / "app.py").read_text().startswith("# modifié par l'agent")
+    # historique et relecture après « F5 »
+    runs = client.get(f"/api/agent/{cid}/runs").json()["runs"]
+    assert runs[0]["id"] == rid and runs[0]["status"] == "done"
+    again = client.get(f"/api/agent/runs/{rid}?after=1").json()
+    assert again["total"] == len(lines) and again["events"][-1]["applied"] == ["app.py"]
+    # « Poursuivre » : nouvelle tâche liée à la précédente
+    rid2, lines2 = _go(client, cid, task="continue", engine="local", parent=rid)
+    assert client.get(f"/api/agent/runs/{rid2}").json()["parent"] == rid
 
 
 def test_workspace_guards():
@@ -67,7 +86,7 @@ def test_agent_native_tools(client):
     from app import hybrid
     hybrid.save_settings({"allow_docs": True})
     try:
-        lines = [json.loads(l) for l in client.post(f"/api/agent/{cid}", json={"task": "commente", "engine": "remote"}).text.splitlines()]
+        _, lines = _go(client, cid, task="commente", engine="remote")
     finally:
         hybrid.save_settings({"allow_docs": False})
     assert lines[0]["engine"] == "remote"
@@ -106,7 +125,7 @@ def test_rate_limit_pause(client, monkeypatch):
     monkeypatch.setattr(aio, "sleep", fast_sleep)
     hybrid.save_settings({"allow_docs": True})
     try:
-        lines = [json.loads(l) for l in client.post(f"/api/agent/{cid}", json={"task": "commente", "engine": "remote"}).text.splitlines()]
+        _, lines = _go(client, cid, task="commente", engine="remote")
     finally:
         hybrid.save_settings({"allow_docs": False})
     assert any(l["type"] == "info" and "pause" in l["message"] for l in lines)

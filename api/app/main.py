@@ -54,6 +54,7 @@ async def lifespan(_app: FastAPI):
 
 db.init()
 library.init()
+agentcode.init()
 auth.init()
 app = FastAPI(title="Atom", lifespan=lifespan)
 
@@ -765,14 +766,42 @@ def code_revert(cid: int, body: RevertIn):
 class AgentIn(BaseModel):
     task: str = Field(min_length=3, max_length=4000)
     engine: str = Field(default="remote", pattern="^(remote|local)$")
+    parent: str | None = Field(default=None, max_length=32)
 
 
 @app.post("/api/agent/{cid}")
-async def agent_run(cid: int, body: AgentIn):
+async def agent_start(cid: int, body: AgentIn):
+    """Lance l'agent en arrière-plan : il continue même si la page est rechargée ou fermée."""
     if not library.get_collection(cid):
         raise HTTPException(404, "Projet introuvable")
-    return StreamingResponse((event(**ev) async for ev in agentcode.run(cid, body.task, body.engine)),
-                             media_type="application/x-ndjson")
+    return {"id": agentcode.start(cid, body.task, body.engine, body.parent)}
+
+
+@app.get("/api/agent/{cid}/runs")
+def agent_runs(cid: int):
+    return {"runs": agentcode.list_runs(cid)}
+
+
+@app.get("/api/agent/runs/{rid}")
+def agent_get(rid: str, after: int = 0):
+    r = agentcode.get_run(rid)
+    if not r:
+        raise HTTPException(404, "Tâche introuvable")
+    return {"id": rid, "collection_id": r["collection_id"], "task": r["task"], "status": r["status"], "parent": r["parent"],
+            "created_at": r["created_at"], "events": r["events"][after:], "total": len(r["events"])}
+
+
+@app.post("/api/agent/runs/{rid}/stop")
+def agent_stop(rid: str):
+    agentcode.stop(rid)
+    return {"ok": True}
+
+
+@app.delete("/api/agent/runs/{rid}")
+def agent_delete(rid: str):
+    agentcode.stop(rid)
+    agentcode.delete_run(rid)
+    return {"ok": True}
 
 
 class AgentApplyIn(BaseModel):
@@ -787,9 +816,8 @@ async def agent_apply(rid: str, body: AgentApplyIn):
         raise HTTPException(404, str(e)) from e
     except PermissionError as e:
         raise HTTPException(403, str(e)) from e
-    cid = agentcode._runs.get(rid, {}).get("cid")
-    if cid and out["applied"]:
-        background(library.index_project(cid))
+    if out["applied"]:
+        background(library.index_project(out["collection_id"]))
     return out
 
 
