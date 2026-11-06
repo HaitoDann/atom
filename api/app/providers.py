@@ -80,6 +80,9 @@ def _bool(v: str, default: bool) -> bool:
     return default if v == "" else v.strip().lower() in ("1", "true", "oui", "yes")
 
 
+SKIPPED: list[dict] = []   # fournisseurs listés dans ATOM_PROVIDERS mais inutilisables (avec la raison)
+
+
 def _load() -> list[Provider]:
     out: list[Provider] = []
     if REMOTE_API_KEY or PROVIDER == "mock":
@@ -96,11 +99,13 @@ def _load() -> list[Provider]:
         key = _env(pid, "API_KEY")
         if not key and PROVIDER != "mock":
             log.warning("fournisseur %s ignoré : ATOM_%s_API_KEY absent", pid, pid.upper())
+            SKIPPED.append({"id": pid, "name": pre.get("name", pid.capitalize()), "reason": f"clé absente : ATOM_{pid.upper()}_API_KEY"})
             continue
         model = _env(pid, "MODEL", pre.get("model", ""))
         url = _env(pid, "URL", pre.get("url", "")).rstrip("/")
         if not url or not model:
             log.warning("fournisseur %s ignoré : adresse ou modèle manquant (ATOM_%s_URL / _MODEL)", pid, pid.upper())
+            SKIPPED.append({"id": pid, "name": pid, "reason": f"fournisseur inconnu : ajoute ATOM_{pid.upper()}_URL et ATOM_{pid.upper()}_MODEL"})
             continue
         out.append(Provider(pid, _env(pid, "NAME", pre.get("name", pid.capitalize())), url, key, model,
                             int(_env(pid, "LIMIT", "200")),

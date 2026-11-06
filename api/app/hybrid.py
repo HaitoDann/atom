@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import os
 import logging
 import re
 from datetime import datetime
@@ -101,7 +102,8 @@ def status() -> dict:
     p = primary()
     return {**settings(), "configured": configured(), "name": name(), "model": model(), "provider": p.id if p else "",
             "model_setting": providers.model_of(p) if p else "", "used_today": providers.used_today(p.id) if p else 0,
-            "limit": p.limit if p else REMOTE_DAILY_LIMIT, "providers": [providers.describe(x) for x in providers.ALL]}
+            "limit": p.limit if p else REMOTE_DAILY_LIMIT, "providers": [providers.describe(x) for x in providers.ALL],
+            "skipped": providers.SKIPPED, "providers_env": os.getenv("ATOM_PROVIDERS", "")}
 
 
 def decide(engine: str, message: str, needs_memory: bool, needs_docs: bool) -> tuple[str, str]:

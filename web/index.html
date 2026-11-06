@@ -517,6 +517,7 @@
   .idxbar i { display: block; height: 100%; background: var(--text-2); transition: width .8s var(--ease-out); }
   .prov-list { display: grid; gap: 8px; margin-top: 10px; }
   .prov { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--text) 3.5%, transparent); }
+  .prov.off { opacity: .75; }
   .prov.on { box-shadow: inset 0 0 0 1px var(--border-2); }
   .prov-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .prov-main { display: flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
@@ -3800,6 +3801,8 @@ async function loadHybrid() {
     };
     box.appendChild(row);
   }
+  for (const x of h.skipped || []) box.insertAdjacentHTML("beforeend", `<div class="prov off"><div class="prov-top"><b style="font-weight:500">${esc(x.name)}</b><span class="prov-tags"><span>ignoré</span></span></div><p class="note" style="margin:6px 0 0">${esc(x.reason)} dans .env, puis <code>docker compose up -d atom</code>.</p></div>`);
+  if (!h.providers_env) box.insertAdjacentHTML("beforeend", '<p class="note">Atom ne voit pas de ligne <code>ATOM_PROVIDERS</code> : elle manque dans <code>.env</code>, ou le conteneur n\'a pas été recréé après la modification.</p>');
 }
 async function saveHybrid(patch) {
   try { hybridState = await (await api("/api/hybrid", { method: "PUT", body: JSON.stringify(patch) })).json(); } catch (e) { toast(esc(e.message)); }
