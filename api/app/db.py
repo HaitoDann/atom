@@ -121,7 +121,7 @@ def create_conversation(title: str = "Nouvelle conversation") -> int:
 def list_conversations() -> list[dict]:
     with conn() as c:
         rows = c.execute(
-            "SELECT id, title, pinned, model, updated_at FROM conversations ORDER BY updated_at DESC"
+            "SELECT id, title, pinned, model, space_id, updated_at FROM conversations ORDER BY updated_at DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 

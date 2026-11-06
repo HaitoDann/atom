@@ -508,6 +508,9 @@ async def run(cid: int, task: str, engine: str = "remote", rid: str | None = Non
     system = SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)",
                            test_tool=TEST_TEXT if sb else "",
                            test_note=TEST_NOTE.format(cmd=sandbox.default_command(cid, listing + [p.name for p in ws.root.iterdir() if p.is_file()]) or "à préciser") if sb else "")
+    learned = get_rules(cid)
+    if learned:
+        rules.append("--- règles retenues par l'utilisateur ---\n" + "\n".join(f"- {r}" for r in learned))
     if rules:
         system += "\n\nConsignes du projet (à respecter en priorité) :\n" + "\n\n".join(rules)[:6000]
     summary, finished = "", False
@@ -670,3 +673,19 @@ def apply(rid: str, paths: list[str]) -> dict:
             ev["applied"] = sorted(set(ev.get("applied", [])) | set(done))
     _save(rid, events=json.dumps(evs, ensure_ascii=False))
     return {"applied": done, "conflicts": conflicts, "collection_id": r["collection_id"]}
+
+
+# ---------------------------------------------------------------- règles retenues par projet
+
+
+def get_rules(cid: int) -> list[str]:
+    try:
+        return [r for r in json.loads(db.kv_get(f"agent:rules:{cid}") or "[]") if isinstance(r, str)]
+    except ValueError:
+        return []
+
+
+def set_rules(cid: int, rules: list[str]) -> list[str]:
+    clean = [r.strip()[:300] for r in rules if r and r.strip()][:40]
+    db.kv_set(f"agent:rules:{cid}", json.dumps(clean, ensure_ascii=False))
+    return clean

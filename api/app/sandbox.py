@@ -152,6 +152,9 @@ def snapshot(cid: int, overlay: dict[str, str] | None = None) -> tuple[bytes, li
 # ---------------------------------------------------------------- Docker
 
 
+_collected: dict[str, bytes] = {}
+
+
 def demux(raw: bytes) -> str:
     """Journaux Docker sans TTY : trames [type, 0, 0, 0, taille(4 octets)] + données."""
     out, i = [], 0
@@ -181,7 +184,7 @@ async def _ensure_image(c: httpx.AsyncClient, image: str) -> AsyncIterator[str]:
 
 
 async def _run_container(c: httpx.AsyncClient, image: str, cmd: str, env: list[str], archive: bytes,
-                         network: bool, timeout: int) -> tuple[int, str, float]:
+                         network: bool, timeout: int, collect: str | None = None) -> tuple[int, str, float]:
     name = f"atom-sandbox-{secrets.token_hex(4)}"
     body = {
         "Image": image, "Cmd": ["sh", "-c", cmd], "WorkingDir": "/work", "Env": env + ["HOME=/tmp"],
@@ -213,6 +216,9 @@ async def _run_container(c: httpx.AsyncClient, image: str, cmd: str, env: list[s
             code = 124
         logs = await c.get(f"/containers/{cid}/logs", params={"stdout": 1, "stderr": 1, "tail": 400})
         out = demux(logs.content)
+        if collect:   # fichiers produits (ex. graphiques) : récupérés avant suppression du conteneur
+            arc = await c.get(f"/containers/{cid}/archive", params={"path": collect})
+            _collected[cid] = arc.content if arc.status_code == 200 else b""
         if code == 124:
             out += f"\n[Atom] Arrêté au bout de {timeout} s."
         elif code == 137:
@@ -268,3 +274,58 @@ async def run_text(cid: int, command: str | None, overlay: dict[str, str] | None
     out = re.sub(r"\x1b\[[0-9;]*m", "", out)
     head = "Tests réussis" if res.get("code") == 0 else f"Échec (code {res.get('code')})"
     return f"{head} · commande : {res.get('command')}\n{out[-4000:]}"
+
+
+# ---------------------------------------------------------------- Python pour l'analyse de données
+
+PY_IMAGE = os.getenv("ATOM_SANDBOX_IMAGE_PYTHON", "python:3.12-slim")
+PY_PACKAGES = "pandas matplotlib openpyxl xlrd"
+
+
+def _tar_files(files: dict[str, bytes]) -> bytes:
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as tar:
+        for d in ("work", "work/out", "work/data"):
+            ti = tarfile.TarInfo(d); ti.type = tarfile.DIRTYPE; ti.mode = 0o777
+            tar.addfile(ti)
+        for name, data in files.items():
+            ti = tarfile.TarInfo(f"work/{name}"); ti.size = len(data); ti.mode = 0o666
+            tar.addfile(ti, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def _untar(data: bytes) -> dict[str, bytes]:
+    out: dict[str, bytes] = {}
+    if not data:
+        return out
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data)) as tar:
+            for m in tar.getmembers():
+                if m.isfile() and m.size < 8 * 1024 * 1024:
+                    f = tar.extractfile(m)
+                    if f:
+                        out[m.name.rsplit("/", 1)[-1]] = f.read()
+    except tarfile.TarError:
+        pass
+    return out
+
+
+async def run_python(files: dict[str, bytes], code: str, timeout: int = 180) -> tuple[int, str, dict[str, bytes]]:
+    """Exécute un script Python (pandas, matplotlib) sur des fichiers, sans réseau.
+    Renvoie (code de sortie, sortie, fichiers produits dans /work/out)."""
+    if not enabled():
+        raise RuntimeError("bac à sable " + status()["reason"])
+    archive = _tar_files({**files, "analysis.py": code.encode()})
+    env = ["PIP_DISABLE_PIP_VERSION_CHECK=1", "MPLBACKEND=Agg", "MPLCONFIGDIR=/tmp", "PYTHONDONTWRITEBYTECODE=1"]
+    async with _client() as c:
+        async for _ in _ensure_image(c, PY_IMAGE):
+            pass
+        # bibliothèques téléchargées une fois (cache), puis installées hors ligne
+        await _run_container(c, PY_IMAGE, f"pip download -q -d /cache/pip-data {PY_PACKAGES}", env, archive, True, 600)
+        cmd = (f"pip install -q --no-index --find-links /cache/pip-data {PY_PACKAGES} >/tmp/pip.log 2>&1 || "
+               "(echo 'Installation des bibliothèques impossible :'; tail -5 /tmp/pip.log; exit 3); python analysis.py")
+        code_, out, _ = await _run_container(c, PY_IMAGE, cmd, env, archive, False, timeout, collect="/work/out")
+    produced = {}
+    for k in list(_collected):
+        produced.update(_untar(_collected.pop(k)))
+    return code_, out, produced

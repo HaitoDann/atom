@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, auth, backup, codeedit, sandbox, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, agentcode, analysis, auth, backup, canvas, codeedit, research, sandbox, spaces, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +55,8 @@ async def lifespan(_app: FastAPI):
 db.init()
 library.init()
 agentcode.init()
+spaces.init()
+canvas.init()
 auth.init()
 app = FastAPI(title="Atom", lifespan=lifespan)
 
@@ -192,6 +194,7 @@ class ChatIn(BaseModel):
     web: str = Field(default="auto", pattern="^(auto|force|off)$")
     scope: str = Field(default="auto", pattern="^(auto|none|[0-9,]+)$")
     engine: str = Field(default="default", pattern="^(default|local|mistral|auto)$")
+    space_id: int | None = None
 
 
 class MemoryIn(BaseModel):
@@ -265,9 +268,166 @@ async def chat(body: ChatIn):
             body.web,
             body.scope,
             body.engine,
+            body.space_id,
         ),
         media_type="application/x-ndjson",
     )
+
+
+# ---- espaces
+
+
+class SpaceIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    instructions: str | None = Field(default=None, max_length=8000)
+    collections: list[int] | None = Field(default=None, max_length=50)
+
+
+@app.get("/api/spaces")
+def get_spaces():
+    return {"spaces": spaces.list_all()}
+
+
+@app.post("/api/spaces")
+def post_space(body: SpaceIn):
+    if not body.name:
+        raise HTTPException(422, "Nom manquant")
+    sid = spaces.create(body.name, body.instructions or "", body.collections or [])
+    return spaces.get(sid)
+
+
+@app.patch("/api/spaces/{sid}")
+def patch_space(sid: int, body: SpaceIn):
+    if not spaces.get(sid):
+        raise HTTPException(404, "Espace introuvable")
+    spaces.update(sid, **{k: v for k, v in body.model_dump().items() if v is not None})
+    return spaces.get(sid)
+
+
+@app.delete("/api/spaces/{sid}")
+def del_space(sid: int):
+    spaces.delete(sid)
+    return {"ok": True}
+
+
+class ConvSpaceIn(BaseModel):
+    space_id: int | None = None
+
+
+@app.put("/api/conversations/{cid}/space")
+def put_conv_space(cid: int, body: ConvSpaceIn):
+    if body.space_id and not spaces.get(body.space_id):
+        raise HTTPException(404, "Espace introuvable")
+    spaces.assign(cid, body.space_id)
+    return {"ok": True}
+
+
+# ---- recherche approfondie, analyse de données, canevas
+
+
+class ResearchIn(BaseModel):
+    message: str = Field(min_length=3, max_length=4000)
+    conversation_id: int | None = None
+
+
+@app.post("/api/research")
+async def research_run(body: ResearchIn):
+    return StreamingResponse((event(**ev) async for ev in research.run(body.message.strip(), body.conversation_id)),
+                             media_type="application/x-ndjson")
+
+
+class AnalyzeIn(BaseModel):
+    name: str = Field(max_length=200)
+    data: str   # base64
+    question: str = Field(default="", max_length=4000)
+    conversation_id: int | None = None
+
+
+@app.post("/api/analyze")
+async def analyze_run(body: AnalyzeIn):
+    raw = analysis.decode(body.data)
+    if len(raw) > 50 * 1024 * 1024:
+        raise HTTPException(413, "Fichier trop gros (50 Mo max)")
+    return StreamingResponse((event(**ev) async for ev in analysis.run(body.name, raw, body.question, body.conversation_id)),
+                             media_type="application/x-ndjson")
+
+
+@app.get("/api/analysis/{fid}")
+def analysis_image(fid: str):
+    p = analysis.image_path(fid)
+    if not p:
+        raise HTTPException(404, "Image introuvable")
+    return FileResponse(p)
+
+
+@app.get("/api/sandbox")
+def sandbox_global():
+    return sandbox.status()
+
+
+class CanvasIn(BaseModel):
+    title: str | None = Field(default=None, max_length=120)
+    content: str | None = Field(default=None, max_length=400_000)
+    conversation_id: int | None = None
+    kind: str | None = Field(default=None, pattern="^(doc|code)$")
+
+
+class CanvasEditIn(BaseModel):
+    instruction: str = Field(min_length=2, max_length=2000)
+    selection: str = Field(default="", max_length=100_000)
+    engine: str = Field(default="auto", pattern="^(auto|local)$")
+
+
+@app.get("/api/canvas")
+def canvas_list(conversation_id: int | None = None):
+    return {"canvases": canvas.list_for(conversation_id)}
+
+
+@app.post("/api/canvas")
+def canvas_create(body: CanvasIn):
+    cid = canvas.create(body.title or "Sans titre", body.content or "", body.conversation_id, body.kind or "doc")
+    return canvas.get(cid)
+
+
+@app.get("/api/canvas/{cid}")
+def canvas_get(cid: int):
+    c = canvas.get(cid)
+    if not c:
+        raise HTTPException(404, "Canevas introuvable")
+    return c
+
+
+@app.put("/api/canvas/{cid}")
+def canvas_put(cid: int, body: CanvasIn):
+    try:
+        cur = canvas.get(cid) or {}
+        return canvas.save(cid, body.content if body.content is not None else cur.get("content", ""), "toi", "", body.title)
+    except KeyError as e:
+        raise HTTPException(404, "Canevas introuvable") from e
+
+
+@app.post("/api/canvas/{cid}/edit")
+async def canvas_edit(cid: int, body: CanvasEditIn):
+    try:
+        return await canvas.edit(cid, body.instruction, body.selection, body.engine)
+    except KeyError as e:
+        raise HTTPException(404, "Canevas introuvable") from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Modification impossible : {e}") from e
+
+
+@app.get("/api/canvas/{cid}/versions/{i}")
+def canvas_version(cid: int, i: int):
+    try:
+        return {"content": canvas.version(cid, i)}
+    except KeyError as e:
+        raise HTTPException(404, "Version introuvable") from e
+
+
+@app.delete("/api/canvas/{cid}")
+def canvas_delete(cid: int):
+    canvas.delete(cid)
+    return {"ok": True}
 
 
 # ---- fichiers joints
@@ -775,6 +935,20 @@ async def agent_start(cid: int, body: AgentIn):
     if not library.get_collection(cid):
         raise HTTPException(404, "Projet introuvable")
     return {"id": agentcode.start(cid, body.task, body.engine, body.parent)}
+
+
+class RulesIn(BaseModel):
+    rules: list[str] = Field(default_factory=list, max_length=40)
+
+
+@app.get("/api/agent/{cid}/rules")
+def agent_rules(cid: int):
+    return {"rules": agentcode.get_rules(cid)}
+
+
+@app.put("/api/agent/{cid}/rules")
+def agent_rules_put(cid: int, body: RulesIn):
+    return {"rules": agentcode.set_rules(cid, body.rules)}
 
 
 @app.get("/api/agent/{cid}/runs")

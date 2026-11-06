@@ -11,7 +11,7 @@ from typing import AsyncIterator
 
 import httpx
 
-from . import db, hybrid, library, llm, memory, reminders, search
+from . import db, hybrid, library, llm, memory, reminders, search, spaces
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
@@ -32,6 +32,8 @@ def system_prompt(persona: str, memory_block: str, web: str = "off", web_block: 
         "fear = inquiet, thinking = perplexe, sleep = fatigué, idle = calme, "
         "curious = intrigué, focus = concentré sur une tâche)\n"
         "Exemple : [joy] Ravi de te revoir !\n"
+        "Pour un schéma (architecture, étapes d'un processus, plan d'un sujet, carte mentale, chronologie), "
+        "dessine-le dans un bloc ```mermaid (flowchart, sequenceDiagram, mindmap ou timeline), avec des libellés courts.\n"
         "Ne réfléchis pas à voix haute, ne décris pas ton raisonnement : réponds directement.\n"
         "/no_think\n\n"
         + reminders.prompt_block()
@@ -81,15 +83,21 @@ async def chat_events(
     web: str = "auto",  # "auto" : Atom décide · "force" : chercher · "off" : jamais
     scope: str = "auto",  # bibliothèque : "auto" (documents), "none", ou "3,5" (collections choisies)
     engine: str = "default",  # "default" (réglage), "local", "mistral", "auto"
+    space_id: int | None = None,
 ) -> AsyncIterator[dict]:
     """Événements : meta, context, emotion, token…, reminder…, done, memory — ou error."""
     title_src = message or (attachments[0]["name"] if attachments else "Fichier")
     if conversation_id is None or not db.conversation_exists(conversation_id):
         conversation_id = db.create_conversation(title_prefix + make_title(title_src))
+        if space_id and spaces.get(space_id):
+            spaces.assign(conversation_id, space_id)
     elif not db.messages(conversation_id, 1):
         db.rename_conversation(conversation_id, title_prefix + make_title(title_src))
     db.set_conversation_model(conversation_id, model)
-    yield dict(type="meta", conversation_id=conversation_id)
+    space = spaces.of_conversation(conversation_id)
+    if space:
+        persona = persona.strip() + "\n\n" + spaces.prompt_block(space)
+    yield dict(type="meta", conversation_id=conversation_id, space_id=space["id"] if space else None)
 
     history = db.messages(conversation_id, CONTEXT_TURNS * 2)
     mem_block, used = await memory.context_for(message or title_src, conversation_id)
@@ -101,7 +109,9 @@ async def chat_events(
     docs_block, doc_refs = "", []
     if scope != "none":
         try:
-            if scope == "auto":
+            if scope == "auto" and space and space["collections"]:
+                ids = list(space["collections"])   # dans un espace : ses collections d'abord
+            elif scope == "auto":
                 ids = [c["id"] for c in library.list_collections() if c["kind"] == "docs"]
             else:
                 ids = [int(x) for x in scope.split(",") if x.strip().isdigit()]
