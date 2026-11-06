@@ -72,9 +72,13 @@ async def _remote() -> list[dict]:
             models = await providers.list_models(p)
             m = providers.model_of(p)
             ok = m in models or not models
+            hint = ""
+            if not ok:
+                sugg = [x for x in models if providers.family_of(x, "") == p.family][:2] or models[:2]
+                hint = "Réglages → Connexions → choisir un modèle" + (f" (par ex. {', '.join(sugg)})" if sugg else "")
             return _c(label, "ok" if ok else "warn",
                       f"{m} · {providers.used_today(p.id)}/{p.limit} aujourd'hui" + ("" if p.private else " · sans données privées")
-                      + ("" if ok else " · modèle introuvable"), "" if ok else "Réglages → Connexions → choisir un modèle")
+                      + ("" if ok else " · modèle introuvable"), hint)
         except Exception as e:  # noqa: BLE001
             return _c(label, "error", str(e)[:120], "vérifie la clé et l'adresse dans .env")
 

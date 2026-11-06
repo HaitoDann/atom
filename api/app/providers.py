@@ -130,7 +130,14 @@ def get(pid: str) -> Provider | None:
 
 
 def model_of(p: Provider) -> str:
-    return db.kv_get(f"prov:model:{p.id}") or p.model
+    m = db.kv_get(f"prov:model:{p.id}")
+    if not m and ALL and p is ALL[0]:
+        # ancien réglage du mode hybride (avant les fournisseurs multiples)
+        try:
+            m = json.loads(db.kv_get("hybrid") or "{}").get("model") or ""
+        except ValueError:
+            m = ""
+    return m or p.model
 
 
 def set_model(pid: str, model: str) -> None:
@@ -190,18 +197,34 @@ class Unavailable(RuntimeError):
     """Le fournisseur n'a rien produit (clé, limite, panne) : on peut passer au suivant."""
 
 
+CATALOGS = {"github": "https://models.github.ai/catalog/models"}   # GitHub n'a pas de /models au format OpenAI
+
+
 async def list_models(p: Provider) -> list[str]:
     if PROVIDER == "mock":
         return [p.model, p.model + "-large"]
-    async with httpx.AsyncClient(timeout=10) as client:
-        r = await client.get(f"{p.url}/models", headers={"Authorization": f"Bearer {p.key}"})
+    url = CATALOGS.get(p.id) or f"{p.url}/models"
+    async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+        r = await client.get(url, headers={"Authorization": f"Bearer {p.key}", "Accept": "application/json"})
     if r.status_code != 200:
         raise RuntimeError(f"{p.name} a répondu {r.status_code}")
-    data = r.json().get("data", [])
+    try:
+        body = r.json()
+    except ValueError as e:
+        raise RuntimeError(f"{p.name} : liste des modèles illisible") from e
+    data = body if isinstance(body, list) else body.get("data") or body.get("models") or []
     skip = ("whisper", "tts", "embed", "guard", "moderation", "ocr", "transcri", "speech", "audio", "image", "vision-preview")
-    ids = [m.get("id", "") for m in data if m.get("id") and not any(x in m.get("id", "").lower() for x in skip)
-           and m.get("active", True) is not False]
-    return sorted(set(i.removeprefix("models/") for i in ids))
+    ids = []
+    for m in data:
+        mid = (m.get("id") or m.get("name") or "") if isinstance(m, dict) else str(m)
+        if not mid or any(x in mid.lower() for x in skip) or (isinstance(m, dict) and m.get("active", True) is False):
+            continue
+        if isinstance(m, dict) and m.get("supported_output_modalities") and "text" not in m["supported_output_modalities"]:
+            continue
+        ids.append(mid.removeprefix("models/"))
+    if p.id == "openrouter":
+        ids = [i for i in ids if i.endswith(":free")]   # seulement les modèles gratuits : aucune dépense possible
+    return sorted(set(ids))
 
 
 async def stream(p: Provider, messages: list[dict], model: str | None = None, stats: dict | None = None) -> AsyncIterator[str]:
