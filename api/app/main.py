@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, codeedit, db, ocr, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, auth, backup, codeedit, db, gitops, ocr, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -738,6 +738,80 @@ def code_revert(cid: int, body: RevertIn):
     except (PermissionError, RuntimeError) as e:
         raise HTTPException(409, str(e)) from e
     return {"ok": True}
+
+
+# ---- Git (projets clonés par Atom) : chaque action vient d'un bouton
+
+
+def _git_call(fn, *a):
+    try:
+        return fn(*a)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Projet introuvable") from e
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from e
+    except (ValueError, gitops.GitError) as e:
+        raise HTTPException(409, str(e)) from e
+
+
+class GitName(BaseModel):
+    name: str = Field(max_length=100)
+
+
+class GitCommit(BaseModel):
+    message: str = Field(max_length=5000)
+    paths: list[str] = Field(max_length=500)
+
+
+class GitPaths(BaseModel):
+    paths: list[str] = Field(default_factory=list, max_length=500)
+
+
+@app.get("/api/git/{cid}/status")
+def git_status(cid: int):
+    return _git_call(gitops.status, cid)
+
+
+@app.get("/api/git/{cid}/diff")
+def git_diff(cid: int):
+    return {"diff": _git_call(gitops.diff, cid, None)}
+
+
+@app.post("/api/git/{cid}/branch")
+def git_branch(cid: int, body: GitName):
+    return _git_call(gitops.new_branch, cid, body.name)
+
+
+@app.post("/api/git/{cid}/switch")
+async def git_switch(cid: int, body: GitName):
+    out = _git_call(gitops.switch, cid, body.name)
+    background(library.index_project(cid))   # les fichiers ont changé : réindexation (seuls les fichiers modifiés)
+    return out
+
+
+@app.post("/api/git/{cid}/commit")
+def git_commit(cid: int, body: GitCommit):
+    return _git_call(gitops.commit, cid, body.message, body.paths)
+
+
+@app.post("/api/git/{cid}/push")
+def git_push(cid: int):
+    return _git_call(gitops.push, cid)
+
+
+@app.post("/api/git/{cid}/discard")
+async def git_discard(cid: int):
+    out = _git_call(gitops.discard_all, cid)
+    background(library.index_project(cid))
+    return out
+
+
+@app.post("/api/git/{cid}/message")
+async def git_message(cid: int, body: GitPaths):
+    try:
+        return {"message": await gitops.suggest_message(cid, body.paths)}
+    except (FileNotFoundError, PermissionError, ValueError, gitops.GitError) as e:
+        raise HTTPException(409, str(e)) from e
 
 
 # ---- sauvegardes

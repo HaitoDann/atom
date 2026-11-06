@@ -531,7 +531,19 @@
   .cv-changes .h { display: flex; align-items: center; justify-content: space-between; color: var(--muted); margin-bottom: 4px; }
   .cv-changes .f { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
   .cv-changes .f span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-  .cv-changes button { background: none; border: 0; color: var(--faint); font-size: 11.5px; padding: 0 2px; }
+  .cv-changes .f button, .cv-changes .h button { background: none; border: 0; color: var(--faint); font-size: 11.5px; padding: 0 2px; }
+  .cv-changes .f input { margin: 0; accent-color: var(--text-2); }
+  .cv-changes .f em { font: 10.5px var(--mono); color: var(--faint); font-style: normal; }
+  .cv-changes .git-br { flex: 1; min-width: 0; background: none; border: 0; color: var(--strong); font: 500 12.5px var(--mono); padding: 0; }
+  .cv-changes .git-st { margin: 2px 0 6px; color: var(--muted); }
+  .cv-changes .git-st b { color: var(--strong); font-weight: 500; }
+  .cv-changes .git-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .cv-changes .git-acts:empty { display: none; }
+  .cv-changes .git-commit { display: grid; gap: 6px; margin-top: 8px; }
+  .cv-changes .git-commit[hidden] { display: none; }
+  .cv-changes .git-commit textarea { font: 12px var(--mono); resize: vertical; }
+  .cv-changes .git-commit .row { display: flex; gap: 5px; align-items: center; }
+  .cv-changes .git-last { margin-top: 8px; font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cv-changes button:hover { color: var(--text); }
   .cv-path { font: 12.5px var(--mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .cv-meta { font: 11px var(--mono); color: var(--faint); white-space: nowrap; }
@@ -3840,7 +3852,7 @@ async function loadCodeProjects() {
   await loadCodeFiles();
   if (projects.some((p) => p.status === "indexing")) { clearTimeout(libTimer); libTimer = setTimeout(loadLibrary, 2000); }
 }
-$("cvProject").onchange = async () => { code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
+$("cvProject").onchange = async () => { code.project = +$("cvProject").value; code.open = []; code.proposal = null; code.gitSel = null; code.gitKnown = null; code.active = null; code.expanded = new Set([""]); await loadCodeFiles(); renderTabs(); renderEditor(); };
 
 async function loadCodeFiles() {
   const d = await getJSON(`/api/library/collections/${code.project}/documents`);
@@ -4072,26 +4084,104 @@ $("cvDiffApply").onclick = async () => {
   toast(`<b>${esc(p.path)}</b> · modification appliquée (clone local).`);
   renderEditor(); loadChanges();
 };
+function agoFr(ts) {
+  const d = Date.now() / 1000 - ts;
+  return d < 60 ? "à l'instant" : d < 3600 ? `il y a ${Math.round(d / 60)} min` : d < 86400 ? `il y a ${Math.round(d / 3600)} h` : `il y a ${Math.round(d / 86400)} j`;
+}
+// ---- Git : statut, branches, commit, push (chaque action = un clic de ta part)
 async function loadChanges() {
   const box = $("cvChanges");
-  let d;
-  try { d = await getJSON(`/api/code/${code.project}/changes`); } catch { box.hidden = true; return; }
-  code.changes = d;
-  box.hidden = !d.files.length;
-  if (!d.files.length) return;
-  box.innerHTML = `<div class="h"><span>${d.files.length} modification${d.files.length > 1 ? "s" : ""} locale${d.files.length > 1 ? "s" : ""}</span><button id="cvPatchAll">Patch</button></div>`
-    + d.files.map((f, i) => `<div class="f"><span data-i2="${i}" title="${esc(f.path)} · ${esc(f.status)}">${esc(f.path)}</span><button data-rv="${i}" title="Revenir à la version du dépôt">Annuler</button></div>`).join("");
-  box.querySelector("#cvPatchAll").onclick = () => downloadPatch(d.diff, "atom-modifications.patch");
-  box.querySelectorAll("[data-i2]").forEach((el) => { el.onclick = () => openFile(d.files[+el.dataset.i2].path); });
+  let g;
+  try { g = await getJSON(`/api/git/${code.project}/status`); } catch { box.hidden = true; code.git = null; return; }
+  code.git = g; box.hidden = false;
+  const sel = code.gitSel || (code.gitSel = new Set());
+  for (const f of g.files) if (!code.gitKnown?.has(f.path)) sel.add(f.path);   // nouveaux fichiers cochés par défaut
+  code.gitKnown = new Set(g.files.map((f) => f.path));
+  for (const p of [...sel]) if (!code.gitKnown.has(p)) sel.delete(p);
+  const n = g.files.length;
+  box.innerHTML = `
+    <div class="h"><select class="git-br" id="gitBranch" title="Branche">${g.branches.map((b) => `<option ${b === g.branch ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
+      <button id="gitNewBr" title="Nouvelle branche">＋ branche</button></div>
+    <div class="git-st">${n ? `${n} fichier${n > 1 ? "s" : ""} modifié${n > 1 ? "s" : ""}` : "Aucune modification"}${g.ahead ? ` · <b>${g.ahead}</b> commit${g.ahead > 1 ? "s" : ""} à pousser` : ""}</div>
+    ${g.files.map((f, i) => `<div class="f"><input type="checkbox" data-ck="${i}" ${sel.has(f.path) ? "checked" : ""}><span data-i2="${i}" title="${esc(f.path)} · ${esc(f.status)}">${esc(f.path)}</span><em>${esc(f.code)}</em><button data-rv="${i}" title="Revenir à la version du dépôt">Annuler</button></div>`).join("")}
+    <div class="git-commit" id="gitCommitBox" ${code.gitCommitOpen && n ? "" : "hidden"}>
+      <textarea class="field" id="gitMsg" rows="3" placeholder="Message du commit">${esc(code.gitMsg || "")}</textarea>
+      <div class="row"><button class="btn sm" id="gitSuggest"><span data-i="spark"></span>Proposer</button><span class="spacer"></span><button class="btn sm" id="gitCancel">Annuler</button><button class="btn sm primary" id="gitDoCommit">Valider</button></div>
+    </div>
+    <div class="git-acts">
+      ${n ? '<button class="btn sm" id="gitCommit">Commit…</button>' : ""}
+      ${g.ahead ? `<button class="btn sm" id="gitPush" ${g.protected ? 'disabled title="Pas de push sur la branche principale : crée une branche"' : ""}>Pousser</button>` : ""}
+      ${n ? '<button class="btn sm" id="gitPatch" title="Télécharger le patch des modifications">Patch</button>' : ""}
+      ${n ? '<button class="btn sm" id="gitDiscard" title="Annuler toutes les modifications non commitées">Tout annuler</button>' : ""}
+    </div>
+    ${g.last ? `<div class="git-last" title="Dernier commit">${esc(g.last.hash)} · ${esc(g.last.subject)} · ${agoFr(g.last.when)}</div>` : ""}
+    ${!g.token ? '<div class="git-last">Pour pousser : jeton GitHub avec droit d\'écriture dans .env (ATOM_GITHUB_TOKEN).</div>' : ""}`;
+  const q = (x) => box.querySelector(x);
+  box.querySelectorAll("[data-ck]").forEach((el) => { el.onchange = () => { const p = g.files[+el.dataset.ck].path; el.checked ? sel.add(p) : sel.delete(p); }; });
+  box.querySelectorAll("[data-i2]").forEach((el) => { el.onclick = () => openFile(g.files[+el.dataset.i2].path); });
   box.querySelectorAll("[data-rv]").forEach((el) => {
     el.onclick = async () => {
-      const path = d.files[+el.dataset.rv].path;
+      const path = g.files[+el.dataset.rv].path;
       if (!confirm(`Annuler les modifications de ${path} ?`)) return;
-      await send_(`/api/code/${code.project}/revert`, "POST", { path });
+      try { await send_(`/api/code/${code.project}/revert`, "POST", { path }); } catch (e) { toast(esc(e.message)); }
       code.open = code.open.filter((x) => x.path !== path);
       if (code.active === path) { code.active = null; await openFile(path); }
       loadChanges();
     };
+  });
+  const gitDo = async (path, body, okMsg) => {
+    try { const r = await (await send_(`/api/git/${code.project}/${path}`, "POST", body)).json(); if (okMsg) toast(okMsg(r)); return r; }
+    catch (e) { toast(`<b>Git</b> · ${esc(e.message)}`); return null; }
+    finally { await loadChanges(); }
+  };
+  const newBranch = async () => {
+    const d = new Date(), def = `atom/${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+    const name = prompt("Nom de la nouvelle branche (tes modifications et commits non poussés la suivent) :", def);
+    if (!name) return false;
+    return !!(await gitDo("branch", { name: name.trim() }, (r) => `Branche <b>${esc(r.branch)}</b> créée.`));
+  };
+  q("#gitNewBr").onclick = newBranch;
+  q("#gitBranch").onchange = async (e) => {
+    const name = e.target.value;
+    const r = await gitDo("switch", { name }, () => `Branche <b>${esc(name)}</b> · réindexation des fichiers changés…`);
+    if (r) { markIndexing(code.project); code.open = []; code.active = null; code.proposal = null; renderTabs(); renderEditor(); loadLibrary(); setTimeout(loadCodeFiles, 1500); }
+  };
+  q("#gitCommit") && (q("#gitCommit").onclick = async () => {
+    if (!sel.size) { toast("Coche au moins un fichier."); return; }
+    code.gitCommitOpen = true;
+    if (g.protected && confirm(`Tu es sur « ${g.branch} », où Atom ne pousse pas.\nCréer une branche de travail d'abord ?`)) { await newBranch(); }
+    else { q("#gitCommitBox").hidden = false; }
+    $("gitMsg")?.focus();
+  });
+  q("#gitCancel").onclick = () => { code.gitCommitOpen = false; code.gitMsg = ""; q("#gitCommitBox").hidden = true; };
+  q("#gitMsg").oninput = (e) => { code.gitMsg = e.target.value; };
+  q("#gitSuggest").onclick = async (e) => {
+    const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Atom lit le diff…'; setEmotion("thinking");
+    try { code.gitMsg = $("gitMsg").value = (await (await send_(`/api/git/${code.project}/message`, "POST", { paths: [...sel] })).json()).message; }
+    catch (err) { toast(`<b>Git</b> · ${esc(err.message)}`); }
+    finally { b.disabled = false; b.innerHTML = `${icon("spark")}Proposer`; setEmotion("idle"); }
+  };
+  q("#gitDoCommit").onclick = async () => {
+    const message = $("gitMsg").value.trim();
+    if (message.length < 3) { $("gitMsg").focus(); return; }
+    code.gitCommitOpen = false; code.gitMsg = "";
+    const ok = await gitDo("commit", { message, paths: [...sel] }, (r) => `Commit <b>${esc(r.last?.hash || "")}</b> créé · ${r.ahead} à pousser.`);
+    if (ok) entity.seal = 1;
+    else { code.gitCommitOpen = true; code.gitMsg = message; loadChanges(); }
+  };
+  q("#gitPush") && (q("#gitPush").onclick = async (e) => {
+    if (!confirm(`Pousser ${g.ahead} commit${g.ahead > 1 ? "s" : ""} sur GitHub, branche « ${g.branch} » ?`)) return;
+    e.currentTarget.disabled = true; e.currentTarget.innerHTML = '<span class="spin"></span> Envoi…';
+    const r = await gitDo("push", undefined, null);
+    if (r) {
+      entity.seal = 1;
+      toast(`<b>${esc(r.pushed)}</b> poussée sur GitHub.` + (r.compare ? ` <a href="${esc(r.compare)}" target="_blank" rel="noopener">Ouvrir une pull request</a>` : ""));
+    }
+  });
+  q("#gitPatch") && (q("#gitPatch").onclick = async () => { try { downloadPatch((await getJSON(`/api/git/${code.project}/diff`)).diff, "atom-modifications.patch"); } catch (e) { toast(esc(e.message)); } });
+  q("#gitDiscard") && (q("#gitDiscard").onclick = async () => {
+    if (!confirm("Annuler toutes les modifications non commitées (fichiers nouveaux compris) ?")) return;
+    if (await gitDo("discard", undefined, () => "Modifications annulées.")) { code.open = []; code.active = null; renderTabs(); renderEditor(); setTimeout(loadCodeFiles, 1200); }
   });
 }
 

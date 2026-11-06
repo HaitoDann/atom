@@ -64,7 +64,9 @@ BACKUP_TIME = os.getenv("ATOM_BACKUP_TIME", "03:30")
 # Bibliothèque
 DATA_DIR = DB_PATH.parent
 PROJECTS_DIR = Path(os.getenv("ATOM_PROJECTS_DIR", "/projects"))   # dossiers de code du serveur (lecture seule)
-GITHUB_TOKEN = os.getenv("ATOM_GITHUB_TOKEN", "")                    # pour les dépôts privés
+GITHUB_TOKEN = os.getenv("ATOM_GITHUB_TOKEN", "")                    # dépôts privés ; droit d'écriture pour pousser
+GIT_NAME = os.getenv("ATOM_GIT_NAME", "Atom")
+GIT_EMAIL = os.getenv("ATOM_GIT_EMAIL", "atom@localhost")
 
 # Mode hybride : API externe compatible OpenAI (Mistral par défaut)
 REMOTE_NAME = os.getenv("ATOM_REMOTE_NAME", "Mistral")

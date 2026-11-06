@@ -79,6 +79,8 @@ services:
       - ATOM_PASSWORD=${ATOM_PASSWORD:-}
       - ATOM_NUM_THREADS=${ATOM_NUM_THREADS:-0}
       - ATOM_GITHUB_TOKEN=${ATOM_GITHUB_TOKEN:-}
+      - ATOM_GIT_NAME=${ATOM_GIT_NAME:-Atom}
+      - ATOM_GIT_EMAIL=${ATOM_GIT_EMAIL:-atom@localhost}
       - ATOM_REMOTE_API_KEY=${ATOM_REMOTE_API_KEY:-}
       - ATOM_REMOTE_MODEL=${ATOM_REMOTE_MODEL:-mistral-small-latest}
       - ATOM_REMOTE_URL=${ATOM_REMOTE_URL:-https://api.mistral.ai/v1}

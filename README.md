@@ -229,7 +229,12 @@ Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub o
 - **Demander à Atom** : clique sur un numéro de ligne (Maj+clic pour une plage), puis **Expliquer**, **Relire** (bugs, cas oubliés) ou **Demander…** — le passage est joint à une nouvelle conversation ciblée sur le projet. « Expliquer le fichier » fait de même pour tout le fichier.
 - **Modifier…** (sur le fichier, ou sur une sélection de lignes) : écris la consigne (« gère le cas où la liste est vide »), Atom propose une version réécrite et le serveur affiche le **diff** (lignes ajoutées / retirées). Rien n'est écrit tant que tu n'as pas cliqué **Appliquer**. Fichier entier jusqu'à 400 lignes ; au-delà, sélectionne la partie à changer. Avec le mode hybride et « fichiers et bibliothèque » autorisés, tu peux cocher l'API distante pour cette proposition.
 - **Appliquer** n'est possible que sur les **dépôts GitHub clonés par Atom** (`data/repos`). Les dossiers du serveur (`/projects`) sont montés en **lecture seule** : télécharge le **patch** et applique-le chez toi (`git apply fichier.patch`).
-- **Modifications locales** (en haut de l'arborescence) : liste des fichiers changés, **Patch** pour tout télécharger, **Annuler** pour revenir à la version du dépôt. Atom ne fait jamais de commit ni de push.
+- **Git** (dépôts GitHub clonés par Atom), en haut de l'arborescence — chaque action est un bouton que tu cliques, jamais une décision du modèle :
+  - **branche** active et changement de branche (les fichiers sont réindexés), **＋ branche** (les modifications et commits non poussés la suivent) ;
+  - fichiers modifiés à **cocher**, **Commit…** avec **Proposer** (Atom écrit le message à partir du diff, en local), **Annuler** par fichier ou **Tout annuler** ;
+  - **Pousser** (avec confirmation) puis lien **Ouvrir une pull request**. Atom **ne pousse jamais sur la branche principale** du dépôt (il propose de créer une branche `atom/…` au moment du commit) et ne fait **jamais de force-push** ;
+  - **Patch** pour télécharger les modifications en cours.
+  - Il faut un jeton GitHub **fine-grained** limité à tes dépôts avec **Contents: Read and write** dans `ATOM_GITHUB_TOKEN` (`.env`), et `ATOM_GIT_NAME` / `ATOM_GIT_EMAIL` pour signer les commits. Le jeton n'est jamais écrit dans les dépôts clonés.
 - **Mettre à jour** récupère les derniers changements du dépôt (si un fichier modifié localement change aussi sur GitHub, annule d'abord ta modification).
 
 ## Atelier multi-IA (désactivé par défaut)

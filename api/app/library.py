@@ -449,23 +449,44 @@ def list_server_projects() -> list[str]:
     return sorted(p.name for p in PROJECTS_DIR.iterdir() if p.is_dir() and not p.name.startswith("."))
 
 
+def _git_err(r: subprocess.CompletedProcess) -> str:
+    msg = (r.stderr or r.stdout or "")
+    return (msg.replace(GITHUB_TOKEN, "***") if GITHUB_TOKEN else msg).strip()[-300:]
+
+
 def _sync_repo(col: dict) -> Path:
     root = _code_root(col)
     src = col["source"]
     if src.startswith(("http://", "https://", "git@")):
         if (root / ".git").exists():
-            subprocess.run(["git", "-C", str(root), "pull", "--ff-only", "--depth", "1"], check=True,
-                           capture_output=True, timeout=300)
+            g = ["git", "-C", str(root)]
+            subprocess.run([*g, "remote", "set-url", "origin", src], capture_output=True, timeout=30)   # pas de jeton sur le disque
+            branch = subprocess.run([*g, "branch", "--show-current"], capture_output=True, text=True, timeout=30).stdout.strip()
+            # sans --depth : dans un clone superficiel, git ne récupère que ce qui manque depuis notre dernier commit
+            r = subprocess.run([*g, "fetch", _git_url(src), f"+refs/heads/{branch}:refs/remotes/origin/{branch}"],
+                               capture_output=True, text=True, timeout=300)
+            if r.returncode == 0:
+                r = subprocess.run([*g, "merge", "--ff-only", f"refs/remotes/origin/{branch}"], capture_output=True, text=True, timeout=120)
+            if r.returncode != 0:
+                msg = _git_err(r)
+                if "couldn't find remote ref" in msg:
+                    pass   # branche créée par Atom, pas encore poussée : rien à récupérer
+                elif "would be overwritten" in msg or "fast-forward" in msg or "diverg" in msg:
+                    raise RuntimeError("Mise à jour impossible : tes modifications locales ou commits non poussés "
+                                       "entrent en conflit avec GitHub. Pousse-les sur une branche ou annule-les.")
+                else:
+                    raise RuntimeError(msg)
         else:
             shutil.rmtree(root, ignore_errors=True)
             root.parent.mkdir(parents=True, exist_ok=True)
             r = subprocess.run(["git", "clone", "--depth", "1", _git_url(src), str(root)],
                                capture_output=True, text=True, timeout=600)
             if r.returncode != 0:
-                msg = (r.stderr or r.stdout).replace(GITHUB_TOKEN, "***") if GITHUB_TOKEN else (r.stderr or r.stdout)
+                msg = _git_err(r)
                 if "Authentication" in msg or "could not read Username" in msg or "not found" in msg.lower():
                     msg = "Dépôt introuvable ou privé : ajoute ATOM_GITHUB_TOKEN dans .env pour les dépôts privés."
-                raise RuntimeError(msg.strip()[-300:])
+                raise RuntimeError(msg)
+            subprocess.run(["git", "-C", str(root), "remote", "set-url", "origin", src], capture_output=True, timeout=30)
     return root
 
 
