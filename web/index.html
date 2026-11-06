@@ -1481,7 +1481,7 @@
       <section class="pane" data-pane="entity">
         <div class="block">
           <h4>Apparence de l'entité</h4>
-          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine. Orbe : une sphère métallique articulée, gravée de circuits et de médaillons, dont les bandes pivotent — elle s'ouvre et projette une carte lumineuse pendant les grosses tâches.</p>
+          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine. Orbe : une sphère articulée dessinée en points et traits fins, gravée de circuits et de médaillons, dont les bandes pivotent — elle s'ouvre et projette une carte lumineuse pendant les grosses tâches.</p>
           <div class="row" id="styleRow"></div>
         </div>
         <div class="block">
@@ -1829,7 +1829,14 @@ function setEntityState(t) { $("emoState").textContent = t; }
         }
         tr.push({ pts, pulse: R2(), speed: 0.25 + R2() * 0.35 });
       }
-      bands.push({ lo, hi, med, tr, panels: b === 0 || b === NB - 1 ? 3 : 6 + (b % 2) * 2 });
+      // nuage de points de surface, réparti uniformément sur la bande (tourne avec elle)
+      const cloud = [];
+      const area = Math.abs(Math.sin(hi) - Math.sin(lo));
+      for (let k = 0; k < Math.round(170 * area); k++) {
+        const u = Math.sin(lo) + (Math.sin(hi) - Math.sin(lo)) * R2();
+        cloud.push([R2() * Math.PI * 2, Math.asin(u), R2()]);
+      }
+      bands.push({ lo, hi, med, tr, cloud, panels: b === 0 || b === NB - 1 ? 3 : 6 + (b % 2) * 2 });
     }
     const holo = Array.from({ length: 140 }, () => {   // carte de points projetée
       const u = R2() * 2 - 1, a = R2() * Math.PI * 2, r = Math.sqrt(1 - u * u);
@@ -1869,141 +1876,127 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const tmp = [0, 0, 0], tmp2 = [0, 0, 0];
 
     function draw(ctx, st) {
-      const R = st.R, light = document.documentElement.dataset.theme === "light", lit = st.lit, tint = st.tint, A = st.alpha;
+      // Même langage que le maillage et le nuage de points : des points et des traits fins, sans matière.
+      const R = st.R, tint = st.tint, A = st.alpha, lit = st.lit, px = st.px;
       const gap = openK * R * 0.34;
-      const liftOf = (b) => (b === NB - 1 ? -gap : 0);   // seule la calotte du haut se soulève
-      const yCut = -Math.sin(LAT[NB - 1]) * R * Math.cos(tiltX);
-      // --- corps métallique : ombrage, reflet et bord
+      const liftOf = (b) => (b === NB - 1 ? -gap : 0);
+      const depthA = (z) => (z >= 0 ? 0.35 + 0.65 * z : 0.1 * (1 + z));   // l'arrière reste visible, estompé
       ctx.save();
-      ctx.globalAlpha = A;
-      const metal = (lift) => {
-        const g = ctx.createRadialGradient(-R * 0.36, -R * 0.4 + lift, R * 0.04, 0, lift, R * 1.02);
-        if (light) { g.addColorStop(0, "#ffffff"); g.addColorStop(0.4, "#deded9"); g.addColorStop(0.82, "#acaca7"); g.addColorStop(1, "#8b8b86"); }
-        else { g.addColorStop(0, "#b4b4b4"); g.addColorStop(0.3, "#6e6e6e"); g.addColorStop(0.72, "#363636"); g.addColorStop(1, "#191919"); }
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, lift, R, 0, Math.PI * 2); ctx.fill();
-        // brossage : fins arcs concentriques autour du reflet
-        ctx.save(); ctx.beginPath(); ctx.arc(0, lift, R * 0.995, 0, Math.PI * 2); ctx.clip();
-        ctx.strokeStyle = light ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.04)"; ctx.lineWidth = 0.6 * st.px;
-        for (let k = 1; k < 16; k++) { ctx.beginPath(); ctx.arc(-R * 0.36, -R * 0.4 + lift, R * k * 0.1, 0.15, 2.0); ctx.stroke(); }
-        ctx.restore();
+      ctx.fillStyle = `rgb(${tint})`; ctx.strokeStyle = `rgb(${tint})`;
+      const dot = (x, y, a, sz) => { ctx.globalAlpha = Math.min(1, a) * A; const w = sz * px; ctx.fillRect(x - w / 2, y - w / 2, w, w); };
+      // lignes de points le long d'un tracé (θ, φ), espacement régulier
+      const dotted = (b, coords, lift, step, a0, sz) => {
+        for (let k = 0; k < coords.length - 1; k++) {
+          const [t0, p0] = coords[k], [t1, p1] = coords[k + 1];
+          const len = Math.hypot((t1 - t0) * Math.cos((p0 + p1) / 2), p1 - p0);
+          const n = Math.max(1, Math.round(len / step));
+          for (let j = 0; j < n; j++) {
+            const f = j / n; P(b, t0 + (t1 - t0) * f, p0 + (p1 - p0) * f, R, lift, tmp);
+            dot(tmp[0], tmp[1], a0 * depthA(tmp[2]), sz * (0.8 + Math.max(0, tmp[2]) * 0.5));
+          }
+        }
       };
-      if (openK < 0.02) metal(0);
-      else {
-        ctx.save(); ctx.beginPath(); ctx.rect(-R * 1.3, yCut, R * 2.6, R * 2.4); ctx.clip(); metal(0); ctx.restore();
-        // cœur lumineux dans l'ouverture
-        const cg = ctx.createRadialGradient(0, yCut, 0, 0, yCut, R * 0.85);
-        cg.addColorStop(0, `rgba(${tint},${0.55 * openK})`); cg.addColorStop(1, `rgba(${tint},0)`);
-        ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0, yCut - gap * 0.5, Math.cos(LAT[NB - 1]) * R * 1.05, gap * 0.9 + R * 0.12, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.save(); ctx.beginPath(); ctx.rect(-R * 1.3, -R * 1.4 - gap, R * 2.6, yCut + R * 1.4); ctx.clip(); metal(-gap); ctx.restore();
-      }
-      // --- gravures : tracé en creux (ligne sombre + liseré clair décalé)
-      const dark = light ? "rgba(50,50,48,.62)" : "rgba(0,0,0,.78)", hi = light ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.17)";
-      const groove = (pts, w) => {
-        ctx.lineWidth = w * 1.3 * st.px; ctx.strokeStyle = dark; ctx.stroke(pts);
-        ctx.save(); ctx.translate(0.7 * st.px, 0.9 * st.px); ctx.lineWidth = w * 0.7 * st.px; ctx.strokeStyle = hi; ctx.stroke(pts); ctx.restore();
-      };
-      const path = (b, coords, lift, closeIt) => {   // ne garde que la face avant
-        const p = new Path2D(); let pen = false;
+      // traits fins (comme les liens du maillage), avant uniquement
+      const line = (b, coords, lift, a0) => {
+        ctx.lineWidth = 0.7 * px; ctx.beginPath(); let pen = false, zs = 0, n = 0;
         for (const [th, ph] of coords) {
           P(b, th, ph, R, lift, tmp);
-          if (tmp[2] < -0.02) { pen = false; continue; }
-          if (!pen) { p.moveTo(tmp[0], tmp[1]); pen = true; } else p.lineTo(tmp[0], tmp[1]);
+          if (tmp[2] < 0) { pen = false; continue; }
+          zs += tmp[2]; n++;
+          if (!pen) { ctx.moveTo(tmp[0], tmp[1]); pen = true; } else ctx.lineTo(tmp[0], tmp[1]);
         }
-        if (closeIt && pen) p.closePath();
-        return p;
+        if (!n) return;
+        ctx.globalAlpha = a0 * (0.3 + 0.7 * zs / n) * A; ctx.stroke();
       };
-      const SEG = 56;
+      // halo du cœur quand l'orbe s'ouvre
+      if (openK > 0.02) {
+        const yC = -Math.sin(LAT[NB - 1]) * R * Math.cos(tiltX) - gap * 0.5;
+        const cg = ctx.createRadialGradient(0, yC, 0, 0, yC, R * 0.7);
+        cg.addColorStop(0, `rgba(${tint},${0.28 * openK})`); cg.addColorStop(1, `rgba(${tint},0)`);
+        ctx.globalAlpha = A; ctx.fillStyle = cg; ctx.fillRect(-R, yC - R * 0.7, R * 2, R * 1.4); ctx.fillStyle = `rgb(${tint})`;
+      }
+      // contour léger de la sphère
+      for (let k = 0; k < 90; k++) { const a = (k / 90) * Math.PI * 2; dot(Math.cos(a) * R, Math.sin(a) * R + (Math.sin(a) < -0.85 ? -gap : 0), 0.22, 1); }
       for (let b = 0; b < NB; b++) {
         const B = bands[b], lift = liftOf(b);
-        // limites de bande
+        for (const [th, ph, w] of B.cloud) {   // surface : nuage de points
+          P(b, th, ph, R, lift, tmp);
+          dot(tmp[0], tmp[1], (0.22 + 0.18 * Math.sin(st.t * 0.8 + w * 9)) * depthA(tmp[2]) * 1.4, 1.1 + Math.max(0, tmp[2]) * 0.6);
+        }
+        // limites de bande : lignes de points serrées
         for (const ph of [B.lo, B.hi]) {
           if (Math.abs(ph) > 1.5) continue;
-          const c = []; for (let k = 0; k <= SEG; k++) c.push([(k / SEG) * Math.PI * 2, ph]);
-          groove(path(b, c, lift), 1.6);
+          const c = []; for (let k = 0; k <= 64; k++) c.push([(k / 64) * Math.PI * 2, ph]);
+          dotted(b, c, lift, 0.045, 0.95, 1.5);
         }
-        // panneaux (méridiens dans la bande)
+        // panneaux : méridiens en pointillés plus espacés
         for (let k = 0; k < B.panels; k++) {
-          const th = (k / B.panels) * Math.PI * 2, c = [];
-          for (let j = 0; j <= 8; j++) c.push([th, B.lo + (B.hi - B.lo) * (j / 8)]);
-          groove(path(b, c, lift), 1.1);
+          const th = (k / B.panels) * Math.PI * 2;
+          dotted(b, [[th, B.lo], [th, B.hi]], lift, 0.085, 0.6, 1.2);
         }
-        // circuits
+        // circuits : traits fins terminés par un point
         for (const tr of B.tr) {
-          groove(path(b, tr.pts, lift), 0.95);
-          // petite pastille au bout du circuit
+          line(b, tr.pts, lift, 0.4);
           const e = tr.pts[tr.pts.length - 1]; P(b, e[0], e[1], R, lift, tmp);
-          if (tmp[2] > 0.05) { ctx.beginPath(); ctx.arc(tmp[0], tmp[1], R * 0.018, 0, Math.PI * 2); ctx.lineWidth = 1 * st.px; ctx.strokeStyle = dark; ctx.stroke(); }
+          if (tmp[2] > 0) dot(tmp[0], tmp[1], 0.85 * depthA(tmp[2]), 2.6);
         }
-      }
-      // --- médaillons en relief (disque + anneau gravé), qui s'allument
-      for (let b = 0; b < NB; b++) {
-        const lift = liftOf(b);
-        for (const m of bands[b].med) {
+        // médaillons : anneaux de points (double anneau) + cœur qui s'allume
+        for (const m of B.med) {
           P(b, m.th, m.ph, R, lift, tmp);
-          if (tmp[2] < 0.05) continue;
-          // ellipse projetée : la normale donne l'aplatissement
-          const cx = tmp[0], cy = tmp[1], depth = tmp[2];
-          const ang = Math.atan2(cy - lift, cx);   // l'aplatissement suit la direction du bord
-          const rr = m.r * R * 0.62, flat = Math.max(0.14, depth);
-          ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
-          const mg = ctx.createRadialGradient(-rr * 0.3, -rr * 0.3, 0, 0, 0, rr);
-          mg.addColorStop(0, light ? "#ffffff" : "#8e8e8e"); mg.addColorStop(1, light ? "#c4c4bf" : "#3c3c3c");
-          ctx.beginPath(); ctx.ellipse(0, 0, rr * flat, rr, 0, 0, Math.PI * 2); ctx.fillStyle = mg; ctx.fill();
-          ctx.lineWidth = 1.4 * st.px; ctx.strokeStyle = dark; ctx.stroke();
-          ctx.beginPath(); ctx.ellipse(0, 0, rr * flat * 0.62, rr * 0.62, 0, 0, Math.PI * 2); ctx.lineWidth = 0.9 * st.px; ctx.stroke();
-          if (lit > 0.02) {
-            const k = lit * (0.55 + 0.45 * Math.sin(st.t * 3 + m.th * 5)) * depth;
-            const lg = ctx.createRadialGradient(0, 0, 0, 0, 0, rr * 0.9);
-            lg.addColorStop(0, `rgba(${tint},${0.95 * k})`); lg.addColorStop(1, `rgba(${tint},0)`);
-            ctx.beginPath(); ctx.ellipse(0, 0, rr * flat * 0.6, rr * 0.6, 0, 0, Math.PI * 2); ctx.fillStyle = lg; ctx.fill();
+          const zc = tmp[2];
+          for (const [rf, n, sz] of [[1, 16, 1.5], [0.55, 9, 1.2]]) {
+            for (let k = 0; k < n; k++) {
+              const a = (k / n) * Math.PI * 2, dph = Math.sin(a) * m.r * rf, dth = Math.cos(a) * m.r * rf / Math.max(0.25, Math.cos(m.ph));
+              P(b, m.th + dth, m.ph + dph, R, lift, tmp);
+              dot(tmp[0], tmp[1], 0.9 * depthA(tmp[2]), sz);
+            }
           }
-          ctx.restore();
+          if (zc > 0) {
+            P(b, m.th, m.ph, R, lift, tmp);
+            const k = (0.25 + lit * 0.75 * (0.6 + 0.4 * Math.sin(st.t * 3 + m.th * 5))) * zc;
+            dot(tmp[0], tmp[1], k, 2.4 + lit * 2.2);
+          }
         }
       }
-      // --- impulsions de lumière dans les circuits
-      ctx.lineCap = "round";
+      // poussière intérieure discrète (comme le nuage de points)
+      for (let i = 0; i < holo.length; i += 2) {
+        const [x, y, z, w] = holo[i];
+        const a = spinA * 0.6, ca = Math.cos(a), sa = Math.sin(a), X = (x * ca - z * sa) * 0.82, Z = (x * sa + z * ca) * 0.82;
+        dot(X * R, y * R * 0.82 * Math.cos(tiltX), 0.12 + 0.1 * Math.sin(st.t + w * 7), 1);
+      }
+      // signaux : points lumineux qui glissent le long des circuits
       for (let b = 0; b < NB; b++) {
         const lift = liftOf(b);
         for (const tr of bands[b].tr) {
           tr.pulse = (tr.pulse + st.dt * tr.speed * st.pulseRate) % 1;
           const n = tr.pts.length - 1, pos = tr.pulse * n, i0 = Math.floor(pos), f = pos - i0;
-          const a = tr.pts[i0], c = tr.pts[Math.min(n, i0 + 1)];
-          const th = a[0] + (c[0] - a[0]) * f, ph = a[1] + (c[1] - a[1]) * f;
-          P(b, th, ph, R, lift, tmp);
-          if (tmp[2] < 0.05) continue;
-          const k = (0.25 + lit * 0.75) * tmp[2];
-          const pg = ctx.createRadialGradient(tmp[0], tmp[1], 0, tmp[0], tmp[1], R * 0.06);
-          pg.addColorStop(0, `rgba(${tint},${0.9 * k})`); pg.addColorStop(1, `rgba(${tint},0)`);
-          ctx.fillStyle = pg; ctx.fillRect(tmp[0] - R * 0.06, tmp[1] - R * 0.06, R * 0.12, R * 0.12);
+          const a0 = tr.pts[i0], c = tr.pts[Math.min(n, i0 + 1)];
+          P(b, a0[0] + (c[0] - a0[0]) * f, a0[1] + (c[1] - a0[1]) * f, R, lift, tmp);
+          if (tmp[2] < 0) continue;
+          const k = (0.3 + lit * 0.7) * (0.4 + 0.6 * tmp[2]);
+          dot(tmp[0], tmp[1], k, 3.2);
+          dot(tmp[0], tmp[1], k * 0.25, 7);
         }
       }
-      // --- reflet spéculaire et liseré du bord
-      const sg = ctx.createRadialGradient(-R * 0.42, -R * 0.48, 0, -R * 0.42, -R * 0.48, R * 0.55);
-      sg.addColorStop(0, light ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.2)"); sg.addColorStop(1, "rgba(255,255,255,0)");
-      ctx.save(); if (openK >= 0.02) { ctx.beginPath(); ctx.rect(-R * 1.3, yCut, R * 2.6, R * 2.4); ctx.clip(); }
-      ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.lineWidth = 1 * st.px; ctx.strokeStyle = light ? "rgba(0,0,0,.18)" : "rgba(255,255,255,.08)"; ctx.stroke();
-      // --- carte holographique projetée au-dessus
+      // carte holographique projetée au-dessus
       if (openK > 0.02) {
+        const yCut = -Math.sin(LAT[NB - 1]) * R * Math.cos(tiltX);
         const hy = -R * 1.25 - gap * 1.6, HR = R * 0.95, a0 = st.t * 0.35;
-        ctx.fillStyle = `rgb(${tint})`;
         const prj = [];
         for (const [x, y, z, w] of holo) {
           const ca = Math.cos(a0), sa = Math.sin(a0), X = x * ca - z * sa, Z = x * sa + z * ca;
           const sx = X * HR, sy = hy + y * HR * 0.42 - Z * HR * 0.08, d = (Z + 1.4) / 2.4;
-          prj.push([sx, sy, d]);
-          ctx.globalAlpha = A * openK * (0.25 + 0.75 * d) * (0.6 + 0.4 * Math.sin(st.t * 2 + w * 9));
-          const sz = (0.8 + d * 1.6) * st.px; ctx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+          prj.push([sx, sy]);
+          dot(sx, sy, openK * (0.25 + 0.75 * d) * (0.6 + 0.4 * Math.sin(st.t * 2 + w * 9)), 0.8 + d * 1.6);
         }
-        ctx.globalAlpha = A * openK * 0.18; ctx.strokeStyle = `rgb(${tint})`; ctx.lineWidth = 0.5 * st.px;
-        ctx.beginPath();
+        ctx.globalAlpha = A * openK * 0.18; ctx.lineWidth = 0.5 * px; ctx.beginPath();
         for (let i = 0; i < prj.length; i += 3) { const p = prj[i], q = prj[(i * 7 + 5) % prj.length]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) < R * 0.5) { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); } }
         ctx.stroke();
-        // faisceau
-        const bg = ctx.createLinearGradient(0, yCut - gap * 0.4, 0, hy);
-        bg.addColorStop(0, `rgba(${tint},${0.18 * openK})`); bg.addColorStop(1, `rgba(${tint},0)`);
-        ctx.globalAlpha = A; ctx.fillStyle = bg;
-        ctx.beginPath(); ctx.moveTo(-R * 0.15, yCut - gap * 0.4); ctx.lineTo(R * 0.15, yCut - gap * 0.4); ctx.lineTo(HR, hy); ctx.lineTo(-HR, hy); ctx.closePath(); ctx.fill();
+        // faisceau en pointillés
+        for (let k = 0; k < 26; k++) {
+          const f = k / 25, side = k % 2 ? 1 : -1, y = yCut - gap * 0.4 + (hy - (yCut - gap * 0.4)) * f;
+          dot(side * (R * 0.15 + (HR - R * 0.15) * f), y, openK * 0.35 * (1 - f * 0.6), 1.2);
+        }
       }
       ctx.restore();
     }

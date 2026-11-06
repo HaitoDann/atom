@@ -380,7 +380,7 @@ Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans p
 
 - **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
 - **Apparence : maillage** (par défaut) — la sphère est un réseau de ~360 nœuds régulièrement répartis et reliés à leurs voisins, l'arrière estompé dans la profondeur, une poussière intérieure discrète, et des **signaux lumineux** qui parcourent les liens (rares au repos, nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA). Toutes les émotions et animations s'appliquent au réseau ; dans l'atelier, les liens entre amas se rompent. Réglages → Entité → « Fragments » pour revenir à la sphère de poussière d'origine.
-- **Apparence : orbe** : une sphère métallique articulée, en monochrome. Cinq bandes pivotent indépendamment (des quarts de tour, comme un casse-tête), et des gravures-circuits et des médaillons en relief la recouvrent.
+- **Apparence : orbe** : une sphère articulée dessinée en points et traits fins, dans le même style que le maillage. Cinq bandes pivotent indépendamment (des quarts de tour, comme un casse-tête), et des gravures-circuits et des médaillons en relief la recouvrent.
   - Au repos, elle tourne lentement. Quand Atom travaille, les médaillons s'allument et des impulsions de lumière parcourent les gravures.
   - Pour les grosses tâches (recherche, atelier, IA distante, agent), la calotte se soulève et projette une carte de points lumineux.
   - Les émotions passent par la façon de tourner (frénétique en colère, en spirale par curiosité, presque immobile en sommeil, affaissée en tristesse) et par la couleur de la lumière.
