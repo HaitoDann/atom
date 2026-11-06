@@ -1168,6 +1168,7 @@
           <h4>Comparatif</h4>
           <p class="desc">Les mêmes questions sont posées à chaque modèle, l'un après l'autre. Atom mesure le chargement, le délai avant le premier mot et la vitesse d'écriture. Le premier passage d'un modèle inclut son chargement en mémoire.</p>
           <div id="labPick" class="lab-pick"></div>
+          <p class="note" id="labRemoteNote" hidden>Les API distantes ne reçoivent que les questions du comparatif (jamais tes souvenirs ni tes documents) et chaque question compte dans leur quota du jour. Leur vitesse dépend surtout du réseau et de leur charge.</p>
           <div id="labPrompts" class="lab-pick"></div>
           <textarea class="field" id="labCustom" rows="2" placeholder="Ta propre question (facultatif) — le meilleur test, c'est ton usage réel"></textarea>
           <div class="row" style="margin-top:8px"><button class="btn primary" id="labRun">Lancer le comparatif</button><span class="note" id="labRunInfo" style="margin-left:8px"></span></div>
@@ -3531,7 +3532,9 @@ async function loadLab() {
   // choix pour le comparatif (on garde les cases déjà cochées)
   const was = new Set([...document.querySelectorAll("#labPick input:checked")].map((i) => i.value));
   if (!was.size) { was.add(cur); const other = lab.installed.find((n) => n !== cur); if (other) was.add(other); }
-  $("labPick").innerHTML = lab.installed.map((n) => `<label class="mono"><input type="checkbox" value="${esc(n)}" ${was.has(n) ? "checked" : ""}>${esc(n)}</label>`).join("");
+  $("labPick").innerHTML = lab.installed.map((n) => `<label class="mono"><input type="checkbox" value="${esc(n)}" ${was.has(n) ? "checked" : ""}>${esc(n)}</label>`).join("")
+    + lab.remote.map((r) => `<label class="mono" title="${esc(r.model)} · ${r.left} requêtes restantes aujourd'hui"><input type="checkbox" value="${esc(r.id)}" ${was.has(r.id) ? "checked" : ""}>${esc(r.name)} · ${esc(r.model.split("/").pop())}</label>`).join("");
+  $("labRemoteNote").hidden = !lab.remote.length;
   if (!$("labPrompts").children.length)
     $("labPrompts").innerHTML = lab.prompts.map((p, i) => `<label><input type="checkbox" value="${p.id}" ${i < 3 ? "checked" : ""}>${esc(p.label)}</label>`).join("");
   clearTimeout(labTimer);
@@ -3550,21 +3553,23 @@ function labUse(name) {
   if (![...modelSel.options].some((o) => o.value === name)) modelSel.add(new Option(name, name));
   modelSel.value = name; modelSel.onchange(); loadLab();
 }
+const labName = (m) => { const r = lab?.remote.find((x) => x.id === m); return r ? `${r.name} · ${r.model}` : m; };
 $("labInstall").onclick = () => { labInstall($("labName").value); $("labName").value = ""; };
 $("labRun").onclick = async () => {
   if (labRunning) return;
-  const models = [...document.querySelectorAll("#labPick input:checked")].map((i) => i.value).slice(0, 3);
+  const models = [...document.querySelectorAll("#labPick input:checked")].map((i) => i.value).slice(0, 4);
   const prompts = [...document.querySelectorAll("#labPrompts input:checked")].map((i) => i.value);
   const custom = $("labCustom").value.trim();
-  if (!models.length) { toast("Coche au moins un modèle (3 au plus)."); return; }
+  if (!models.length) { toast("Coche au moins un modèle (4 au plus)."); return; }
   if (!prompts.length && !custom) { toast("Coche au moins une question."); return; }
   const qs = [...lab.prompts.filter((p) => prompts.includes(p.id)), ...(custom ? [{ id: "perso", label: "Ta question" }] : [])];
   const box = $("labResults");
-  box.innerHTML = `<div class="lab-res"><table><thead><tr><td class="q"></td>${models.map((m) => `<th>${esc(m)}</th>`).join("")}</tr></thead><tbody>
+  box.innerHTML = `<div class="lab-res"><table><thead><tr><td class="q"></td>${models.map((m) => `<th>${esc(labName(m))}</th>`).join("")}</tr></thead><tbody>
     ${qs.map((q) => `<tr><td class="q">${esc(q.label)}</td>${models.map((m) => `<td data-c="${esc(m)}|${q.id}"><div class="m">en attente</div><div class="md"></div></td>`).join("")}</tr>`).join("")}
     <tr class="sum"><td class="q">Moyenne</td>${models.map((m) => `<td data-s="${esc(m)}">—</td>`).join("")}</tr>
-    <tr><td class="q"></td>${models.map((m) => `<td><button class="btn sm" data-pick="${esc(m)}">Utiliser ce modèle</button></td>`).join("")}</tr></tbody></table></div>`;
+    <tr><td class="q"></td>${models.map((m) => m.startsWith("p:") ? `<td><button class="btn sm" data-prov="${esc(m.slice(2))}">En faire le principal</button></td>` : `<td><button class="btn sm" data-pick="${esc(m)}">Utiliser ce modèle</button></td>`).join("")}</tr></tbody></table></div>`;
   box.querySelectorAll("[data-pick]").forEach((b) => { b.onclick = () => labUse(b.dataset.pick); });
+  box.querySelectorAll("[data-prov]").forEach((b) => { b.onclick = async () => { await saveHybrid({ provider: b.dataset.prov }); toast(`Fournisseur principal : <b>${esc(labName("p:" + b.dataset.prov))}</b>`); }; });
   const cell = (m, q) => box.querySelector(`[data-c="${CSS.escape(m + "|" + q)}"]`);
   const agg = {};
   labRunning = true; $("labRun").disabled = true; $("labRunInfo").textContent = "Comparatif en cours…"; setEmotion("focus");
@@ -3578,7 +3583,7 @@ $("labRun").onclick = async () => {
       while ((nl = buf.indexOf("\n")) >= 0) {
         const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1); if (!line) continue;
         const ev = JSON.parse(line), c = ev.model ? cell(ev.model, ev.prompt) : null;
-        if (ev.type === "start" && c) { c.querySelector(".m").innerHTML = '<span class="spin"></span> écrit…'; texts[ev.model + ev.prompt] = ""; $("labRunInfo").textContent = `${ev.model}…`; }
+        if (ev.type === "start" && c) { c.querySelector(".m").innerHTML = '<span class="spin"></span> écrit…'; texts[ev.model + ev.prompt] = ""; $("labRunInfo").textContent = `${labName(ev.model)}…`; }
         else if (ev.type === "token" && c) {
           texts[ev.model + ev.prompt] += ev.text; entity.tokenKick = 1;
           if (!q) { q = true; requestAnimationFrame(() => { q = false; box.querySelectorAll("[data-c]").forEach((x) => { const k = x.dataset.c.replace("|", ""); if (texts[k] != null) x.querySelector(".md").innerHTML = md(texts[k].replace(/^\s*\[[a-z_]+\]\s*/i, "")); }); }); }
@@ -3591,6 +3596,7 @@ $("labRun").onclick = async () => {
         } else if (ev.type === "error" && c) { c.querySelector(".m").textContent = "Erreur"; c.querySelector(".md").textContent = ev.message; }
       }
     }
+    loadLab();
     $("labRunInfo").textContent = `Terminé en ${Math.round((Date.now() - t0) / 1000)} s. Compare surtout la qualité des réponses : c'est elle qui compte au quotidien.`;
   } catch (e) { $("labRunInfo").textContent = e.message; }
   finally { labRunning = false; $("labRun").disabled = false; setEmotion("idle"); }

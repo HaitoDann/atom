@@ -246,7 +246,7 @@ Réglages → Système → **Modèles locaux** :
 - **Essayer un autre modèle** : des suggestions avec leur taille, et l'installation de n'importe quel modèle Ollama par son nom. Le téléchargement se fait en arrière-plan avec une barre de progression, et un avertissement s'affiche si le modèle dépasse la mémoire disponible.
   - `qwen3:30b-a3b-instruct-2507-q4_K_M` : modèle « à experts » de 30 milliards de paramètres, dont environ 3 sont actifs par mot. Il est nettement plus capable qu'un 4B, pour une vitesse proche sur processeur, mais demande environ 19 Go de RAM.
   - `qwen2.5-coder:7b` : spécialisé dans le code.
-- **Comparatif** : les mêmes questions (raisonnement, rédaction, code, connaissances, ou ta propre question) sont posées à 1 à 3 modèles, l'un après l'autre. Les réponses s'affichent côte à côte avec la vitesse d'écriture, le délai avant le premier mot et le temps de chargement. **Utiliser ce modèle** l'adopte directement. À la fin, les modèles non retenus sont déchargés de la mémoire.
+- **Comparatif** : les mêmes questions (raisonnement, rédaction, code, connaissances, ou ta propre question) sont posées à 1 à 4 modèles, l'un après l'autre. Les **API distantes** peuvent être ajoutées : elles ne reçoivent que les questions du comparatif, et chaque question compte dans leur quota du jour. Un bouton « En faire le principal » permet de choisir un fournisseur depuis le comparatif. Les réponses s'affichent côte à côte avec la vitesse d'écriture, le délai avant le premier mot et le temps de chargement. **Utiliser ce modèle** l'adopte directement. À la fin, les modèles non retenus sont déchargés de la mémoire.
 
 ## Mode Code
 

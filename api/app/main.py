@@ -902,7 +902,7 @@ class ModelName(BaseModel):
 
 
 class CompareIn(BaseModel):
-    models: list[str] = Field(min_length=1, max_length=3)
+    models: list[str] = Field(min_length=1, max_length=4)
     prompts: list[str] = Field(default_factory=list, max_length=4)   # ids de PROMPTS
     custom: str = Field(default="", max_length=2000)
 
@@ -919,7 +919,9 @@ async def lab():
     snap = await system.snapshot()
     return {"installed": [n for n in installed if n.split(":")[0] != EMBED_MODEL.split(":")[0]],
             "suggested": models_lab.SUGGESTED, "prompts": [{"id": p["id"], "label": p["label"]} for p in models_lab.PROMPTS],
-            "pulls": models_lab.pulls(), "memory": snap.get("memory"), "current": db.kv_get("model") or DEFAULT_MODEL}
+            "pulls": models_lab.pulls(), "memory": snap.get("memory"), "current": db.kv_get("model") or DEFAULT_MODEL,
+            "remote": [{"id": f"p:{p.id}", "name": p.name, "model": providers.model_of(p), "left": providers.quota_left(p.id)}
+                       for p in providers.ALL if p.configured]}
 
 
 @app.post("/api/lab/install")

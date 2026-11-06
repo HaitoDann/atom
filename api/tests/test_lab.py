@@ -17,3 +17,10 @@ def test_lab(client):
     res = [l for l in lines if l["type"] == "result"]
     assert len(res) == 4 and {r["model"] for r in res} == {"a", "b"} and lines[-1]["type"] == "done"
     assert all(r["first_s"] is not None for r in res)
+
+
+def test_lab_remote(client):
+    rid = client.get("/api/lab").json()["remote"][0]["id"]
+    lines = [json.loads(l) for l in client.post("/api/lab/compare", json={"models": ["mock", rid], "prompts": ["redaction"]}).text.splitlines()]
+    res = {l["model"]: l for l in lines if l["type"] == "result"}
+    assert set(res) == {"mock", rid} and "mode test" in res[rid]["text"]

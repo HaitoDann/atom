@@ -16,7 +16,7 @@ from typing import AsyncIterator
 
 import httpx
 
-from . import llm
+from . import llm, providers
 from .config import OLLAMA_URL, PROVIDER
 
 SUGGESTED = [
@@ -104,17 +104,28 @@ async def compare(models: list[str], prompts: list[dict], keep: str | None = Non
             yield dict(type="start", model=m, prompt=p["id"])
             t0, first, text = time.time(), None, ""
             try:
-                async for tok in llm.stream_chat(m, [{"role": "user", "content": p["text"] + " /no_think"}]):
+                if m.startswith("p:"):   # fournisseur distant (même question, sans aucune donnée personnelle)
+                    prov = providers.get(m[2:])
+                    if not prov or not prov.configured:
+                        raise RuntimeError("fournisseur non configuré")
+                    stats: dict = {}
+                    gen = providers.stream(prov, [{"role": "user", "content": p["text"]}], None, stats)
+                else:
+                    stats = llm.last_stats
+                    gen = llm.stream_chat(m, [{"role": "user", "content": p["text"] + " /no_think"}])
+                async for tok in gen:
                     first = first or time.time()
                     text += tok
                     yield dict(type="token", model=m, prompt=p["id"], text=tok)
-                s = dict(llm.last_stats)
+                s = dict(stats)
+                if m.startswith("p:") and s.get("tokens") and first:
+                    s["tok_s"] = round(s["tokens"] / max(0.01, time.time() - first), 1)   # mesuré côté Atom
                 yield dict(type="result", model=m, prompt=p["id"], text=text,
                            first_s=round((first or time.time()) - t0, 2), wall_s=round(time.time() - t0, 2),
                            tok_s=s.get("tok_s"), prompt_tok_s=s.get("prompt_tok_s"), load_s=s.get("load_s"), tokens=s.get("tokens"))
             except Exception as e:  # noqa: BLE001
                 yield dict(type="error", model=m, prompt=p["id"], message=str(e)[:300])
                 break   # modèle en échec (absent, mémoire insuffisante) : on passe au suivant
-        if keep and m != keep:
+        if keep and m != keep and not m.startswith("p:"):
             await unload(m)
     yield dict(type="done")
