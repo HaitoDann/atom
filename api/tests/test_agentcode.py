@@ -53,3 +53,10 @@ def test_parse():
     t, a = agentcode._parse('Je lis.\n```action\n{"tool": "read", "path": "a.py"}\n```')
     assert t == "Je lis." and a == {"tool": "read", "path": "a.py"}
     assert agentcode._parse("pas d'action")[1] is None
+
+
+def test_paths_normalized():
+    cid, root = _project()
+    ws = agentcode.Workspace(cid)
+    assert "app.py" in ws.t_list("./") and "app.py" in ws.t_list(".") and "app.py" in ws.t_list("/")
+    assert ws.t_read("./app.py").startswith("app.py")

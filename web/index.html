@@ -4484,7 +4484,11 @@ $("agRun").onclick = async () => {
 };
 function agResults() {
   const box = $("agRes"), r = agRun; box.hidden = false;
-  if (!r.files?.length) { box.innerHTML = `<h5>Aucune modification proposée</h5>${r.summary ? `<div class="sum md">${md(r.summary)}</div>` : ""}`; return; }
+  if (!r.files?.length) {
+    box.innerHTML = r.summary ? `<h5>Réponse de l'agent</h5><div class="sum md"></div><p class="note">Aucun fichier modifié.</p>` : "<h5>Aucune modification proposée</h5>";
+    if (r.summary) setMd(box.querySelector(".sum"), r.summary);
+    return;
+  }
   const add = r.files.reduce((s, f) => s + f.added, 0), rem = r.files.reduce((s, f) => s + f.removed, 0);
   box.innerHTML = `<h5>${r.files.length} fichier${r.files.length > 1 ? "s" : ""} modifié${r.files.length > 1 ? "s" : ""} · +${add} / −${rem}</h5>
     ${r.summary ? `<div class="sum md">${md(r.summary)}</div>` : ""}

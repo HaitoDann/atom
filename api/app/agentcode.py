@@ -33,13 +33,17 @@ Tu ne vois le projet qu'à travers des outils. Rien n'est écrit sur le disque :
 l'utilisateur, qui décidera de les appliquer.
 
 Outils (une seule action par réponse) :
-- {{"tool": "list", "dir": "chemin/ou/vide"}} : fichiers d'un dossier (vide = racine)
+- {{"tool": "list", "dir": "chemin/relatif"}} : fichiers d'un dossier ("" = racine ; chemins relatifs, sans « ./ »)
 - {{"tool": "read", "path": "fichier", "start": 1, "end": 400}} : lire des lignes (numérotées)
 - {{"tool": "search", "query": "texte"}} : chercher un texte exact dans tout le projet
 - {{"tool": "edit", "path": "fichier", "old": "texte exact existant", "new": "remplacement"}} : remplacer un passage.
   « old » doit apparaître UNE seule fois dans le fichier, copié à l'identique (espaces et indentation compris).
 - {{"tool": "write", "path": "fichier", "content": "contenu complet"}} : créer un fichier (ou le réécrire s'il est court)
 - {{"tool": "done", "summary": "ce que tu as changé et pourquoi, et ce que l'utilisateur doit vérifier"}}
+
+Si la tâche est une QUESTION (expliquer, décrire, trouver, analyser) : explore et lis les fichiers utiles sans rien
+modifier, puis réponds en détail dans « summary » de l'action done (rôle du projet, architecture, fichiers clés,
+fonctionnement, points d'attention), en Markdown.
 
 Méthode :
 1. Au premier tour, écris un PLAN court (3 à 6 étapes numérotées), puis ta première action.
@@ -52,6 +56,9 @@ Format de chaque réponse : une ou deux phrases de réflexion, puis exactement :
 ```action
 {{ ...json... }}
 ```
+
+Fichiers du projet (extrait) :
+{files}
 
 Arborescence (dossiers) :
 {tree}
@@ -74,7 +81,10 @@ class Workspace:
         self.read_ok: set[str] = set()
 
     def _safe(self, rel: str) -> str:
-        rel = (rel or "").strip().lstrip("/").replace("\\", "/")
+        rel = (rel or "").strip().replace("\\", "/")
+        # « ./src/a.py », « /src/ », « . » → chemins relatifs propres
+        parts = [x for x in rel.split("/") if x not in ("", ".")]
+        rel = "/".join(parts)
         p = (self.root / rel).resolve()
         if rel and (not str(p).startswith(str(self.root) + "/") or "/.git/" in f"/{rel}/"):
             raise ValueError("chemin hors du projet")
@@ -272,7 +282,9 @@ async def run(cid: int, task: str, engine: str = "remote") -> AsyncIterator[dict
     eng, why = engine_for(engine)
     rid = secrets.token_hex(8)
     yield dict(type="start", id=rid, engine=eng, info=why, writable=_writable(ws.col))
-    messages = [{"role": "system", "content": SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80))},
+    listing = ws.all_paths()
+    files = "\n".join(listing[:150]) + (f"\n… ({len(listing)} fichiers au total)" if len(listing) > 150 else "")
+    messages = [{"role": "system", "content": SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)")},
                 {"role": "user", "content": f"Tâche : {task.strip()}"}]
     summary, bad = "", 0
     for step in range(1, MAX_STEPS + 1):
