@@ -84,3 +84,30 @@ def test_fit_budget():
     small = agentcode._fit(msgs, 5000)
     assert agentcode._est(small) <= 5200 and len(msgs[-1]["content"]) > len(small[-1]["content"]) - 1
     assert msgs[3]["content"].count("\n") == 600     # l'original n'est pas modifié
+
+
+def test_rate_limit_pause(client, monkeypatch):
+    import asyncio as aio
+    from app import hybrid, providers
+    cid, root = _project()
+    calls = {"n": 0}
+    real = providers.chat_tools
+
+    async def flaky(p, messages, tools, max_tokens=4096):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise providers.RateLimited("limite par minute de l'offre Test", 1)
+        return await real(p, messages, tools, max_tokens)
+
+    async def fast_sleep(s):
+        return None
+
+    monkeypatch.setattr(providers, "chat_tools", flaky)
+    monkeypatch.setattr(aio, "sleep", fast_sleep)
+    hybrid.save_settings({"allow_docs": True})
+    try:
+        lines = [json.loads(l) for l in client.post(f"/api/agent/{cid}", json={"task": "commente", "engine": "remote"}).text.splitlines()]
+    finally:
+        hybrid.save_settings({"allow_docs": False})
+    assert any(l["type"] == "info" and "pause" in l["message"] for l in lines)
+    assert lines[-1]["files"] and not any("en local" in l.get("message", "") for l in lines)

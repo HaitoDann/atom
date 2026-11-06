@@ -14,6 +14,7 @@ UNE action dans un bloc ```action {json}```. Atom exécute l'action et lui renvo
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import json
 import re
@@ -342,24 +343,38 @@ async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> A
     for step in range(1, MAX_STEPS + 1):
         state["step"] = step
         yield dict(type="thinking", step=step)
-        msg, errors = None, []
-        for p in list(order):
-            try:
-                bud = providers.budget(p)
-                out_tok = min(2048, max(600, int(bud * 0.25)))
+        msg, errors, waits = None, [], []
+        for attempt in range(4):
+            msg, errors, waits = None, [], []
+            for p in list(order):
                 try:
-                    msg = await providers.chat_tools(p, _fit(messages, bud - out_tok), TOOLS, out_tok)
-                except providers.TooLarge:
-                    small = int(bud * 0.6)   # estimation trop optimiste : on réessaie nettement plus court
-                    msg = await providers.chat_tools(p, _fit(messages, small - 600), TOOLS, 600)
-                if announced != p.id:
-                    announced = p.id
-                    yield dict(type="engine", name=f"{p.name} · {providers.model_of(p)}")
-                order = [p] + [x for x in order if x is not p]   # on garde le fournisseur qui marche
+                    bud = providers.budget(p)
+                    out_tok = min(2048, max(600, int(bud * 0.25)))
+                    try:
+                        msg = await providers.chat_tools(p, _fit(messages, bud - out_tok), TOOLS, out_tok)
+                    except providers.TooLarge:
+                        small = int(bud * 0.6)   # estimation trop optimiste : on réessaie nettement plus court
+                        msg = await providers.chat_tools(p, _fit(messages, small - 600), TOOLS, 600)
+                    if announced != p.id:
+                        announced = p.id
+                        yield dict(type="engine", name=f"{p.name} · {providers.model_of(p)}")
+                    order = [p] + [x for x in order if x is not p]   # on garde le fournisseur qui marche
+                    break
+                except providers.RateLimited as e:
+                    errors.append(str(e))
+                    if e.wait < 120:
+                        waits.append(e.wait)
+                    else:
+                        order = [x for x in order if x is not p]   # limite du jour : on l'écarte
+                except providers.Unavailable as e:
+                    errors.append(str(e))
+                    order = [x for x in order if x is not p]
+            if msg is not None or not waits:
                 break
-            except providers.Unavailable as e:
-                errors.append(str(e))
-                order = [x for x in order if x is not p]
+            # Tous limités pour la minute : mieux vaut patienter que basculer sur le modèle local.
+            pause = min(65, max(3, min(waits) + 1))
+            yield dict(type="info", message=f"Limite par minute atteinte ({errors[0]}) : pause de {int(pause)} s puis reprise.")
+            await asyncio.sleep(pause)
         if msg is None:
             state["fallback"] = " ; ".join(errors) or "aucun fournisseur disponible"
             return

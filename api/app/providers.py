@@ -206,6 +206,14 @@ class Unavailable(RuntimeError):
     """Le fournisseur n'a rien produit (clé, limite, panne) : on peut passer au suivant."""
 
 
+class RateLimited(Unavailable):
+    """Limite par minute atteinte : réessayer après `wait` secondes."""
+
+    def __init__(self, msg: str, wait: float = 60):
+        super().__init__(msg)
+        self.wait = wait
+
+
 class TooLarge(Unavailable):
     """Requête trop grosse pour l'offre du fournisseur : on peut réessayer en plus court."""
 
@@ -388,16 +396,21 @@ async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_t
         if r.status_code in (401, 403):
             raise Unavailable(f"clé API {p.name} refusée")
         if r.status_code == 429:
-            _cooldown[p.id] = time.time() + 120
-            raise Unavailable(f"limite de l'offre {p.name} atteinte pour le moment")
+            m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", body)
+            wait = (int(m.group(1) or 0) * 60 + float(m.group(2))) if m else float(r.headers.get("retry-after") or 60)
+            per_day = "per day" in low or "tokens per day" in low or "requests per day" in low
+            raise RateLimited(f"limite {'du jour' if per_day else 'par minute'} de l'offre {p.name}", wait if not per_day else 99999)
         if r.status_code >= 500:
             _cooldown[p.id] = time.time() + 60
         raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:200]}")
     count(p.id)
     try:
-        msg = (r.json().get("choices") or [{}])[0].get("message") or {}
-    except ValueError as e:
-        raise Unavailable(f"{p.name} : réponse illisible") from e
+        data = r.json()
+        msg = (data.get("choices") or [{}])[0].get("message") or {}
+    except (ValueError, AttributeError) as e:
+        snippet = re.sub(r"\s+", " ", r.text[:160])
+        log.warning("%s : réponse illisible (%s) : %s", p.name, r.headers.get("content-type"), snippet)
+        raise Unavailable(f"{p.name} : réponse illisible ({r.headers.get('content-type', '?')} : {snippet[:100]})") from e
     return msg
 
 
