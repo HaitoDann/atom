@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, codeedit, db, gitops, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, auth, backup, codeedit, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -892,6 +892,66 @@ async def import_db(request: Request):
 
 
 # ---- vitesse
+
+
+# ---- labo des modèles locaux
+
+
+class ModelName(BaseModel):
+    name: str = Field(min_length=2, max_length=120, pattern=r"^[A-Za-z0-9._:/-]+$")
+
+
+class CompareIn(BaseModel):
+    models: list[str] = Field(min_length=1, max_length=3)
+    prompts: list[str] = Field(default_factory=list, max_length=4)   # ids de PROMPTS
+    custom: str = Field(default="", max_length=2000)
+
+
+@app.get("/api/lab")
+async def lab():
+    try:
+        installed = [] if PROVIDER == "mock" else await llm.installed_models()
+    except httpx.HTTPError:
+        installed = []
+    if PROVIDER == "mock":
+        installed = ["mock", "qwen3:4b-instruct-2507-q4_K_M"]
+    from . import system
+    snap = await system.snapshot()
+    return {"installed": [n for n in installed if n.split(":")[0] != EMBED_MODEL.split(":")[0]],
+            "suggested": models_lab.SUGGESTED, "prompts": [{"id": p["id"], "label": p["label"]} for p in models_lab.PROMPTS],
+            "pulls": models_lab.pulls(), "memory": snap.get("memory"), "current": db.kv_get("model") or DEFAULT_MODEL}
+
+
+@app.post("/api/lab/install")
+async def lab_install(body: ModelName):
+    st = next((p for p in models_lab.pulls() if p["name"] == body.name), None)
+    if st and not st["done"]:
+        raise HTTPException(409, "Installation déjà en cours")
+    background(models_lab.install(body.name))
+    return {"ok": True}
+
+
+@app.post("/api/lab/delete")
+async def lab_delete(body: ModelName):
+    if body.name == (db.kv_get("model") or DEFAULT_MODEL):
+        raise HTTPException(409, "C'est le modèle utilisé par Atom : choisis-en un autre avant de le supprimer.")
+    try:
+        await models_lab.delete(body.name)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, str(e)) from e
+    return {"ok": True}
+
+
+@app.post("/api/lab/compare")
+async def lab_compare(body: CompareIn):
+    prompts = [p for p in models_lab.PROMPTS if p["id"] in body.prompts]
+    if body.custom.strip():
+        prompts.append({"id": "perso", "label": "Ta question", "text": body.custom.strip()})
+    if not prompts:
+        raise HTTPException(422, "Choisis au moins une question")
+    keep = db.kv_get("model") or DEFAULT_MODEL
+    return StreamingResponse((event(**ev) async for ev in models_lab.compare(body.models, prompts, keep)),
+                             media_type="application/x-ndjson")
 
 
 @app.post("/api/benchmark")

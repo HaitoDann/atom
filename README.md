@@ -238,6 +238,16 @@ Pour un fournisseur connu, la clé suffit ; `ATOM_PROVIDERS=…` sert pour un fo
 - **Données privées** : un fournisseur avec `ATOM_<ID>_PRIVATE=0` ne reçoit **jamais** tes souvenirs, documents ni fichiers, même si tu les as autorisés. C'est le réglage par défaut pour `gemini` et `openrouter`, dont les offres gratuites peuvent réutiliser les données.
 - Les modèles par défaut changent souvent chez les fournisseurs : si l'un d'eux affiche « modèle introuvable » dans l'écran État, choisis-en un autre dans la liste.
 
+## Modèles locaux : essayer et comparer
+
+Réglages → Système → **Modèles locaux** :
+
+- **Modèles installés** : **Utiliser** pour en changer, ou **Supprimer** pour libérer de l'espace disque. Le modèle actif ne peut pas être supprimé.
+- **Essayer un autre modèle** : des suggestions avec leur taille, et l'installation de n'importe quel modèle Ollama par son nom. Le téléchargement se fait en arrière-plan avec une barre de progression, et un avertissement s'affiche si le modèle dépasse la mémoire disponible.
+  - `qwen3:30b-a3b-instruct-2507-q4_K_M` : modèle « à experts » de 30 milliards de paramètres, dont environ 3 sont actifs par mot. Il est nettement plus capable qu'un 4B, pour une vitesse proche sur processeur, mais demande environ 19 Go de RAM.
+  - `qwen2.5-coder:7b` : spécialisé dans le code.
+- **Comparatif** : les mêmes questions (raisonnement, rédaction, code, connaissances, ou ta propre question) sont posées à 1 à 3 modèles, l'un après l'autre. Les réponses s'affichent côte à côte avec la vitesse d'écriture, le délai avant le premier mot et le temps de chargement. **Utiliser ce modèle** l'adopte directement. À la fin, les modèles non retenus sont déchargés de la mémoire.
+
 ## Mode Code
 
 Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub ou dossier du serveur), et faire proposer des modifications.
