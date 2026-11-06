@@ -1481,7 +1481,7 @@
       <section class="pane" data-pane="entity">
         <div class="block">
           <h4>Apparence de l'entité</h4>
-          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine.</p>
+          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine. Orbe : une sphère métallique articulée, gravée de circuits et de médaillons, dont les bandes pivotent — elle s'ouvre et projette une carte lumineuse pendant les grosses tâches.</p>
           <div class="row" id="styleRow"></div>
         </div>
         <div class="block">
@@ -1796,6 +1796,220 @@ function setEntityState(t) { $("emoState").textContent = t; }
   let nextBlink = 6, nextGlance = 9;
   const ease = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
+  /* ---------------------------------------------------------------- apparence « Orbe »
+     Une sphère métallique articulée (monochrome) : 5 bandes qui pivotent indépendamment comme un
+     casse-tête, gravures-circuits et médaillons en relief, impulsions de lumière dans les gravures.
+     Les émotions passent par la façon de tourner et la couleur de la lumière.
+     Grosses tâches (recherche, atelier, IA distante, agent) : l'orbe s'ouvre et projette une carte de points. */
+  const orb = (() => {
+    const LAT = [-Math.PI / 2, -0.95, -0.32, 0.32, 0.95, Math.PI / 2];   // limites des 5 bandes
+    const NB = LAT.length - 1;
+    const rot = new Float32Array(NB), from = new Float32Array(NB), to = new Float32Array(NB), mt = new Float32Array(NB).fill(1);
+    let nextMove = 2, spinA = 0, openK = 0, tiltX = 0.38, tiltZ = 0;
+    const R2 = () => Math.random();
+    // décor de chaque bande : médaillons et circuits (coordonnées locales θ, φ)
+    const bands = [];
+    for (let b = 0; b < NB; b++) {
+      const lo = LAT[b], hi = LAT[b + 1], mid = (lo + hi) / 2, h = hi - lo;
+      const med = [], tr = [];
+      const nMed = b === 0 || b === NB - 1 ? 1 : 3 + (b === 2 ? 1 : 0);
+      for (let k = 0; k < nMed; k++) {
+        const th = (k / nMed) * Math.PI * 2 + R2() * 0.6;
+        const ph = b === 0 ? -Math.PI / 2 : b === NB - 1 ? Math.PI / 2 : mid + (R2() - 0.5) * h * 0.25;
+        med.push({ th, ph, r: b === 0 || b === NB - 1 ? 0.3 : 0.13 + R2() * 0.06 });
+      }
+      for (let k = 0; k < (b === 0 || b === NB - 1 ? 3 : 7); k++) {   // circuits : tracés à angles droits
+        let th = R2() * Math.PI * 2, ph = lo + h * (0.18 + R2() * 0.64);
+        if (b === 0 || b === NB - 1) ph = mid + (R2() - 0.5) * h * 0.5;
+        const pts = [[th, ph]];
+        for (let s = 0; s < 3; s++) {
+          if (s % 2 === 0) th += (R2() < 0.5 ? -1 : 1) * (0.25 + R2() * 0.45);
+          else ph = Math.max(lo + h * 0.12, Math.min(hi - h * 0.12, ph + (R2() - 0.5) * h * 0.5));
+          pts.push([th, ph]);
+        }
+        tr.push({ pts, pulse: R2(), speed: 0.25 + R2() * 0.35 });
+      }
+      bands.push({ lo, hi, med, tr, panels: b === 0 || b === NB - 1 ? 3 : 6 + (b % 2) * 2 });
+    }
+    const holo = Array.from({ length: 140 }, () => {   // carte de points projetée
+      const u = R2() * 2 - 1, a = R2() * Math.PI * 2, r = Math.sqrt(1 - u * u);
+      return [Math.cos(a) * r, u, Math.sin(a) * r, R2()];
+    });
+    const easeIO = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+
+    function step(dt, st) {
+      // un « coup » : une bande pivote d'un quart (ou d'un huitième) de tour
+      nextMove -= dt * st.moveRate;
+      if (nextMove <= 0) {
+        const b = 1 + ((R2() * (NB - 2)) | 0);
+        const dir = st.swirl ? (b % 2 ? 1 : -1) : (R2() < 0.5 ? -1 : 1);
+        from[b] = rot[b]; to[b] = rot[b] + dir * (st.jit ? Math.PI / 4 : Math.PI / 2); mt[b] = 0;
+        nextMove = 1 + R2() * 2.5;
+      }
+      for (let b = 0; b < NB; b++) {
+        if (mt[b] < 1) { mt[b] = Math.min(1, mt[b] + dt * st.moveSpeed); rot[b] = from[b] + (to[b] - from[b]) * (st.jit ? mt[b] : easeIO(mt[b])); }
+        if (st.swirl) rot[b] += dt * st.swirl * 0.5 * (b - 2) * 0.4;   // curiosité : bandes en spirale
+      }
+      spinA += dt * st.spin;
+      openK += ((st.open ? 1 : 0) - openK) * Math.min(1, dt * 2.2);
+      tiltX += ((0.38 + st.droop) - tiltX) * Math.min(1, dt * 2);
+      tiltZ = Math.sin(st.t * 0.31) * 0.06 + (st.jit ? Math.sin(st.t * 37) * 0.03 * st.jit : 0);
+    }
+
+    // projection : point (θ, φ) de la bande b → écran (x, y, profondeur)
+    function P(b, th, ph, R, lift, out) {
+      const a = th + rot[b] + spinA;
+      let x = Math.cos(ph) * Math.cos(a), y = -Math.sin(ph), z = Math.cos(ph) * Math.sin(a);
+      const cx = Math.cos(tiltX), sx = Math.sin(tiltX);
+      const y2 = y * cx - z * sx, z2 = y * sx + z * cx;
+      const cz = Math.cos(tiltZ), sz = Math.sin(tiltZ);
+      out[0] = (x * cz - y2 * sz) * R; out[1] = (x * sz + y2 * cz) * R + lift; out[2] = -z2;
+      return out;
+    }
+    const tmp = [0, 0, 0], tmp2 = [0, 0, 0];
+
+    function draw(ctx, st) {
+      const R = st.R, light = document.documentElement.dataset.theme === "light", lit = st.lit, tint = st.tint, A = st.alpha;
+      const gap = openK * R * 0.34;
+      const liftOf = (b) => (b === NB - 1 ? -gap : 0);   // seule la calotte du haut se soulève
+      const yCut = -Math.sin(LAT[NB - 1]) * R * Math.cos(tiltX);
+      // --- corps métallique : ombrage, reflet et bord
+      ctx.save();
+      ctx.globalAlpha = A;
+      const metal = (lift) => {
+        const g = ctx.createRadialGradient(-R * 0.36, -R * 0.4 + lift, R * 0.04, 0, lift, R * 1.02);
+        if (light) { g.addColorStop(0, "#ffffff"); g.addColorStop(0.4, "#deded9"); g.addColorStop(0.82, "#acaca7"); g.addColorStop(1, "#8b8b86"); }
+        else { g.addColorStop(0, "#b4b4b4"); g.addColorStop(0.3, "#6e6e6e"); g.addColorStop(0.72, "#363636"); g.addColorStop(1, "#191919"); }
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, lift, R, 0, Math.PI * 2); ctx.fill();
+        // brossage : fins arcs concentriques autour du reflet
+        ctx.save(); ctx.beginPath(); ctx.arc(0, lift, R * 0.995, 0, Math.PI * 2); ctx.clip();
+        ctx.strokeStyle = light ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.04)"; ctx.lineWidth = 0.6 * st.px;
+        for (let k = 1; k < 16; k++) { ctx.beginPath(); ctx.arc(-R * 0.36, -R * 0.4 + lift, R * k * 0.1, 0.15, 2.0); ctx.stroke(); }
+        ctx.restore();
+      };
+      if (openK < 0.02) metal(0);
+      else {
+        ctx.save(); ctx.beginPath(); ctx.rect(-R * 1.3, yCut, R * 2.6, R * 2.4); ctx.clip(); metal(0); ctx.restore();
+        // cœur lumineux dans l'ouverture
+        const cg = ctx.createRadialGradient(0, yCut, 0, 0, yCut, R * 0.85);
+        cg.addColorStop(0, `rgba(${tint},${0.55 * openK})`); cg.addColorStop(1, `rgba(${tint},0)`);
+        ctx.fillStyle = cg; ctx.beginPath(); ctx.ellipse(0, yCut - gap * 0.5, Math.cos(LAT[NB - 1]) * R * 1.05, gap * 0.9 + R * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.beginPath(); ctx.rect(-R * 1.3, -R * 1.4 - gap, R * 2.6, yCut + R * 1.4); ctx.clip(); metal(-gap); ctx.restore();
+      }
+      // --- gravures : tracé en creux (ligne sombre + liseré clair décalé)
+      const dark = light ? "rgba(50,50,48,.62)" : "rgba(0,0,0,.78)", hi = light ? "rgba(255,255,255,.85)" : "rgba(255,255,255,.17)";
+      const groove = (pts, w) => {
+        ctx.lineWidth = w * 1.3 * st.px; ctx.strokeStyle = dark; ctx.stroke(pts);
+        ctx.save(); ctx.translate(0.7 * st.px, 0.9 * st.px); ctx.lineWidth = w * 0.7 * st.px; ctx.strokeStyle = hi; ctx.stroke(pts); ctx.restore();
+      };
+      const path = (b, coords, lift, closeIt) => {   // ne garde que la face avant
+        const p = new Path2D(); let pen = false;
+        for (const [th, ph] of coords) {
+          P(b, th, ph, R, lift, tmp);
+          if (tmp[2] < -0.02) { pen = false; continue; }
+          if (!pen) { p.moveTo(tmp[0], tmp[1]); pen = true; } else p.lineTo(tmp[0], tmp[1]);
+        }
+        if (closeIt && pen) p.closePath();
+        return p;
+      };
+      const SEG = 56;
+      for (let b = 0; b < NB; b++) {
+        const B = bands[b], lift = liftOf(b);
+        // limites de bande
+        for (const ph of [B.lo, B.hi]) {
+          if (Math.abs(ph) > 1.5) continue;
+          const c = []; for (let k = 0; k <= SEG; k++) c.push([(k / SEG) * Math.PI * 2, ph]);
+          groove(path(b, c, lift), 1.6);
+        }
+        // panneaux (méridiens dans la bande)
+        for (let k = 0; k < B.panels; k++) {
+          const th = (k / B.panels) * Math.PI * 2, c = [];
+          for (let j = 0; j <= 8; j++) c.push([th, B.lo + (B.hi - B.lo) * (j / 8)]);
+          groove(path(b, c, lift), 1.1);
+        }
+        // circuits
+        for (const tr of B.tr) {
+          groove(path(b, tr.pts, lift), 0.95);
+          // petite pastille au bout du circuit
+          const e = tr.pts[tr.pts.length - 1]; P(b, e[0], e[1], R, lift, tmp);
+          if (tmp[2] > 0.05) { ctx.beginPath(); ctx.arc(tmp[0], tmp[1], R * 0.018, 0, Math.PI * 2); ctx.lineWidth = 1 * st.px; ctx.strokeStyle = dark; ctx.stroke(); }
+        }
+      }
+      // --- médaillons en relief (disque + anneau gravé), qui s'allument
+      for (let b = 0; b < NB; b++) {
+        const lift = liftOf(b);
+        for (const m of bands[b].med) {
+          P(b, m.th, m.ph, R, lift, tmp);
+          if (tmp[2] < 0.05) continue;
+          // ellipse projetée : la normale donne l'aplatissement
+          const cx = tmp[0], cy = tmp[1], depth = tmp[2];
+          const ang = Math.atan2(cy - lift, cx);   // l'aplatissement suit la direction du bord
+          const rr = m.r * R * 0.62, flat = Math.max(0.14, depth);
+          ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang);
+          const mg = ctx.createRadialGradient(-rr * 0.3, -rr * 0.3, 0, 0, 0, rr);
+          mg.addColorStop(0, light ? "#ffffff" : "#8e8e8e"); mg.addColorStop(1, light ? "#c4c4bf" : "#3c3c3c");
+          ctx.beginPath(); ctx.ellipse(0, 0, rr * flat, rr, 0, 0, Math.PI * 2); ctx.fillStyle = mg; ctx.fill();
+          ctx.lineWidth = 1.4 * st.px; ctx.strokeStyle = dark; ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(0, 0, rr * flat * 0.62, rr * 0.62, 0, 0, Math.PI * 2); ctx.lineWidth = 0.9 * st.px; ctx.stroke();
+          if (lit > 0.02) {
+            const k = lit * (0.55 + 0.45 * Math.sin(st.t * 3 + m.th * 5)) * depth;
+            const lg = ctx.createRadialGradient(0, 0, 0, 0, 0, rr * 0.9);
+            lg.addColorStop(0, `rgba(${tint},${0.95 * k})`); lg.addColorStop(1, `rgba(${tint},0)`);
+            ctx.beginPath(); ctx.ellipse(0, 0, rr * flat * 0.6, rr * 0.6, 0, 0, Math.PI * 2); ctx.fillStyle = lg; ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
+      // --- impulsions de lumière dans les circuits
+      ctx.lineCap = "round";
+      for (let b = 0; b < NB; b++) {
+        const lift = liftOf(b);
+        for (const tr of bands[b].tr) {
+          tr.pulse = (tr.pulse + st.dt * tr.speed * st.pulseRate) % 1;
+          const n = tr.pts.length - 1, pos = tr.pulse * n, i0 = Math.floor(pos), f = pos - i0;
+          const a = tr.pts[i0], c = tr.pts[Math.min(n, i0 + 1)];
+          const th = a[0] + (c[0] - a[0]) * f, ph = a[1] + (c[1] - a[1]) * f;
+          P(b, th, ph, R, lift, tmp);
+          if (tmp[2] < 0.05) continue;
+          const k = (0.25 + lit * 0.75) * tmp[2];
+          const pg = ctx.createRadialGradient(tmp[0], tmp[1], 0, tmp[0], tmp[1], R * 0.06);
+          pg.addColorStop(0, `rgba(${tint},${0.9 * k})`); pg.addColorStop(1, `rgba(${tint},0)`);
+          ctx.fillStyle = pg; ctx.fillRect(tmp[0] - R * 0.06, tmp[1] - R * 0.06, R * 0.12, R * 0.12);
+        }
+      }
+      // --- reflet spéculaire et liseré du bord
+      const sg = ctx.createRadialGradient(-R * 0.42, -R * 0.48, 0, -R * 0.42, -R * 0.48, R * 0.55);
+      sg.addColorStop(0, light ? "rgba(255,255,255,.55)" : "rgba(255,255,255,.2)"); sg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.save(); if (openK >= 0.02) { ctx.beginPath(); ctx.rect(-R * 1.3, yCut, R * 2.6, R * 2.4); ctx.clip(); }
+      ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.lineWidth = 1 * st.px; ctx.strokeStyle = light ? "rgba(0,0,0,.18)" : "rgba(255,255,255,.08)"; ctx.stroke();
+      // --- carte holographique projetée au-dessus
+      if (openK > 0.02) {
+        const hy = -R * 1.25 - gap * 1.6, HR = R * 0.95, a0 = st.t * 0.35;
+        ctx.fillStyle = `rgb(${tint})`;
+        const prj = [];
+        for (const [x, y, z, w] of holo) {
+          const ca = Math.cos(a0), sa = Math.sin(a0), X = x * ca - z * sa, Z = x * sa + z * ca;
+          const sx = X * HR, sy = hy + y * HR * 0.42 - Z * HR * 0.08, d = (Z + 1.4) / 2.4;
+          prj.push([sx, sy, d]);
+          ctx.globalAlpha = A * openK * (0.25 + 0.75 * d) * (0.6 + 0.4 * Math.sin(st.t * 2 + w * 9));
+          const sz = (0.8 + d * 1.6) * st.px; ctx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
+        }
+        ctx.globalAlpha = A * openK * 0.18; ctx.strokeStyle = `rgb(${tint})`; ctx.lineWidth = 0.5 * st.px;
+        ctx.beginPath();
+        for (let i = 0; i < prj.length; i += 3) { const p = prj[i], q = prj[(i * 7 + 5) % prj.length]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) < R * 0.5) { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); } }
+        ctx.stroke();
+        // faisceau
+        const bg = ctx.createLinearGradient(0, yCut - gap * 0.4, 0, hy);
+        bg.addColorStop(0, `rgba(${tint},${0.18 * openK})`); bg.addColorStop(1, `rgba(${tint},0)`);
+        ctx.globalAlpha = A; ctx.fillStyle = bg;
+        ctx.beginPath(); ctx.moveTo(-R * 0.15, yCut - gap * 0.4); ctx.lineTo(R * 0.15, yCut - gap * 0.4); ctx.lineTo(HR, hy); ctx.lineTo(-HR, hy); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    return { step, draw };
+  })();
+
   let last = performance.now(), t = 0;
   function frame(now) {
     const dt = Math.min((now - last) / 1000, 0.05);
@@ -1934,8 +2148,25 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const glJ = entity.glitch * 9, glBand = entity.glitch > 0.05 ? ((t * 23) | 0) % 9 : -1;
     let lastQ = -1;
 
-    const meshMode = settings.entityStyle !== "fragments";
-    for (let i = 0; i < N; i++) {
+    const orbStyle = settings.entityStyle === "orb";
+    const meshMode = settings.entityStyle !== "fragments" && !orbStyle;
+    if (orbStyle) {
+      const a = entity.activity;
+      const busy = a === "thinking" || a === "talking" || a === "focus" || a === "curious";
+      const big = entity.feeding || entity.remoteK > 0.3 || entity.splitK > 0.3 || entity.scan;
+      const st = {
+        t, dt, R: R0 * rad * (1 + entity.tokenKick * 0.01), px: pxSize, tint, alpha: globalA,
+        lit: Math.max(0.1, cur.dim) * Math.min(1, (busy ? 0.75 : 0.18) + entity.tokenKick * 0.5 + (a === "angry" ? 0.6 : 0) + (a === "joy" ? 0.4 : 0) + entity.absorb * 0.6 + entity.seal * 0.5) * (a === "sleep" ? 0.2 : 1),
+        spin: (a === "sleep" ? 0.03 : 0.12) * cur.spin * (a === "surprise" ? 3 : 1) + gaze.x * 0.002,
+        moveRate: a === "sleep" ? 0 : a === "angry" ? 2.6 : a === "joy" ? 1.4 : busy ? 1.1 : a === "sad" ? 0.12 : 0.28,
+        moveSpeed: a === "angry" ? 4.5 : a === "sad" ? 0.7 : a === "joy" ? 2.2 : 1.4,
+        jit: cur.jitter, swirl: a === "curious" ? 1 : cur.swirl, pulseRate: (busy ? 2.2 : 0.6) * (a === "angry" ? 2.5 : 1) * (a === "sleep" ? 0.2 : 1),
+        droop: (a === "sad" ? 0.25 : a === "sleep" ? 0.18 : 0) + gaze.y * 0.004 + (a === "fear" ? Math.sin(t * 30) * 0.01 : 0), open: big,
+      };
+      orb.step(dt, st);
+      orb.draw(ctx, st);
+    }
+    for (let i = 0; i < (orbStyle ? 0 : N); i++) {
       visA[i] = 0;
       if (rank[i] > visible) continue;
       let tx, ty, tz;
@@ -3544,7 +3775,7 @@ function choiceRow(id, key, options) {
   }
 }
 choiceRow("densityRow", "density", [["comfort", "Confortable"], ["compact", "Compacte"]]);
-choiceRow("styleRow", "entityStyle", [["mesh", "Maillage"], ["fragments", "Fragments"]]);
+choiceRow("styleRow", "entityStyle", [["mesh", "Maillage"], ["fragments", "Fragments"], ["orb", "Orbe"]]);
 choiceRow("widthRow", "width", [["normal", "Normale"], ["narrow", "Étroite"], ["wide", "Large"]]);
 
 /* ============================================================
