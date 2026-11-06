@@ -524,7 +524,9 @@
   .prov-main b { font-weight: 500; color: var(--strong); }
   .prov-tags { display: flex; gap: 6px; font: 11px var(--mono); color: var(--faint); }
   .prov-model { margin: 8px 0 6px; gap: 6px; }
-  .prov-model input { flex: 1; min-width: 0; font: 12.5px var(--mono); }
+  .prov-model select, .prov-model input { flex: 1; min-width: 0; font: 12.5px var(--mono); }
+  .prov-model [hidden] { display: none; }
+  .prov-note { margin: 0 0 6px; }
   .cv-editbox { padding: 10px 12px; border-bottom: 1px solid var(--border); display: grid; gap: 8px; }
   .cv-editbox[hidden], .cv-diffbar[hidden], .cv-changes[hidden] { display: none; }
   .cv-editbox textarea { resize: vertical; min-height: 54px; font-size: 13px; }
@@ -3782,21 +3784,28 @@ async function loadHybrid() {
     const pct = Math.min(100, (100 * p.used_today) / Math.max(1, p.limit));
     row.innerHTML = `<div class="prov-top"><label class="prov-main"><input type="radio" name="hyPrimary" ${p.id === h.provider ? "checked" : ""}> <b>${esc(p.name)}</b></label>
         <span class="prov-tags"><span>${esc(p.family)}</span><span title="Force estimée (1 à 3)">${"●".repeat(p.strength)}${"○".repeat(3 - p.strength)}</span>${p.private ? "" : "<span>sans données privées</span>"}${p.paused ? "<span>en pause</span>" : ""}</span></div>
-      <div class="row prov-model"><input class="field" list="dl-${esc(p.id)}" value="${esc(p.model)}" spellcheck="false" autocomplete="off"><datalist id="dl-${esc(p.id)}"></datalist><button class="btn sm">Enregistrer</button></div>
+      <div class="row prov-model"><select class="field"><option value="${esc(p.model)}">${esc(p.model)}</option><option value="__other">Autre… (saisir un nom)</option></select><input class="field" hidden value="${esc(p.model)}" spellcheck="false" autocomplete="off" placeholder="nom exact du modèle"><button class="btn sm">Enregistrer</button></div>
+      <p class="note prov-note" hidden></p>
       <div class="metric"><div class="l"><span>${p.used_today} / ${p.limit} aujourd'hui</span><span></span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
     row.querySelector("input").onchange = () => saveHybrid({ provider: p.id });
-    const sel = row.querySelector("input"), dl = row.querySelector("datalist");
-    let loaded = false;
-    sel.onfocus = async () => {
-      if (loaded) return; loaded = true;
+    const sel = row.querySelector("select"), inp = row.querySelector(".prov-model input"), note = row.querySelector(".prov-note");
+    const showNote = (t) => { note.textContent = t; note.hidden = !t; };
+    sel.onchange = () => { const other = sel.value === "__other"; inp.hidden = !other; sel.hidden = other; if (other) { inp.focus(); inp.select(); } };
+    (async () => {   // liste chargée tout de suite, pour que le menu soit complet à l'ouverture
       try {
         const { models } = await getJSON(`/api/hybrid/models?provider=${encodeURIComponent(p.id)}`);
-        dl.innerHTML = models.map((m) => `<option value="${esc(m)}">`).join("");
-        if (models.length && !models.includes(p.model)) sel.title = `« ${p.model} » n'est pas dans la liste de ${p.name}`;
-      } catch { sel.placeholder = "liste indisponible : écris le nom exact du modèle"; }
-    };
+        if (!models.length) { showNote(`${p.name} ne publie pas de liste : choisis « Autre… » pour écrire le nom exact.`); return; }
+        const missing = !models.includes(p.model);
+        sel.innerHTML = (missing ? `<option value="${esc(p.model)}">${esc(p.model)} (introuvable)</option>` : "")
+          + models.map((m) => `<option value="${esc(m)}" ${m === p.model ? "selected" : ""}>${esc(m)}</option>`).join("")
+          + '<option value="__other">Autre… (saisir un nom)</option>';
+        if (missing) showNote(`« ${p.model} » n'est plus proposé par ${p.name} : choisis un modèle dans la liste (${models.length} disponibles).`);
+      } catch { showNote(`Liste des modèles indisponible : choisis « Autre… » pour écrire le nom exact.`); }
+    })();
     row.querySelector("button").onclick = async () => {
-      try { hybridState = await (await api(`/api/hybrid/providers/${p.id}`, { method: "PUT", body: JSON.stringify({ model: sel.value }) })).json(); toast(`${esc(p.name)} · modèle <b>${esc(sel.value)}</b>`); }
+      const model = (sel.hidden ? inp.value : sel.value).trim();
+      if (!model || model === "__other") { inp.focus(); return; }
+      try { hybridState = await (await api(`/api/hybrid/providers/${p.id}`, { method: "PUT", body: JSON.stringify({ model }) })).json(); toast(`${esc(p.name)} · modèle <b>${esc(model)}</b>`); }
       catch (e) { toast(esc(e.message)); }
       loadHybrid();
     };
