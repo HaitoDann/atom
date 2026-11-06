@@ -64,6 +64,11 @@ services:
       args:
         ATOM_VERSION: ${ATOM_VERSION:-dev}
     restart: unless-stopped
+    # Toutes les variables du .env (dont les fournisseurs ATOM_PROVIDERS / ATOM_<ID>_*) ;
+    # la liste « environment » ci-dessous garde la priorité.
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       - ollama
       - ntfy

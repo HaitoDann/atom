@@ -194,7 +194,7 @@ Si c'est encore lent, vérifie :
 - Réglables dans `.env` : `ATOM_BACKUP_TIME`, `ATOM_BACKUP_KEEP`.
 - Le dossier `backups/` est sur le même disque que le serveur : télécharge une copie de temps en temps, ou inclus le conteneur dans les sauvegardes Proxmox.
 
-## Mode hybride (Mistral)
+## Mode hybride (API distantes)
 
 Atom répond **en local par défaut**. Il peut s'appuyer sur un modèle Mistral, plus puissant, quand ça vaut le coup.
 
@@ -218,7 +218,24 @@ Atom répond **en local par défaut**. Il peut s'appuyer sur un modèle Mistral,
 - La mémorisation, la recherche dans tes documents, l'indexation et les embeddings restent **toujours** en local.
 - Sur l'offre gratuite de Mistral, tes échanges peuvent servir à améliorer leurs modèles : vérifie les conditions et les réglages de confidentialité de ton compte.
 
-**Limites** : `ATOM_REMOTE_DAILY_LIMIT` (200 par défaut) plafonne les requêtes par jour ; au-delà, Atom reste en local. Modèle : `ATOM_REMOTE_MODEL` ou Réglages → Hybride. Tout fournisseur compatible OpenAI fonctionne en changeant `ATOM_REMOTE_URL` et `ATOM_REMOTE_NAME`.
+**Limites** : `ATOM_REMOTE_DAILY_LIMIT` (200 par défaut) plafonne les requêtes par jour ; au-delà, Atom passe au fournisseur suivant, puis au local. Tout fournisseur compatible OpenAI fonctionne en changeant `ATOM_REMOTE_URL` et `ATOM_REMOTE_NAME`.
+
+**Plusieurs fournisseurs gratuits**
+
+Ajoute-en autant que tu veux dans `.env`, puis `docker compose up -d atom` :
+
+```
+ATOM_PROVIDERS=cerebras,gemini
+ATOM_CEREBRAS_API_KEY=...
+ATOM_GEMINI_API_KEY=...
+```
+
+- Fournisseurs connus (adresse, modèle par défaut et famille déjà renseignés) : `groq`, `cerebras`, `gemini`, `openrouter`, `github`, `mistral`. Pour un autre : `ATOM_<ID>_URL` et `ATOM_<ID>_MODEL`.
+- Chacun a son **quota du jour** (`ATOM_<ID>_LIMIT`), sa **famille** de modèles et une **force** estimée (`ATOM_<ID>_STRENGTH`, de 1 à 3).
+- Réglages → Connexions → **Fournisseurs** : choisis le **principal** et le modèle de chacun, et suis l'utilisation du jour.
+- **Relais automatique** : si le principal est indisponible (limite atteinte, panne, quota du jour), Atom passe au suivant, du plus fort au plus faible, puis au local. Un fournisseur qui renvoie « limite atteinte » est mis en pause 2 minutes.
+- **Données privées** : un fournisseur avec `ATOM_<ID>_PRIVATE=0` ne reçoit **jamais** tes souvenirs, documents ni fichiers, même si tu les as autorisés. C'est le réglage par défaut pour `gemini` et `openrouter`, dont les offres gratuites peuvent réutiliser les données.
+- Les modèles par défaut changent souvent chez les fournisseurs : si l'un d'eux affiche « modèle introuvable » dans l'écran État, choisis-en un autre dans la liste.
 
 ## Mode Code
 
@@ -244,9 +261,15 @@ Pour une demande importante, plusieurs IA collaborent. Réglages → **Atelier**
 - **Rédaction puis relecture** : un rédacteur écrit, un relecteur critique, une version corrigée est produite (1 à 3 tours).
 - **Comité et arbitre** : deux propositions indépendantes, un arbitre fait la synthèse.
 - **Débat contradictoire** : deux positions opposées, un arbitre tranche — utile pour une décision.
-- Chaque rôle peut être tenu par le modèle **local** ou un modèle du **mode hybride** (Groq, Mistral…) ; mélanger des modèles différents donne de meilleurs résultats.
+- Chaque rôle est en **Automatique** par défaut, ou tenu par le modèle **local** ou par un fournisseur précis. En automatique :
+  - le modèle le **plus fort** rédige ;
+  - le relecteur vient d'une **autre famille** (Llama, Qwen, Gemini…), qui ne fait pas les mêmes erreurs ;
+  - l'**arbitre n'est jamais le plus faible** : c'est le plus fort disponible, et si possible un troisième fournisseur ;
+  - les réglages affichent qui tient chaque rôle, avec un avertissement si un choix manuel affaiblit l'atelier.
+- **Relecture avec une grille** : exactitude (faits, chiffres, code), consignes oubliées, cohérence, utilité. Chaque problème est classé `[bloquant]`, `[important]` ou `[mineur]`, avec une section « Non vérifiable » pour ce que le relecteur ne peut pas confirmer. La correction traite tout ce qui est bloquant ou important et retire ou signale ce qui n'est pas vérifiable. Si le verdict est « OK », la correction est **sautée** : un appel de moins.
+- Un participant indisponible est remplacé par le fournisseur suivant (mention « relais »), puis par le local.
 - Le travail intermédiaire de chaque IA est visible dans une carte repliable au-dessus de la réponse finale.
-- Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges (ni souvenirs, ni bibliothèque, ni fichiers). Un participant distant devient local si l'API manque ou si le quota du jour est atteint. Coût : 3 étapes ou plus par demande.
+- Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges (ni souvenirs, ni bibliothèque, ni fichiers). Coût : jusqu'à 3 étapes ou plus par demande.
 
 ## Bibliothèque : tes documents et ton code
 

@@ -1,4 +1,6 @@
-"""Mode hybride : le modèle local par défaut, Mistral quand ça vaut le coup.
+"""Mode hybride : le modèle local par défaut, un modèle distant quand ça vaut le coup.
+
+- Plusieurs fournisseurs possibles (voir providers.py) : le principal d'abord, puis relais automatique.
 
 - Moteurs : « local » (Ollama), « mistral » (API compatible OpenAI), « auto » (Atom choisit).
 - En auto, Mistral sert pour les demandes longues ou complexes, et en secours si le local échoue.
@@ -13,24 +15,23 @@ from __future__ import annotations
 import json
 import logging
 import re
-import time
 from datetime import datetime
 from typing import AsyncIterator
 
-import httpx
-
-from . import db
-from .config import MAX_TOKENS, PROVIDER, REMOTE_API_KEY, REMOTE_DAILY_LIMIT, REMOTE_MODEL, REMOTE_NAME, REMOTE_URL
+from . import db, providers
+from .config import REMOTE_DAILY_LIMIT, REMOTE_MODEL, REMOTE_NAME
 
 log = logging.getLogger("atom.hybrid")
 last_stats: dict = {}
+last_used: dict = {}   # {id, name, model, skipped} du dernier appel distant
 
 DEFAULTS = {
     "mode": "local",          # moteur par défaut : local | auto | mistral
     "allow_memory": False,    # envoyer les souvenirs à Mistral
     "allow_docs": False,      # envoyer les extraits de la bibliothèque et les fichiers joints
     "allow_web": True,        # envoyer les résultats de recherche web (déjà publics)
-    "model": "",              # vide = ATOM_REMOTE_MODEL
+    "model": "",              # (ancien) modèle du fournisseur principal — désormais réglé par fournisseur
+    "provider": "",           # fournisseur principal ; vide = le premier configuré
 }
 
 COMPLEX = re.compile(
@@ -42,7 +43,7 @@ COMPLEX = re.compile(
 
 
 def configured() -> bool:
-    return PROVIDER == "mock" or bool(REMOTE_API_KEY)
+    return any(p.configured for p in providers.ALL)
 
 
 def settings() -> dict:
@@ -58,123 +59,92 @@ def settings() -> dict:
 
 def save_settings(new: dict) -> dict:
     s = settings()
+    if new.get("model") is not None:   # le modèle se règle par fournisseur
+        p = primary()
+        if p:
+            providers.set_model(p.id, new.pop("model"))
     s.update({k: v for k, v in new.items() if k in DEFAULTS})
     if s["mode"] not in ("local", "auto", "mistral"):
         s["mode"] = "local"
+    if s["provider"] and not providers.get(s["provider"]):
+        s["provider"] = ""
     db.kv_set("hybrid", json.dumps(s))
     return s
 
 
+def primary() -> providers.Provider | None:
+    """Le fournisseur choisi pour les réponses approfondies (sinon le premier configuré)."""
+    pid = settings()["provider"]
+    return providers.get(pid) or next((p for p in providers.ALL if p.configured), None)
+
+
+def name() -> str:
+    """Nom à afficher : le fournisseur qui vient de répondre, sinon le principal."""
+    p = primary()
+    return p.name if p else REMOTE_NAME
+
+
 def model() -> str:
-    return settings()["model"] or REMOTE_MODEL
-
-
-def _today_key() -> str:
-    return "hybrid:used:" + datetime.now().strftime("%Y-%m-%d")
+    p = primary()
+    return providers.model_of(p) if p else REMOTE_MODEL
 
 
 def used_today() -> int:
-    return int(db.kv_get(_today_key(), "0") or 0)
-
-
-def _count() -> None:
-    db.kv_set(_today_key(), str(used_today() + 1))
+    return sum(providers.used_today(p.id) for p in providers.ALL)
 
 
 def quota_left() -> int:
-    return max(0, REMOTE_DAILY_LIMIT - used_today())
+    return sum(providers.quota_left(p.id) for p in providers.ALL if p.configured)
 
 
 def status() -> dict:
-    return {**settings(), "configured": configured(), "name": REMOTE_NAME, "model": model(),
-            "model_setting": settings()["model"], "used_today": used_today(), "limit": REMOTE_DAILY_LIMIT}
+    p = primary()
+    return {**settings(), "configured": configured(), "name": name(), "model": model(), "provider": p.id if p else "",
+            "model_setting": providers.model_of(p) if p else "", "used_today": providers.used_today(p.id) if p else 0,
+            "limit": p.limit if p else REMOTE_DAILY_LIMIT, "providers": [providers.describe(x) for x in providers.ALL]}
 
 
 def decide(engine: str, message: str, needs_memory: bool, needs_docs: bool) -> tuple[str, str]:
-    """Renvoie (moteur, raison). Moteur : « local » ou « mistral »."""
+    """Renvoie (moteur, raison). Moteur : « local » ou « mistral » (= distant, quel que soit le fournisseur)."""
     s = settings()
     engine = s["mode"] if engine in ("", "default") else engine
     if engine == "local":
         return "local", ""
     if not configured():
-        return "local", "Mistral n'est pas configuré (clé API absente)."
-    if quota_left() <= 0:
-        return "local", "Quota Mistral du jour atteint : réponse en local."
+        return "local", "Aucun fournisseur distant configuré (clé API absente)."
+    sensitive = (needs_memory and s["allow_memory"]) or (needs_docs and s["allow_docs"])
+    if not providers.chain(s["provider"] or None, sensitive):
+        return "local", "Quotas distants du jour atteints (ou fournisseurs en pause) : réponse en local."
     if needs_docs and not s["allow_docs"]:
-        return "local", "Cette demande utilise ta bibliothèque ou un fichier, dont l'envoi à Mistral n'est pas autorisé."
+        return "local", "Cette demande utilise ta bibliothèque ou un fichier, dont l'envoi n'est pas autorisé."
     if engine == "mistral":
         return "mistral", "demandé"
-    # auto : Mistral pour ce qui dépasse le petit modèle local
     m = message.strip()
     if len(m) > 600 or COMPLEX.search(m) or m.count("\n") > 8:
         return "mistral", "demande longue ou complexe"
     return "local", ""
 
 
-async def list_models() -> list[str]:
-    """Modèles proposés par le fournisseur (endpoint /models, format OpenAI)."""
-    if PROVIDER == "mock":
-        return ["mistral-small-latest", "mistral-large-latest"]
-    if not REMOTE_API_KEY:
+async def list_models(pid: str | None = None) -> list[str]:
+    p = providers.get(pid) if pid else primary()
+    if not p or not p.configured:
         return []
-    async with httpx.AsyncClient(timeout=10) as client:
-        r = await client.get(f"{REMOTE_URL}/models", headers={"Authorization": f"Bearer {REMOTE_API_KEY}"})
-    if r.status_code != 200:
-        raise RuntimeError(f"{REMOTE_NAME} a répondu {r.status_code}")
-    data = r.json().get("data", [])
-    skip = ("whisper", "tts", "embed", "guard", "moderation", "ocr", "transcri", "speech", "audio", "image", "vision-preview")
-    ids = [m.get("id", "") for m in data if m.get("id") and not any(x in m.get("id", "").lower() for x in skip)
-           and m.get("active", True) is not False]
-    return sorted(set(ids))
+    return await providers.list_models(p)
 
 
-async def stream(messages: list[dict], model_name: str | None = None) -> AsyncIterator[str]:
-    """Flux de texte depuis l'API (format OpenAI : /chat/completions en SSE)."""
-    if PROVIDER == "mock":
-        reply = "[curious] (Mistral, mode test) Voici une réponse plus approfondie, venue de l'extérieur."
-        for w in re.findall(r"\S+\s*", reply):
-            yield w
+async def stream(messages: list[dict], model_name: str | None = None, sensitive: bool = False) -> AsyncIterator[str]:
+    """Flux depuis le fournisseur principal, avec relais vers les autres s'il est indisponible.
+    sensitive=True : la demande contient souvenirs/documents → seulement les fournisseurs « private »."""
+    p = primary()
+    order = providers.chain(p.id if p else None, sensitive)
+    used: dict = {}
+    try:
+        async for t in providers.stream_chain(order, messages, used, model_name):
+            yield t
+    finally:
+        last_used.clear()
+        last_used.update({k: v for k, v in used.items() if k != "stats"})
         last_stats.clear()
-        last_stats.update(tokens=12, tok_s=40.0, provider="mistral")
-        _count()
-        return
-    payload = {"model": model_name or model(), "messages": messages, "stream": True,
-               "temperature": 0.6, "max_tokens": MAX_TOKENS}
-    headers = {"Authorization": f"Bearer {REMOTE_API_KEY}", "Accept": "text/event-stream"}
-    t0, first, n = time.time(), None, 0
-    async with httpx.AsyncClient(timeout=httpx.Timeout(15, read=120)) as client:
-        async with client.stream("POST", f"{REMOTE_URL}/chat/completions", json=payload, headers=headers) as r:
-            if r.status_code != 200:
-                body = (await r.aread()).decode(errors="replace")[:300]
-                if r.status_code == 401:
-                    raise RuntimeError(f"clé API {REMOTE_NAME} refusée, vérifie ATOM_REMOTE_API_KEY")
-                if r.status_code == 429:
-                    raise RuntimeError(f"limite de l'offre {REMOTE_NAME} atteinte pour le moment")
-                if r.status_code == 404 and "model" in body.lower():
-                    raise RuntimeError(f"le modèle « {payload['model']} » n'existe pas chez {REMOTE_NAME} : "
-                                       "choisis-en un dans Réglages → Hybride")
-                raise RuntimeError(f"{REMOTE_NAME} a répondu {r.status_code} : {body}")
-            _count()
-            usage = {}
-            async for line in r.aiter_lines():
-                if not line.startswith("data:"):
-                    continue
-                data = line[5:].strip()
-                if data == "[DONE]":
-                    break
-                try:
-                    chunk = json.loads(data)
-                except ValueError:
-                    continue
-                usage = chunk.get("usage") or usage
-                for ch in chunk.get("choices", []):
-                    text = (ch.get("delta") or {}).get("content") or ""
-                    if text:
-                        first = first or time.time()
-                        n += 1
-                        yield text
-    dur = time.time() - (first or t0)
-    toks = usage.get("completion_tokens", n)
-    last_stats.clear()
-    last_stats.update(tokens=toks, tok_s=round(toks / dur, 1) if dur > 0 else None, provider="mistral",
-                      prompt_tokens=usage.get("prompt_tokens"), total_s=round(time.time() - t0, 2))
+        last_stats.update(used.get("stats", {}))
+        if used.get("id"):
+            last_stats["provider"] = "mistral"

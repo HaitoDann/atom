@@ -164,7 +164,8 @@ async def chat_events(
         if provider == "mistral":
             got = False
             try:
-                async for tok in hybrid.stream(messages):
+                sensitive = bool((hs["allow_memory"] and mem_block) or (hs["allow_docs"] and (docs_block or attachments)))
+                async for tok in hybrid.stream(messages, sensitive=sensitive):
                     got = True
                     yield tok
                 return
@@ -175,7 +176,7 @@ async def chat_events(
                 provider = "local"
                 messages[0]["content"] = system_for("local")
                 yield {"route": dict(type="route", provider="local", model=model,
-                                     reason=f"{hybrid.REMOTE_NAME} indisponible ({log_reason}) : réponse en local.")}
+                                     reason=f"Fournisseurs distants indisponibles ({log_reason}) : réponse en local.")}
         async for tok in llm.stream_chat(model, messages):
             yield tok
 
@@ -273,7 +274,8 @@ async def chat_events(
         if rem_cards:
             asst_meta = {**(asst_meta or {}), "reminders": rem_cards}
         if provider != "local":
-            asst_meta = {**(asst_meta or {}), "provider": hybrid.REMOTE_NAME, "remote_model": hybrid.model()}
+            asst_meta = {**(asst_meta or {}), "provider": hybrid.last_used.get("name") or hybrid.name(),
+                         "remote_model": hybrid.last_used.get("model") or hybrid.model()}
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
         stats = dict(hybrid.last_stats if provider != "local" else llm.last_stats)

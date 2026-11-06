@@ -515,6 +515,15 @@
   .cv-selbar { background: rgba(255,214,102,.05); font-size: 12.5px; color: var(--text-2); }
   .idxbar { display: block; height: 2px; margin-top: 6px; border-radius: 2px; background: var(--border); overflow: hidden; max-width: 320px; }
   .idxbar i { display: block; height: 100%; background: var(--text-2); transition: width .8s var(--ease-out); }
+  .prov-list { display: grid; gap: 8px; margin-top: 10px; }
+  .prov { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--text) 3.5%, transparent); }
+  .prov.on { box-shadow: inset 0 0 0 1px var(--border-2); }
+  .prov-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .prov-main { display: flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
+  .prov-main b { font-weight: 500; color: var(--strong); }
+  .prov-tags { display: flex; gap: 6px; font: 11px var(--mono); color: var(--faint); }
+  .prov-model { margin: 8px 0 6px; gap: 6px; }
+  .prov-model select { flex: 1; min-width: 0; }
   .cv-editbox { padding: 10px 12px; border-bottom: 1px solid var(--border); display: grid; gap: 8px; }
   .cv-editbox[hidden], .cv-diffbar[hidden], .cv-changes[hidden] { display: none; }
   .cv-editbox textarea { resize: vertical; min-height: 54px; font-size: 13px; }
@@ -1166,26 +1175,25 @@
       <section class="pane" data-pane="hybrid">
         <div class="block">
           <h4>Mode hybride</h4>
-          <p class="desc" id="hyInfo">Atom répond en local par défaut, et peut s'appuyer sur un modèle plus puissant (Mistral) quand ça vaut le coup.</p>
+          <p class="desc" id="hyInfo">Atom répond en local par défaut, et peut s'appuyer sur des modèles plus puissants (Groq, Cerebras, Gemini…) quand ça vaut le coup.</p>
           <div id="hySetup" class="note" style="display:none;margin-bottom:12px"></div>
           <h4 style="font-size:13px;margin-top:6px">Moteur par défaut</h4>
           <div class="row" id="hyMode" style="margin:8px 0 6px;flex-wrap:wrap"></div>
-          <p class="note">Auto : Mistral pour les demandes longues ou complexes (analyse, comparaison, rédaction…), local pour le reste. Si Mistral ne répond pas, Atom repasse en local. Le choix sous la saisie peut changer le moteur pour une conversation.</p>
+          <p class="note">Auto : distant pour les demandes longues ou complexes (analyse, comparaison, rédaction…), local pour le reste. Si aucun fournisseur ne répond, Atom repasse en local. Le choix sous la saisie peut changer le moteur pour une conversation.</p>
         </div>
         <div class="block">
-          <h4>Ce qui peut être envoyé à Mistral</h4>
-          <p class="desc">Ton message et le fil de la conversation sont toujours envoyés quand Mistral répond. Le reste ne sort que si tu l'autorises. La mémorisation, la recherche dans tes documents et l'indexation restent toujours en local.</p>
+          <h4>Ce qui peut être envoyé aux fournisseurs distants</h4>
+          <p class="desc">Ton message et le fil de la conversation sont toujours envoyés quand un modèle distant répond. Le reste ne sort que si tu l'autorises. La mémorisation, la recherche dans tes documents et l'indexation restent toujours en local.</p>
           <label class="switch"><span>Mes souvenirs (ce qu'Atom sait de moi)</span><input type="checkbox" id="hyMem"></label>
           <label class="switch"><span>Ma bibliothèque et mes fichiers joints</span><input type="checkbox" id="hyDocs"></label>
           <label class="switch"><span>Les résultats de recherche web</span><input type="checkbox" id="hyWeb"></label>
           <p class="note">Si une demande a besoin de ta bibliothèque ou d'un fichier et que l'envoi n'est pas autorisé, Atom répond en local.</p>
         </div>
         <div class="block">
-          <h4>Utilisation aujourd'hui</h4>
-          <div class="metric"><div class="l"><span id="hyUseL">—</span><span id="hyUseV"></span></div><div class="bar"><i id="hyUseB"></i></div></div>
-          <label class="lbl" id="hyModelLbl">Modèle</label>
-          <div class="row"><select class="field" id="hyModelSel"></select><button class="btn" id="hyModelSave">Enregistrer</button></div>
-          <p class="note" id="hyModelNote">Liste des modèles proposés par ton fournisseur.</p>
+          <h4>Fournisseurs</h4>
+          <p class="desc">Le fournisseur <b>principal</b> répond quand Atom passe en distant. S'il est indisponible (limite, panne, quota du jour), Atom passe automatiquement au suivant, du plus fort au plus faible, puis au local. Ajoute-en d'autres dans <code>.env</code> (<code>ATOM_PROVIDERS=groq,cerebras,gemini</code> et une clé par fournisseur).</p>
+          <div id="hyProviders" class="prov-list"></div>
+          <p class="note">« Sans données privées » : ce fournisseur ne reçoit jamais tes souvenirs, documents ni fichiers, même si tu les autorises plus haut (offres gratuites qui peuvent réutiliser les données). Réglable avec <code>ATOM_&lt;ID&gt;_PRIVATE</code>.</p>
         </div>
       </section>
 
@@ -1202,11 +1210,12 @@
         </div>
         <div class="block">
           <h4>Participants</h4>
-          <p class="desc">Mélanger des modèles différents donne de meilleurs résultats : deux copies du même modèle se trompent souvent de la même façon.</p>
+          <p class="desc">« Automatique » : le modèle le plus fort rédige, un modèle d'une <b>autre famille</b> relit (ils ne font pas les mêmes erreurs), et l'arbitre n'est jamais le plus faible. Le relecteur suit une grille (exactitude, consignes, cohérence, utilité) et signale ce qu'il ne peut pas vérifier.</p>
           <div id="wsParts"></div>
           <div class="row" id="wsRoundsRow" style="margin-top:10px"><span style="width:130px;font-size:13px;color:var(--text-2)">Tours de relecture</span><select class="field" id="wsRounds" style="max-width:120px"><option>1</option><option>2</option><option>3</option></select></div>
+          <p class="note" id="wsWarn" hidden></p>
           <p class="note" id="wsCost"></p>
-          <p class="note">Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges — ni souvenirs, ni bibliothèque, ni fichiers. Un participant distant devient local si l'API n'est pas configurée ou si le quota du jour est atteint.</p>
+          <p class="note">Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges — ni souvenirs, ni bibliothèque, ni fichiers. Si un participant est indisponible (limite, panne, quota), un autre fournisseur prend le relais, puis le local.</p>
         </div>
       </section>
 
@@ -3754,9 +3763,9 @@ async function loadHybrid() {
   renderEngine();
   const h = hybridState;
   $("hySetup").style.display = h.configured ? "none" : "";
-  $("hySetup").innerHTML = "Mistral n'est pas encore configuré : crée une clé sur <b>console.mistral.ai</b> (API Keys), puis ajoute <code>ATOM_REMOTE_API_KEY=…</code> dans le fichier <code>.env</code> du serveur et relance Atom. Voir le README.";
+  $("hySetup").innerHTML = "Aucun fournisseur distant configuré : ajoute une clé (Groq, Cerebras, Gemini…) dans le fichier <code>.env</code> du serveur — <code>ATOM_REMOTE_API_KEY=…</code> ou <code>ATOM_PROVIDERS=…</code> — puis relance Atom. Voir le README.";
   $("hyMode").innerHTML = "";
-  for (const [v, t] of [["local", "Local"], ["auto", "Auto"], ["mistral", h.name]]) {
+  for (const [v, t] of [["local", "Local"], ["auto", "Auto"], ["mistral", "Distant"]]) {
     const b = document.createElement("button");
     b.className = "btn" + (h.mode === v ? " primary" : "");
     b.textContent = t; b.disabled = !h.configured && v !== "local";
@@ -3764,23 +3773,32 @@ async function loadHybrid() {
     $("hyMode").appendChild(b);
   }
   $("hyMem").checked = h.allow_memory; $("hyDocs").checked = h.allow_docs; $("hyWeb").checked = h.allow_web;
-  $("hyUseL").textContent = `${h.used_today} requête${h.used_today > 1 ? "s" : ""} ${h.name} aujourd'hui`;
-  $("hyUseV").textContent = `limite ${h.limit}`;
-  $("hyUseB").style.width = Math.min(100, 100 * h.used_today / Math.max(1, h.limit)) + "%";
-  $("hyModelLbl").textContent = `Modèle ${h.name}`;
-  const sel = $("hyModelSel");
-  sel.innerHTML = `<option>${esc(h.model)}</option>`;
-  if (h.configured) {
-    try {
-      const { models } = await getJSON("/api/hybrid/models");
-      if (models.length) {
-        sel.innerHTML = models.map((m) => `<option ${m === h.model ? "selected" : ""}>${esc(m)}</option>`).join("");
-        if (!models.includes(h.model)) {
-          sel.insertAdjacentHTML("afterbegin", `<option selected>${esc(h.model)}</option>`);
-          $("hyModelNote").innerHTML = `⚠ « ${esc(h.model)} » n'est pas proposé par ${esc(h.name)} : choisis un modèle dans la liste.`;
-        } else $("hyModelNote").textContent = `${models.length} modèles proposés par ${h.name}.`;
-      }
-    } catch (e) { $("hyModelNote").textContent = e.message; }
+  const box = $("hyProviders");
+  box.innerHTML = h.providers.length ? "" : '<p class="note">Aucun fournisseur configuré.</p>';
+  for (const p of h.providers) {
+    const row = document.createElement("div");
+    row.className = "prov" + (p.id === h.provider ? " on" : "");
+    const pct = Math.min(100, (100 * p.used_today) / Math.max(1, p.limit));
+    row.innerHTML = `<div class="prov-top"><label class="prov-main"><input type="radio" name="hyPrimary" ${p.id === h.provider ? "checked" : ""}> <b>${esc(p.name)}</b></label>
+        <span class="prov-tags"><span>${esc(p.family)}</span><span title="Force estimée (1 à 3)">${"●".repeat(p.strength)}${"○".repeat(3 - p.strength)}</span>${p.private ? "" : "<span>sans données privées</span>"}${p.paused ? "<span>en pause</span>" : ""}</span></div>
+      <div class="row prov-model"><select class="field"><option>${esc(p.model)}</option></select><button class="btn sm">Enregistrer</button></div>
+      <div class="metric"><div class="l"><span>${p.used_today} / ${p.limit} aujourd'hui</span><span></span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+    row.querySelector("input").onchange = () => saveHybrid({ provider: p.id });
+    const sel = row.querySelector("select");
+    let loaded = false;
+    sel.onfocus = sel.onmousedown = async () => {
+      if (loaded) return; loaded = true;
+      try {
+        const { models } = await getJSON(`/api/hybrid/models?provider=${encodeURIComponent(p.id)}`);
+        if (models.length) sel.innerHTML = (models.includes(p.model) ? "" : `<option selected>${esc(p.model)}</option>`) + models.map((m) => `<option ${m === p.model ? "selected" : ""}>${esc(m)}</option>`).join("");
+      } catch (e) { toast(`<b>${esc(p.name)}</b> · ${esc(e.message)}`); }
+    };
+    row.querySelector("button").onclick = async () => {
+      try { hybridState = await (await api(`/api/hybrid/providers/${p.id}`, { method: "PUT", body: JSON.stringify({ model: sel.value }) })).json(); toast(`${esc(p.name)} · modèle <b>${esc(sel.value)}</b>`); }
+      catch (e) { toast(esc(e.message)); }
+      loadHybrid();
+    };
+    box.appendChild(row);
   }
 }
 async function saveHybrid(patch) {
@@ -3790,7 +3808,6 @@ async function saveHybrid(patch) {
 $("hyMem").onchange = () => saveHybrid({ allow_memory: $("hyMem").checked });
 $("hyDocs").onchange = () => saveHybrid({ allow_docs: $("hyDocs").checked });
 $("hyWeb").onchange = () => saveHybrid({ allow_web: $("hyWeb").checked });
-$("hyModelSave").onclick = async () => { await saveHybrid({ model: $("hyModelSel").value }); toast(`Modèle : <b>${esc($("hyModelSel").value)}</b>`); };
 
 /* ============================================================
    MODE CODE — parcourir un projet, lire ses fichiers
@@ -4202,27 +4219,33 @@ async function loadWorkshop() {
     b.textContent = label; b.onclick = () => saveWorkshop({ pattern: k });
     $("wsPattern").appendChild(b);
   }
-  if (hybridState?.configured && !remoteModels.length) { try { remoteModels = (await getJSON("/api/hybrid/models")).models; } catch {} }
-  const opts = [["local", "Local (modèle du serveur)"], ...remoteModels.map((m) => [`remote:${m}`, `${hybridState?.name || "Distant"} · ${m}`])];
+  const opts = workshopCfg.options.map((o) => [o.id, o.label + (o.family ? ` · ${o.family}` : "")]);
   const roles = workshopCfg.roles[workshopCfg.pattern];
   $("wsParts").innerHTML = "";
   roles.forEach((role, i) => {
     const row = document.createElement("div"); row.className = "row"; row.style.margin = "6px 0";
-    const cur = workshopCfg.participants[i] || "local";
+    const cur = workshopCfg.participants[i] || "auto";
     row.innerHTML = `<span style="width:130px;font-size:13px;color:var(--text-2)">${esc(role)}</span>`;
-    const sel = document.createElement("select"); sel.className = "field";
+    const sel = document.createElement("select"); sel.className = "field"; sel.style.cssText = "flex:1;min-width:0;max-width:260px";
     sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(t)}</option>`).join("")
       + (opts.some(([v]) => v === cur) ? "" : `<option selected value="${esc(cur)}">${esc(cur)}</option>`);
     sel.onchange = () => { const p = [...workshopCfg.participants]; p[i] = sel.value; saveWorkshop({ participants: p }); };
-    row.appendChild(sel); $("wsParts").appendChild(row);
+    row.appendChild(sel);
+    const eff = document.createElement("span"); eff.className = "note"; eff.style.cssText = "margin-left:8px;white-space:nowrap";
+    if (cur === "auto") eff.textContent = "→ " + (workshopCfg.assigned[i] || "");
+    row.appendChild(eff);
+    $("wsParts").appendChild(row);
   });
+  $("wsWarn").innerHTML = workshopCfg.warnings.map((w) => `⚠ ${esc(w)}`).join("<br>");
+  $("wsWarn").hidden = !workshopCfg.warnings.length;
   $("wsRoundsRow").hidden = workshopCfg.pattern !== "review";
   $("wsRounds").value = workshopCfg.rounds;
   const n = workshopCfg.pattern === "review" ? 1 + 2 * workshopCfg.rounds : 3;
   const remote = (workshopCfg.pattern === "review"
-    ? [workshopCfg.participants[0], ...Array(workshopCfg.rounds).fill(0).flatMap(() => [workshopCfg.participants[1], workshopCfg.participants[2]])]
-    : workshopCfg.participants.slice(0, 3)).filter((p) => p.startsWith("remote")).length;
-  $("wsCost").textContent = `${n} étapes par demande, dont ${remote} via ${hybridState?.name || "l'API"}. Compte ${n}× le temps d'une réponse normale.`;
+    ? [workshopCfg.assigned[0], ...Array(workshopCfg.rounds).fill(0).flatMap(() => [workshopCfg.assigned[1], workshopCfg.assigned[2]])]
+    : workshopCfg.assigned.slice(0, 3)).filter((p) => !p.startsWith("Local")).length;
+  $("wsCost").textContent = `Jusqu'à ${n} étapes par demande, dont ${remote} via des API distantes. Compte jusqu'à ${n}× le temps d'une réponse normale`
+    + (workshopCfg.pattern === "review" ? " — si la relecture ne trouve rien d'important, la correction est sautée." : ".");
 }
 async function saveWorkshop(patch) {
   try { await api("/api/workshop", { method: "PUT", body: JSON.stringify(patch) }); } catch (e) { toast(esc(e.message)); }
@@ -4290,6 +4313,9 @@ async function sendWorkshop(text) {
         } else if (ev.type === "step" && ev.status === "token") {
           const s = steps[ev.index]; if (!s) continue; s.text += ev.text;
           if (!q) { q = true; requestAnimationFrame(() => { q = false; steps.forEach((x) => x && (x.el.querySelector(".md").innerHTML = md(x.text))); }); }
+        } else if (ev.type === "step" && ev.status === "engine") {
+          const s = steps[ev.index]; if (s) { const sp = s.el.querySelector(".ws-h span"); sp.textContent = ev.engine; sp.title = ev.reason || ""; }
+          if (ev.reason) toast(`<b>Atelier</b> · relais : ${esc(ev.reason)}`);
         } else if (ev.type === "step" && ev.status === "done") {
           const s = steps[ev.index]; if (s) { s.text = ev.text; setMd(s.el.querySelector(".md"), ev.text); }
         } else if (ev.type === "token") {

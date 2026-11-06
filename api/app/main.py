@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, auth, backup, codeedit, db, gitops, ocr, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, auth, backup, codeedit, db, gitops, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -493,6 +493,19 @@ class HybridIn(BaseModel):
     allow_docs: bool | None = None
     allow_web: bool | None = None
     model: str | None = Field(default=None, max_length=80)
+    provider: str | None = Field(default=None, max_length=40)
+
+
+class ProviderModelIn(BaseModel):
+    model: str = Field(max_length=120)
+
+
+@app.put("/api/hybrid/providers/{pid}")
+def put_provider(pid: str, body: ProviderModelIn):
+    if not providers.get(pid):
+        raise HTTPException(404, "Fournisseur inconnu")
+    providers.set_model(pid, body.model)
+    return hybrid.status()
 
 
 @app.get("/api/hybrid")
@@ -501,9 +514,9 @@ def get_hybrid():
 
 
 @app.get("/api/hybrid/models")
-async def hybrid_models():
+async def hybrid_models(provider: str | None = None):
     try:
-        return {"models": await hybrid.list_models()}
+        return {"models": await hybrid.list_models(provider)}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"Liste des modèles indisponible : {e}") from e
 
@@ -533,7 +546,13 @@ class WorkshopRunIn(BaseModel):
 
 @app.get("/api/workshop")
 def get_workshop():
-    return {**workshop.settings(), "patterns": workshop.PATTERNS, "roles": workshop.ROLES}
+    s = workshop.settings()
+    opts = [{"id": "auto", "label": "Automatique"}, {"id": "local", "label": workshop.engine_label("local")}]
+    opts += [{"id": f"p:{p.id}", "label": workshop.engine_label(f"p:{p.id}"), "family": providers.family_of(providers.model_of(p), p.family),
+              "strength": p.strength} for p in providers.ALL if p.configured]
+    assigned = workshop.assign(s["pattern"], s["participants"])
+    return {**s, "patterns": workshop.PATTERNS, "roles": workshop.ROLES, "options": opts,
+            "assigned": [workshop.engine_label(x) for x in assigned], "warnings": workshop.warnings(s["pattern"], s["participants"])}
 
 
 @app.put("/api/workshop")

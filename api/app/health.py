@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from . import backup, db, hybrid, library, ocr, search, telegram
+from . import backup, db, hybrid, library, ocr, providers, search, telegram
 from .config import (DATA_DIR, DB_PATH, DEFAULT_MODEL, EMBED_MODEL, NTFY_URL, OLLAMA_URL, PROVIDER, SEARXNG_URL,
                      TELEGRAM_ALLOWED, TELEGRAM_TOKEN)
 
@@ -62,17 +62,23 @@ async def _telegram() -> dict:
         return _c("Telegram", "error", str(e)[:120], "vérifie le jeton dans .env")
 
 
-async def _remote() -> dict:
+async def _remote() -> list[dict]:
     if not hybrid.configured():
-        return _c(f"Mode hybride ({hybrid.REMOTE_NAME})", "off", "non configuré", "ATOM_REMOTE_API_KEY dans .env")
-    try:
-        models = await hybrid.list_models()
-        ok = hybrid.model() in models or not models
-        return _c(f"Mode hybride ({hybrid.REMOTE_NAME})", "ok" if ok else "warn",
-                  f"{hybrid.model()} · {hybrid.used_today()}/{hybrid.REMOTE_DAILY_LIMIT} aujourd'hui"
-                  + ("" if ok else " · modèle introuvable"), "" if ok else "Réglages → Hybride → choisir un modèle")
-    except Exception as e:  # noqa: BLE001
-        return _c(f"Mode hybride ({hybrid.REMOTE_NAME})", "error", str(e)[:120], "vérifie la clé et l'adresse dans .env")
+        return [_c("Mode hybride", "off", "non configuré", "ATOM_REMOTE_API_KEY ou ATOM_PROVIDERS dans .env")]
+
+    async def one(p):
+        label = f"API distante ({p.name})"
+        try:
+            models = await providers.list_models(p)
+            m = providers.model_of(p)
+            ok = m in models or not models
+            return _c(label, "ok" if ok else "warn",
+                      f"{m} · {providers.used_today(p.id)}/{p.limit} aujourd'hui" + ("" if p.private else " · sans données privées")
+                      + ("" if ok else " · modèle introuvable"), "" if ok else "Réglages → Connexions → choisir un modèle")
+        except Exception as e:  # noqa: BLE001
+            return _c(label, "error", str(e)[:120], "vérifie la clé et l'adresse dans .env")
+
+    return list(await asyncio.gather(*(one(p) for p in providers.ALL if p.configured)))
 
 
 def _storage() -> list[dict]:
@@ -114,8 +120,9 @@ async def report() -> dict:
         tasks.append(_http("Recherche web (SearXNG)", SEARXNG_URL, "/healthz", "docker compose logs searxng"))
     if NTFY_URL:
         tasks.append(_http("Notifications (ntfy)", NTFY_URL, "/v1/health", "docker compose logs ntfy"))
-    tasks += [_telegram(), _remote()]
+    tasks += [_telegram()]
     checks += list(await asyncio.gather(*tasks))
+    checks += await _remote()
     if not search.enabled():
         checks.append(_c("Recherche web (SearXNG)", "off", "désactivée"))
     checks += _storage()

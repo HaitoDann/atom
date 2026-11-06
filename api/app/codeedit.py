@@ -62,9 +62,9 @@ async def _ask(messages: list[dict], engine: str) -> tuple[str, str]:
                   and hybrid.settings().get("allow_docs"))   # le code ne sort que si tu l'as autorisé
     out = []
     if use_remote:
-        async for t in hybrid.stream(messages):
+        async for t in hybrid.stream(messages, sensitive=True):
             out.append(t)
-        return "".join(out), hybrid.REMOTE_NAME
+        return "".join(out), hybrid.last_used.get("name") or hybrid.name()
     if PROVIDER == "mock":
         code = messages[-1]["content"].split("```", 2)[1].split("\n", 1)[1]
         return f"(mode test) Ajout d'un commentaire.\n```\n# modifié par Atom\n{code}```", "mock"
