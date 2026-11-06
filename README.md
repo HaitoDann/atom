@@ -274,6 +274,29 @@ Barre latérale → **Code** : parcourir un projet de la bibliothèque (GitHub o
   - Il faut un jeton GitHub **fine-grained** limité à tes dépôts avec **Contents: Read and write** dans `ATOM_GITHUB_TOKEN` (`.env`), et `ATOM_GIT_NAME` / `ATOM_GIT_EMAIL` pour signer les commits. Le jeton n'est jamais écrit dans les dépôts clonés.
 - **Mettre à jour** récupère les derniers changements du dépôt (si un fichier modifié localement change aussi sur GitHub, annule d'abord ta modification).
 
+## Bac à sable : exécuter les tests (mode Code)
+
+Atom peut lancer les tests d'un projet dans un **conteneur Docker jetable**, et l'agent peut vérifier lui-même que son code compile et passe les tests.
+
+**Activation** (désactivé par défaut), dans `.env` :
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.sandbox.yml
+```
+puis `./update.sh`. L'écran État affiche « Bac à sable : actif ».
+
+**Utilisation**
+- Code → bloc **Tests** sous le panneau Git : **▶ Lancer les tests**. La commande est détectée selon le projet : `go test ./...`, `cargo test`, `npm test` ou `pytest`. **modifier** permet de la changer pour ce projet, par exemple `go test ./shell/...`.
+- L'agent dispose d'un outil **test** : après ses modifications, il lance les tests *avec ses changements non appliqués*, lit les erreurs, corrige et relance (3 essais au plus).
+- Dans les résultats de l'agent, **Tester ces modifications** fait la même chose à la demande.
+
+**Isolation**
+- Deux conteneurs neufs, supprimés après usage. Le premier récupère les dépendances **avec réseau, sans exécuter de script** (`go mod download`, `cargo fetch`, `npm ci --ignore-scripts`, `pip download`) dans un cache persistant (volume `atom-sandbox-cache`). Le second lance les tests **sans réseau**.
+- Les conteneurs n'ont aucun privilège (`cap-drop ALL`, `no-new-privileges`) et sont limités à 2 Go de mémoire, 2 processeurs, 512 processus et 5 minutes. Ces limites se règlent avec `ATOM_SANDBOX_MEMORY_MB`, `ATOM_SANDBOX_CPUS` et `ATOM_SANDBOX_TIMEOUT`.
+- Le conteneur de test ne voit ni le socket Docker, ni les données d'Atom, ni ton réseau. Le projet y est copié : tes fichiers ne sont jamais modifiés.
+- ⚠ Pour créer ces conteneurs, Atom a besoin du socket Docker, qui donne le contrôle de Docker sur le serveur. Garde un mot de passe solide et n'expose Atom que par Tailscale.
+
+**Espace disque** : les images sont légères et téléchargées une seule fois, au premier test du langage concerné : `golang:1.23-alpine` environ 250 Mo, `node:22-alpine` environ 150 Mo, `python:3.12-slim` environ 130 Mo, `rust:1-slim` environ 700 Mo. Pour libérer la place : `docker image rm …` et `docker volume rm atom-sandbox-cache`.
+
 ## Atelier multi-IA (désactivé par défaut)
 
 Pour une demande importante, plusieurs IA collaborent. Réglages → **Atelier** → « Activer l'atelier », puis le bouton **Atelier** (icône de groupe) sous la saisie pour le message suivant.

@@ -22,7 +22,7 @@ import secrets
 import time
 from typing import AsyncIterator
 
-from . import db, hybrid, library, llm, providers
+from . import db, hybrid, library, llm, providers, sandbox
 from .config import DEFAULT_MODEL, PROVIDER
 
 MAX_STEPS = 25
@@ -39,7 +39,7 @@ Outils (une seule action par réponse) :
 - {{"tool": "edit", "path": "fichier", "old": "texte exact existant", "new": "remplacement"}} : remplacer un passage.
   « old » doit apparaître UNE seule fois dans le fichier, copié à l'identique (espaces et indentation compris).
 - {{"tool": "write", "path": "fichier", "content": "contenu complet"}} : créer un fichier (ou le réécrire s'il est court)
-- {{"tool": "done", "summary": "ce que tu as changé et pourquoi, et ce que l'utilisateur doit vérifier"}}
+- {{"tool": "done", "summary": "ce que tu as changé et pourquoi, et ce que l'utilisateur doit vérifier"}}{test_tool}
 
 Si la tâche est une QUESTION (expliquer, décrire, trouver, analyser) : explore et lis les fichiers utiles sans rien
 modifier, puis réponds en détail dans « summary » de l'action done (rôle du projet, architecture, fichiers clés,
@@ -57,7 +57,7 @@ Format de chaque réponse : une ou deux phrases de réflexion, puis exactement :
 {{ ...json... }}
 ```
 
-Fichiers du projet (extrait) :
+{test_note}Fichiers du projet (extrait) :
 {files}
 
 Arborescence (dossiers) :
@@ -206,6 +206,21 @@ class Workspace:
         return out
 
 
+TEST_TOOL = {"type": "function", "function": {"name": "test", "description":
+    "Lance les tests du projet dans un bac à sable sans réseau, AVEC tes modifications en cours. Renvoie le code de sortie et la fin de la sortie.",
+    "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "commande (facultatif) ; par défaut, celle du projet"}}, "required": []}}}
+TEST_TEXT = """
+- {{"tool": "test", "command": "facultatif"}} : lancer les tests dans un bac à sable sans réseau, avec tes modifications"""
+TEST_NOTE = """Bac à sable disponible : après avoir modifié du code, lance « test ». Si les tests échouent à cause de tes
+changements, corrige puis relance (3 essais au plus). Commande par défaut : {cmd}
+
+"""
+
+
+def tools() -> list[dict]:
+    return TOOLS + ([TEST_TOOL] if sandbox.enabled() else [])
+
+
 TOOLS = [
     {"type": "function", "function": {"name": "list", "description": "Liste les fichiers et sous-dossiers d'un dossier du projet.",
      "parameters": {"type": "object", "properties": {"dir": {"type": "string", "description": "chemin relatif, \"\" pour la racine"}}, "required": []}}},
@@ -244,7 +259,7 @@ def _exec(ws: "Workspace", tool: str, a: dict) -> str:
 
 
 def _is_ok(res: str) -> bool:
-    return not res.startswith(("Erreur", "Fichier introuvable", "« old »", "Lis d'abord", "Outil inconnu"))
+    return not res.startswith(("Échec (code","Erreur", "Fichier introuvable", "« old »", "Lis d'abord", "Outil inconnu"))
 
 
 def _show(a: dict) -> dict:
@@ -355,10 +370,10 @@ async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> A
                     bud = providers.budget(p)
                     out_tok = min(2048, max(600, int(bud * 0.25)))
                     try:
-                        msg = await providers.chat_tools(p, _fit(messages, bud - out_tok), TOOLS, out_tok)
+                        msg = await providers.chat_tools(p, _fit(messages, bud - out_tok), tools(), out_tok)
                     except providers.TooLarge:
                         small = int(bud * 0.6)   # estimation trop optimiste : on réessaie nettement plus court
-                        msg = await providers.chat_tools(p, _fit(messages, small - 600), TOOLS, 600)
+                        msg = await providers.chat_tools(p, _fit(messages, small - 600), tools(), 600)
                     if announced != p.id:
                         announced = p.id
                         yield dict(type="engine", name=f"{p.name} · {providers.model_of(p)}")
@@ -408,7 +423,11 @@ async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> A
             if tool == "done":
                 state.update(summary=str(args.get("summary", content)), finished=True)
                 return
-            res = _exec(ws, tool, args)
+            if tool == "test" and sandbox.enabled():
+                yield dict(type="info", message="Tests dans le bac à sable (sans réseau)…")
+                res = await sandbox.run_text(ws.cid, args.get("command"), ws.changes)
+            else:
+                res = _exec(ws, tool, args)
             yield dict(type="result", step=step, tool=tool, ok=_is_ok(res), text=res[:1500])
             messages.append({"role": "tool", "tool_call_id": c.get("id") or f"call_{step}_{i}", "content": res})
         _trim(messages)
@@ -452,7 +471,11 @@ async def _run_text(ws: "Workspace", system: str, task: str, state: dict) -> Asy
         if tool == "done":
             state["summary"] = str(action.get("summary", ""))
             return
-        res = _exec(ws, tool, action)
+        if tool == "test" and sandbox.enabled():
+            yield dict(type="info", message="Tests dans le bac à sable (sans réseau)…")
+            res = await sandbox.run_text(ws.cid, action.get("command"), ws.changes)
+        else:
+            res = _exec(ws, tool, action)
         yield dict(type="result", step=step, tool=tool, ok=_is_ok(res), text=res[:1500])
         messages.append({"role": "user", "content": f"Résultat de {tool} :\n{res}"})
         _trim(messages)
@@ -475,7 +498,10 @@ async def run(cid: int, task: str, engine: str = "remote", rid: str | None = Non
     yield dict(type="start", id=rid, engine=eng, info=why, writable=_writable(ws.col))
     listing = ws.all_paths()
     files = "\n".join(listing[:150]) + (f"\n… ({len(listing)} fichiers au total)" if len(listing) > 150 else "")
-    system = SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)")
+    sb = sandbox.enabled()
+    system = SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)",
+                           test_tool=TEST_TEXT if sb else "",
+                           test_note=TEST_NOTE.format(cmd=sandbox.default_command(cid, listing) or "à préciser") if sb else "")
     summary, finished = "", False
     step = 0
     if eng == "remote":

@@ -544,6 +544,15 @@
   .prov-model select, .prov-model input { flex: 1; min-width: 0; font: 12.5px var(--mono); }
   .prov-model [hidden] { display: none; }
   .prov-note { margin: 0 0 6px; }
+  .sb-cmd { display: block; font: 11.5px var(--mono); color: var(--text-2); margin: 2px 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-cmd-in { font: 11.5px var(--mono); padding: 4px 6px; margin: 2px 0 4px; }
+  .sb-out:empty { display: none; }
+  .sb-out { margin-top: 8px; }
+  .sb-out .st { font-size: 12px; color: var(--muted); margin: 2px 0; }
+  .sb-out .res { font-weight: 500; font-size: 12.5px; margin: 6px 0 4px; }
+  .sb-out .res.ok { color: var(--strong); }
+  .sb-out .res.ko { color: var(--danger, #e66); }
+  .sb-out pre { font: 11px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; margin: 0; padding: 8px; border-radius: 6px; background: color-mix(in srgb, var(--text) 4%, transparent); }
   .ag { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow-y: auto; }
   .ag[hidden] { display: none; }
   .ag-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
@@ -1047,6 +1056,13 @@
         <div class="row" style="gap:6px"><select class="field" id="cvProject" style="flex:1;min-width:0"></select><button class="iconbtn" id="cvAgent" title="Agent : confier une tâche sur tout le projet" data-i="spark"></button><button class="iconbtn" id="cvSync" title="Mettre à jour le projet" data-i="refresh"></button><button class="iconbtn" id="cvAdd" title="Ajouter un projet" data-i="plus"></button></div>
         <p class="note" id="cvInfo" style="margin:6px 2px 8px"></p>
         <div class="cv-changes" id="cvChanges" hidden></div>
+        <div class="cv-changes sb-box" id="cvTests" hidden>
+          <div class="h"><span>Tests</span><button id="sbEdit" title="Changer la commande">modifier</button></div>
+          <code class="sb-cmd" id="sbCmd"></code>
+          <input class="field sb-cmd-in" id="sbCmdIn" hidden spellcheck="false">
+          <div class="git-acts"><button class="btn sm" id="sbRun">▶ Lancer les tests</button></div>
+          <div class="sb-out" id="sbOut"></div>
+        </div>
         <div class="row" style="gap:6px;margin-bottom:6px"><input class="field" id="cvFilter" placeholder="Filtrer les fichiers…" autocomplete="off"><button class="iconbtn" id="cvGrep" title="Chercher dans le contenu des fichiers" data-i="search"></button></div>
         <div class="cv-tree" id="cvTree"></div>
       </aside>
@@ -4098,7 +4114,7 @@ $("cvProject").onchange = async () => { if (!$("cvAgentView").hidden) agClose();
 
 async function loadCodeFiles() {
   const d = await getJSON(`/api/library/collections/${code.project}/documents`);
-  loadChanges();
+  loadChanges(); loadSandbox();
   code.files = d.documents.map((x) => ({ path: x.path, size: x.size })).sort((a, b) => a.path.localeCompare(b.path));
   const c = d.collection;
   renderCodeInfo({ ...c, progress: library.collections.find((x) => x.id === c.id)?.progress });
@@ -4557,8 +4573,9 @@ function agResults() {
     ${r.files.map((f, i) => `<details class="ag-file"><summary><input type="checkbox" data-ag="${i}" checked><span>${esc(f.path)}</span>${f.new_file ? "<em>nouveau</em>" : ""}<em>+${f.added} −${f.removed}</em></summary>
       <div class="cv-diff">${f.diff.split("\n").filter((l, k) => !(k < 2 && (l.startsWith("---") || l.startsWith("+++")))).map((l) => `<div class="${l.startsWith("@@") ? "hunk" : l[0] === "+" ? "add" : l[0] === "-" ? "del" : ""}">${esc(l)}</div>`).join("")}</div></details>`).join("")}
     <div class="ag-acts">${r.writable !== false ? '<button class="btn primary" id="agApply">Appliquer la sélection</button>' : '<span class="note">Projet en lecture seule : télécharge le patch.</span>'}
-      <button class="btn" id="agPatch">${icon("download")}Patch</button><button class="btn" id="agMore">Poursuivre…</button><button class="btn" id="agDrop">Abandonner</button></div>`;
+      <button class="btn" id="agPatch">${icon("download")}Patch</button>${sbInfo?.enabled ? '<button class="btn" id="agTest">Tester ces modifications</button>' : ""}<button class="btn" id="agMore">Poursuivre…</button><button class="btn" id="agDrop">Abandonner</button></div>`;
   $("agMore").onclick = agContinue;
+  if ($("agTest")) $("agTest").onclick = () => { let o = box.querySelector(".sb-out"); if (!o) { o = document.createElement("div"); o.className = "sb-out"; box.appendChild(o); } sbRun({ run_id: r.id }, o, $("agTest")); };
   box.querySelectorAll(".ag-file input").forEach((c) => { c.onclick = (e) => e.stopPropagation(); });
   const picked = () => [...box.querySelectorAll("[data-ag]:checked")].map((c) => r.files[+c.dataset.ag]);
   $("agPatch").onclick = () => downloadPatch(picked().map((f) => f.diff).join(""), "atom-agent.patch");
@@ -4580,6 +4597,52 @@ function agResults() {
     } catch (e) { toast(`<b>Agent</b> · ${esc(e.message)}`); }
   };
 }
+
+/* ---- bac à sable : lancer les tests dans un conteneur jetable */
+let sbInfo = null;
+async function loadSandbox() {
+  try { sbInfo = await getJSON(`/api/sandbox/${code.project}`); } catch { sbInfo = null; $("cvTests").hidden = true; return; }
+  $("cvTests").hidden = false;
+  $("sbCmd").textContent = sbInfo.enabled ? (sbInfo.command || "commande à préciser") : "bac à sable désactivé";
+  $("sbCmd").title = sbInfo.enabled ? sbInfo.command : sbInfo.reason;
+  $("sbRun").hidden = !sbInfo.enabled; $("sbEdit").hidden = !sbInfo.enabled;
+  if (!sbInfo.enabled) $("sbOut").innerHTML = `<div class="st">${esc(sbInfo.reason)} — voir le README, section « Bac à sable ».</div>`;
+}
+$("sbEdit").onclick = () => {
+  const inp = $("sbCmdIn");
+  if (inp.hidden) { inp.value = sbInfo?.command || ""; inp.hidden = false; $("sbCmd").hidden = true; inp.focus(); $("sbEdit").textContent = "enregistrer"; return; }
+  send_(`/api/sandbox/${code.project}`, "PUT", { command: inp.value }).then((r) => r.json()).then((d) => { sbInfo = d; loadSandbox(); toast("Commande de test enregistrée."); }).catch((e) => toast(esc(e.message)));
+  inp.hidden = true; $("sbCmd").hidden = false; $("sbEdit").textContent = "modifier";
+};
+$("sbCmdIn").addEventListener("keydown", (e) => { if (e.key === "Enter") $("sbEdit").click(); if (e.key === "Escape") { $("sbCmdIn").hidden = true; $("sbCmd").hidden = false; $("sbEdit").textContent = "modifier"; } });
+async function sbRun(body, out, btn) {
+  if (btn.disabled) return;
+  const label = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Tests…';
+  out.innerHTML = ""; setEmotion("focus"); entity.scan = true;
+  const add = (cls, html) => { const d = document.createElement("div"); d.className = cls; d.innerHTML = html; out.appendChild(d); return d; };
+  try {
+    const r = await api(`/api/sandbox/${code.project}/run`, { method: "POST", body: JSON.stringify(body) });
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1); if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "step") add("st", esc(ev.message));
+        else if (ev.type === "result") {
+          out.querySelectorAll(".st").forEach((x) => x.remove());
+          const ok = ev.code === 0;
+          add("res " + (ok ? "ok" : "ko"), ok ? `✓ Tests réussis · ${ev.duration} s` : ev.code === -1 ? "Bac à sable indisponible" : `✗ Échec (code ${ev.code}) · ${ev.duration} s`);
+          add("", `<pre>${esc((ev.output || "").replace(/\x1b\[[0-9;]*m/g, "") || "(aucune sortie)")}</pre>`);
+          if (ok) entity.seal = 1; else entity.glitch = 1;
+        }
+      }
+    }
+  } catch (e) { add("res ko", esc(e.message)); }
+  finally { btn.disabled = false; btn.innerHTML = label; setEmotion("idle"); entity.scan = false; }
+}
+$("sbRun").onclick = () => sbRun({}, $("sbOut"), $("sbRun"));
 
 /* ============================================================
    ATELIER MULTI-IA

@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, auth, backup, codeedit, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, agentcode, auth, backup, codeedit, sandbox, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -819,6 +819,41 @@ async def agent_apply(rid: str, body: AgentApplyIn):
     if out["applied"]:
         background(library.index_project(out["collection_id"]))
     return out
+
+
+# ---- bac à sable (tests dans un conteneur jetable)
+
+
+class SandboxCmd(BaseModel):
+    command: str = Field(default="", max_length=500)
+
+
+class SandboxRun(BaseModel):
+    command: str | None = Field(default=None, max_length=500)
+    run_id: str | None = Field(default=None, max_length=32)   # tester les modifications d'une tâche de l'agent
+
+
+@app.get("/api/sandbox/{cid}")
+def sandbox_info(cid: int):
+    with db.conn() as c:
+        files = [r["path"] for r in c.execute("SELECT path FROM documents WHERE collection_id = ?", (cid,))]
+    return {**sandbox.status(), "command": sandbox.default_command(cid, files), "lang": sandbox.detect(files)}
+
+
+@app.put("/api/sandbox/{cid}")
+def sandbox_set(cid: int, body: SandboxCmd):
+    sandbox.set_command(cid, body.command)
+    return sandbox_info(cid)
+
+
+@app.post("/api/sandbox/{cid}/run")
+async def sandbox_run(cid: int, body: SandboxRun):
+    overlay = None
+    if body.run_id:
+        r = agentcode.get_run(body.run_id)
+        overlay = {k: v[1] for k, v in (r or {}).get("files", {}).items()} if r else None
+    return StreamingResponse((event(**ev) async for ev in sandbox.run(cid, body.command, overlay)),
+                             media_type="application/x-ndjson")
 
 
 # ---- Git (projets clonés par Atom) : chaque action vient d'un bouton
