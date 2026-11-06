@@ -227,6 +227,34 @@ async def list_models(p: Provider) -> list[str]:
     return sorted(set(ids))
 
 
+_ping_cache: dict[str, tuple[float, str]] = {}
+
+
+async def ping(p: Provider) -> str:
+    """Vérifie la clé et le modèle par un appel minimal (1 jeton), mis en cache 30 min. Renvoie "" si OK."""
+    hit = _ping_cache.get(p.id + model_of(p))
+    if hit and time.time() - hit[0] < 1800:
+        return hit[1]
+    err = ""
+    if PROVIDER != "mock":
+        try:
+            async with httpx.AsyncClient(timeout=20) as client:
+                r = await client.post(f"{p.url}/chat/completions", headers={"Authorization": f"Bearer {p.key}"},
+                                      json={"model": model_of(p), "messages": [{"role": "user", "content": "ok"}], "max_tokens": 1})
+            if r.status_code in (401, 403):
+                err = "clé refusée"
+            elif r.status_code == 404 or (r.status_code == 400 and "model" in r.text.lower()):
+                err = "modèle introuvable"
+            elif r.status_code == 429:
+                err = ""   # limite momentanée : la clé et le modèle sont bons
+            elif r.status_code != 200:
+                err = f"a répondu {r.status_code}"
+        except httpx.HTTPError as e:
+            err = f"injoignable ({e.__class__.__name__})"
+    _ping_cache[p.id + model_of(p)] = (time.time(), err)
+    return err
+
+
 async def stream(p: Provider, messages: list[dict], model: str | None = None, stats: dict | None = None) -> AsyncIterator[str]:
     """Flux de texte (format OpenAI, SSE). Lève Unavailable si rien n'a été produit."""
     model = model or model_of(p)

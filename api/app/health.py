@@ -66,21 +66,28 @@ async def _remote() -> list[dict]:
     if not hybrid.configured():
         return [_c("Mode hybride", "off", "non configuré", "ATOM_REMOTE_API_KEY ou ATOM_PROVIDERS dans .env")]
 
+    PREFERRED = ["deepseek", "qwen", "llama", "gemma", "mistral", "gpt", "gemini", "kimi", "glm"]
+
     async def one(p):
         label = f"API distante ({p.name})"
+        m = providers.model_of(p)
+        base = f"{m} · {providers.used_today(p.id)}/{p.limit} aujourd'hui" + ("" if p.private else " · sans données privées")
         try:
             models = await providers.list_models(p)
-            m = providers.model_of(p)
-            ok = m in models or not models
-            hint = ""
-            if not ok:
-                sugg = [x for x in models if providers.family_of(x, "") == p.family][:2] or models[:2]
-                hint = "Réglages → Connexions → choisir un modèle" + (f" (par ex. {', '.join(sugg)})" if sugg else "")
-            return _c(label, "ok" if ok else "warn",
-                      f"{m} · {providers.used_today(p.id)}/{p.limit} aujourd'hui" + ("" if p.private else " · sans données privées")
-                      + ("" if ok else " · modèle introuvable"), hint)
-        except Exception as e:  # noqa: BLE001
-            return _c(label, "error", str(e)[:120], "vérifie la clé et l'adresse dans .env")
+        except Exception:  # noqa: BLE001
+            models = None   # pas de liste (ex. GitHub Models) : on vérifie par un appel minimal
+        if models is None or not models:
+            err = await providers.ping(p)
+            if not err:
+                return _c(label, "ok", base)
+            return _c(label, "error" if err != "modèle introuvable" else "warn", f"{base} · {err}",
+                      "vérifie la clé dans .env" if "clé" in err else "Réglages → Connexions → écris le nom exact du modèle")
+        if m in models:
+            return _c(label, "ok", base)
+        rank = {f: i for i, f in enumerate(PREFERRED)}
+        sugg = sorted(models, key=lambda x: (x and providers.family_of(x, "") != p.family, rank.get(providers.family_of(x, ""), 99), x))[:3]
+        return _c(label, "warn", f"{base} · modèle introuvable",
+                  "Réglages → Connexions → choisir un modèle" + (f" (par ex. {', '.join(sugg)})" if sugg else ""))
 
     return list(await asyncio.gather(*(one(p) for p in providers.ALL if p.configured)))
 
