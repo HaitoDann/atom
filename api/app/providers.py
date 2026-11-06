@@ -16,6 +16,7 @@ Chaque fournisseur a :
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -121,6 +122,14 @@ def _load() -> list[Provider]:
 ALL: list[Provider] = _load()
 LOCAL_STRENGTH = int(os.getenv("ATOM_LOCAL_STRENGTH", "1"))
 
+# Taille de requête tolérée (tokens, question + réponse) : les offres gratuites limitent les tokens par minute.
+BUDGETS = {"groq": 7000, "github": 7500, "cerebras": 30000, "gemini": 100000, "openrouter": 30000, "mistral": 30000}
+
+
+def budget(p: Provider) -> int:
+    v = os.getenv(f"ATOM_{p.id.upper()}_BUDGET")
+    return int(v) if v and v.isdigit() else BUDGETS.get(p.id, 30000)
+
 
 def get(pid: str) -> Provider | None:
     return next((p for p in ALL if p.id == pid), None)
@@ -195,6 +204,10 @@ def describe(p: Provider) -> dict:
 
 class Unavailable(RuntimeError):
     """Le fournisseur n'a rien produit (clé, limite, panne) : on peut passer au suivant."""
+
+
+class TooLarge(Unavailable):
+    """Requête trop grosse pour l'offre du fournisseur : on peut réessayer en plus court."""
 
 
 CATALOGS = {"github": "https://models.github.ai/catalog/models"}   # GitHub n'a pas de /models au format OpenAI
@@ -347,14 +360,31 @@ async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_t
     model = model_of(p)
     payload = {"model": model, "messages": messages, "tools": tools, "tool_choice": "auto",
                "temperature": 0.2, "max_tokens": max_tokens}
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(15, read=180)) as client:
-            r = await client.post(f"{p.url}/chat/completions", json=payload, headers={"Authorization": f"Bearer {p.key}"})
-    except httpx.HTTPError as e:
-        _cooldown[p.id] = time.time() + 60
-        raise Unavailable(f"{p.name} injoignable ({e.__class__.__name__})") from e
+    for attempt in range(3):
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15, read=180)) as client:
+                r = await client.post(f"{p.url}/chat/completions", json=payload, headers={"Authorization": f"Bearer {p.key}"})
+        except httpx.HTTPError as e:
+            _cooldown[p.id] = time.time() + 60
+            raise Unavailable(f"{p.name} injoignable ({e.__class__.__name__})") from e
+        if r.status_code == 429 and attempt < 2:
+            # limite par minute : si le fournisseur dit d'attendre peu, on attend plutôt que d'abandonner
+            try:
+                wait = float(r.headers.get("retry-after") or 0)
+            except ValueError:
+                wait = 0
+            m = re.search(r"try again in ([\d.]+)s", r.text)
+            wait = wait or (float(m.group(1)) if m else 0)
+            if 0 < wait <= 30:
+                await asyncio.sleep(wait + 0.5)
+                continue
+        break
     if r.status_code != 200:
         body = r.text[:300]
+        low = body.lower()
+        if r.status_code == 413 or "request too large" in low or "context_length" in low or "maximum context" in low \
+                or ("tokens per minute" in low and r.status_code != 429):
+            raise TooLarge(f"requête trop longue pour l'offre {p.name}")
         if r.status_code in (401, 403):
             raise Unavailable(f"clé API {p.name} refusée")
         if r.status_code == 429:

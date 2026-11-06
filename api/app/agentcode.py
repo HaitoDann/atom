@@ -25,7 +25,7 @@ from . import db, hybrid, library, llm, providers
 from .config import DEFAULT_MODEL, PROVIDER
 
 MAX_STEPS = 25
-READ_LINES = 400
+READ_LINES = 250
 _runs: dict[str, dict] = {}
 
 SYSTEM = """Tu es l'agent de code d'Atom. Tu travailles sur le projet « {name} » pour réaliser la tâche de l'utilisateur.
@@ -208,7 +208,7 @@ class Workspace:
 TOOLS = [
     {"type": "function", "function": {"name": "list", "description": "Liste les fichiers et sous-dossiers d'un dossier du projet.",
      "parameters": {"type": "object", "properties": {"dir": {"type": "string", "description": "chemin relatif, \"\" pour la racine"}}, "required": []}}},
-    {"type": "function", "function": {"name": "read", "description": "Lit des lignes d'un fichier (numérotées, 400 au plus par appel).",
+    {"type": "function", "function": {"name": "read", "description": "Lit des lignes d'un fichier (numérotées, 250 au plus par appel).",
      "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start": {"type": "integer"}, "end": {"type": "integer"}}, "required": ["path"]}}},
     {"type": "function", "function": {"name": "search", "description": "Cherche un texte exact dans tout le projet (fichier:ligne).",
      "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
@@ -301,6 +301,29 @@ def _mock(messages: list[dict]) -> str:
     return '```action\n{"tool": "done", "summary": "Commentaire ajouté en tête du fichier."}\n```'
 
 
+def _est(messages: list[dict]) -> int:
+    """Estimation grossière des tokens (≈ 3,2 caractères par token pour du code et du français)."""
+    return int(sum(len(json.dumps(m, ensure_ascii=False)) for m in messages) / 3.2) + 600   # + définitions d'outils
+
+
+def _fit(messages: list[dict], budget: int) -> list[dict]:
+    """Copie des messages qui tient dans le budget : les anciens résultats sont raccourcis d'abord."""
+    out = [dict(m) for m in messages]
+    idx = [i for i, m in enumerate(out) if m["role"] == "tool" or (m["role"] == "user" and i > 1)]
+    for i in idx[:-1]:
+        if _est(out) <= budget:
+            return out
+        c = str(out[i].get("content") or "")
+        if len(c) > 240:
+            out[i]["content"] = c[:200] + "\n… (ancien résultat raccourci pour tenir dans la limite)"
+    if idx and _est(out) > budget:   # le dernier résultat lui-même est trop long : on garde le début
+        i = idx[-1]
+        c = str(out[i].get("content") or "")
+        keep = max(800, len(c) - int((_est(out) - budget) * 3.2) - 200)
+        out[i]["content"] = c[:keep] + "\n… (tronqué pour tenir dans la limite : relis la suite avec start=…)"
+    return out
+
+
 def _trim(messages: list[dict]) -> None:
     """Garde le contexte court : les anciens résultats d'outils sont résumés."""
     results = [i for i, m in enumerate(messages) if m["role"] == "tool"
@@ -322,7 +345,13 @@ async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> A
         msg, errors = None, []
         for p in list(order):
             try:
-                msg = await providers.chat_tools(p, messages, TOOLS)
+                bud = providers.budget(p)
+                out_tok = min(2048, max(600, int(bud * 0.25)))
+                try:
+                    msg = await providers.chat_tools(p, _fit(messages, bud - out_tok), TOOLS, out_tok)
+                except providers.TooLarge:
+                    small = int(bud * 0.6)   # estimation trop optimiste : on réessaie nettement plus court
+                    msg = await providers.chat_tools(p, _fit(messages, small - 600), TOOLS, 600)
                 if announced != p.id:
                     announced = p.id
                     yield dict(type="engine", name=f"{p.name} · {providers.model_of(p)}")

@@ -74,3 +74,13 @@ def test_agent_native_tools(client):
     assert [l["tool"] for l in lines if l["type"] == "action"] == ["list", "read", "edit", "done"]
     done = lines[-1]
     assert done["summary"].endswith("(outils natifs).") and done["files"][0]["path"] == "app.py"
+
+
+def test_fit_budget():
+    msgs = [{"role": "system", "content": "s" * 2000}, {"role": "user", "content": "Tâche"}]
+    for i in range(6):
+        msgs.append({"role": "assistant", "content": "x"})
+        msgs.append({"role": "tool", "tool_call_id": str(i), "content": "ligne de code\n" * 600})
+    small = agentcode._fit(msgs, 5000)
+    assert agentcode._est(small) <= 5200 and len(msgs[-1]["content"]) > len(small[-1]["content"]) - 1
+    assert msgs[3]["content"].count("\n") == 600     # l'original n'est pas modifié
