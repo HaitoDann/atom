@@ -340,6 +340,37 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                      prompt_tokens=usage.get("prompt_tokens"), total_s=round(time.time() - t0, 2))
 
 
+async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_tokens: int = 4096) -> dict:
+    """Appel non streamé avec outils natifs (function calling, format OpenAI). Renvoie le message de l'assistant."""
+    if PROVIDER == "mock":
+        return _mock_tools(messages)
+    model = model_of(p)
+    payload = {"model": model, "messages": messages, "tools": tools, "tool_choice": "auto",
+               "temperature": 0.2, "max_tokens": max_tokens}
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15, read=180)) as client:
+            r = await client.post(f"{p.url}/chat/completions", json=payload, headers={"Authorization": f"Bearer {p.key}"})
+    except httpx.HTTPError as e:
+        _cooldown[p.id] = time.time() + 60
+        raise Unavailable(f"{p.name} injoignable ({e.__class__.__name__})") from e
+    if r.status_code != 200:
+        body = r.text[:300]
+        if r.status_code in (401, 403):
+            raise Unavailable(f"clé API {p.name} refusée")
+        if r.status_code == 429:
+            _cooldown[p.id] = time.time() + 120
+            raise Unavailable(f"limite de l'offre {p.name} atteinte pour le moment")
+        if r.status_code >= 500:
+            _cooldown[p.id] = time.time() + 60
+        raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:200]}")
+    count(p.id)
+    try:
+        msg = (r.json().get("choices") or [{}])[0].get("message") or {}
+    except ValueError as e:
+        raise Unavailable(f"{p.name} : réponse illisible") from e
+    return msg
+
+
 async def stream_chain(providers: list[Provider], messages: list[dict], used: dict, model: str | None = None,
                        max_tokens: int | None = None) -> AsyncIterator[str]:
     """Essaie les fournisseurs dans l'ordre ; passe au suivant tant que rien n'a été écrit.
@@ -360,3 +391,24 @@ async def stream_chain(providers: list[Provider], messages: list[dict], used: di
             errors.append(str(e))
     used["skipped"] = errors
     raise Unavailable(" ; ".join(errors) or "aucun fournisseur distant disponible")
+
+
+def _mock_tools(messages: list[dict]) -> dict:
+    """Mode test : enchaîne list → read → edit → done avec de vrais appels d'outils."""
+    results = [m["content"] for m in messages if m["role"] == "tool"]
+    n = len(results)
+
+    def call(name: str, args: dict) -> dict:
+        return {"role": "assistant", "content": f"Étape {n + 1}.",
+                "tool_calls": [{"id": f"c{n}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}]}
+    if n == 0:
+        return call("list", {"dir": "./"})
+    if n == 1:
+        first = next((l for l in results[0].split("\n") if l and not l.endswith("/")), "")
+        return call("read", {"path": first})
+    if n == 2:
+        path = results[1].split(" (lignes")[0]
+        line = re.search(r"\s+1\| (.*)", results[1])
+        old = line.group(1) if line else ""
+        return call("edit", {"path": path, "old": old, "new": "# modifié par l'agent\n" + old})
+    return call("done", {"summary": "Commentaire ajouté (outils natifs)."})

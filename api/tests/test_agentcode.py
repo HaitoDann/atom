@@ -60,3 +60,17 @@ def test_paths_normalized():
     ws = agentcode.Workspace(cid)
     assert "app.py" in ws.t_list("./") and "app.py" in ws.t_list(".") and "app.py" in ws.t_list("/")
     assert ws.t_read("./app.py").startswith("app.py")
+
+
+def test_agent_native_tools(client):
+    cid, root = _project()
+    from app import hybrid
+    hybrid.save_settings({"allow_docs": True})
+    try:
+        lines = [json.loads(l) for l in client.post(f"/api/agent/{cid}", json={"task": "commente", "engine": "remote"}).text.splitlines()]
+    finally:
+        hybrid.save_settings({"allow_docs": False})
+    assert lines[0]["engine"] == "remote"
+    assert [l["tool"] for l in lines if l["type"] == "action"] == ["list", "read", "edit", "done"]
+    done = lines[-1]
+    assert done["summary"].endswith("(outils natifs).") and done["files"][0]["path"] == "app.py"

@@ -205,6 +205,51 @@ class Workspace:
         return out
 
 
+TOOLS = [
+    {"type": "function", "function": {"name": "list", "description": "Liste les fichiers et sous-dossiers d'un dossier du projet.",
+     "parameters": {"type": "object", "properties": {"dir": {"type": "string", "description": "chemin relatif, \"\" pour la racine"}}, "required": []}}},
+    {"type": "function", "function": {"name": "read", "description": "Lit des lignes d'un fichier (numérotées, 400 au plus par appel).",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "start": {"type": "integer"}, "end": {"type": "integer"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "search", "description": "Cherche un texte exact dans tout le projet (fichier:ligne).",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "edit", "description": "Remplace un passage exact (unique dans le fichier, déjà lu) par un nouveau texte.",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "old": {"type": "string"}, "new": {"type": "string"}}, "required": ["path", "old", "new"]}}},
+    {"type": "function", "function": {"name": "write", "description": "Crée un fichier, ou réécrit entièrement un fichier court déjà lu.",
+     "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+    {"type": "function", "function": {"name": "done", "description": "Termine : résumé des changements, ou réponse détaillée (Markdown) si la tâche est une question.",
+     "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}}},
+]
+
+NATIVE_NOTE = """
+(Mode outils natifs : utilise directement les fonctions list, read, search, edit, write et done — pas de bloc ```action```.
+Écris ta réflexion courte dans le texte de ta réponse, et appelle un outil à chaque tour. Termine toujours par done.)"""
+
+
+def _exec(ws: "Workspace", tool: str, a: dict) -> str:
+    try:
+        if tool == "list":
+            return ws.t_list(str(a.get("dir", "")))
+        if tool == "read":
+            return ws.t_read(str(a.get("path", "")), a.get("start"), a.get("end"))
+        if tool == "search":
+            return ws.t_search(str(a.get("query", "")))
+        if tool == "edit":
+            return ws.t_edit(str(a.get("path", "")), str(a.get("old", "")), str(a.get("new", "")))
+        if tool == "write":
+            return ws.t_write(str(a.get("path", "")), str(a.get("content", "")))
+        return f"Outil inconnu : {tool}. Outils : list, read, search, edit, write, done."
+    except (ValueError, OSError) as e:
+        return f"Erreur : {e}"
+
+
+def _is_ok(res: str) -> bool:
+    return not res.startswith(("Erreur", "Fichier introuvable", "« old »", "Lis d'abord", "Outil inconnu"))
+
+
+def _show(a: dict) -> dict:
+    return {k: (v if k not in ("content", "new", "old") else f"{len(str(v).splitlines())} ligne(s)") for k, v in a.items() if k != "tool"}
+
+
 def _parse(reply: str) -> tuple[str, dict | None]:
     m = re.search(r"```(?:action|json)?\s*\n(\{[\s\S]*?\})\s*```", reply)
     raw = m.group(1) if m else None
@@ -239,18 +284,6 @@ def engine_for(engine: str) -> tuple[str, str]:
     return "remote", f"{chain[0].name} · {providers.model_of(chain[0])}"
 
 
-async def _ask(messages: list[dict], engine: str, used: dict) -> str:
-    if engine == "remote":
-        order = providers.chain(hybrid.settings()["provider"] or None, sensitive=True)
-        try:
-            return "".join([t async for t in providers.stream_chain(order, messages, used, max_tokens=4096)])
-        except providers.Unavailable as e:
-            used["fallback"] = str(e)
-    if PROVIDER == "mock":
-        return _mock(messages)
-    return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
-
-
 def _mock(messages: list[dict]) -> str:
     """Agent de test : lit le premier fichier, ajoute un commentaire, termine."""
     turns = sum(1 for m in messages if m["role"] == "assistant")
@@ -270,11 +303,109 @@ def _mock(messages: list[dict]) -> str:
 
 def _trim(messages: list[dict]) -> None:
     """Garde le contexte court : les anciens résultats d'outils sont résumés."""
-    results = [i for i, m in enumerate(messages) if m["role"] == "user" and m["content"].startswith("Résultat de ")]
+    results = [i for i, m in enumerate(messages) if m["role"] == "tool"
+               or (m["role"] == "user" and str(m.get("content", "")).startswith("Résultat de "))]
     for i in results[:-6]:
         c = messages[i]["content"]
         if len(c) > 400:
             messages[i]["content"] = c[:300] + "\n… (ancien résultat raccourci)"
+
+
+async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> AsyncIterator[dict]:
+    """Boucle avec outils natifs des API (Groq, Gemini, GitHub Models…)."""
+    messages = [{"role": "system", "content": system + NATIVE_NOTE}, {"role": "user", "content": f"Tâche : {task.strip()}"}]
+    order = providers.chain(hybrid.settings()["provider"] or None, sensitive=True)
+    announced, nudges = None, 0
+    for step in range(1, MAX_STEPS + 1):
+        state["step"] = step
+        yield dict(type="thinking", step=step)
+        msg, errors = None, []
+        for p in list(order):
+            try:
+                msg = await providers.chat_tools(p, messages, TOOLS)
+                if announced != p.id:
+                    announced = p.id
+                    yield dict(type="engine", name=f"{p.name} · {providers.model_of(p)}")
+                order = [p] + [x for x in order if x is not p]   # on garde le fournisseur qui marche
+                break
+            except providers.Unavailable as e:
+                errors.append(str(e))
+                order = [x for x in order if x is not p]
+        if msg is None:
+            state["fallback"] = " ; ".join(errors) or "aucun fournisseur disponible"
+            return
+        content = re.sub(r"<think>[\s\S]*?</think>", "", msg.get("content") or "").strip()
+        calls = msg.get("tool_calls") or []
+        if not calls:
+            if content and (nudges >= 1 or step > 1):
+                # réponse directe sans outil : on la prend comme conclusion
+                yield dict(type="action", step=step, thought="", tool="done", args={})
+                state.update(summary=content, finished=True)
+                return
+            nudges += 1
+            if content:
+                yield dict(type="thought", step=step, text=content[:600])
+            messages.append({"role": "assistant", "content": content or "…"})
+            messages.append({"role": "user", "content": "Utilise les outils (list, read, search…) pour explorer le projet, puis termine par done."})
+            continue
+        messages.append({"role": "assistant", "content": content or None, "tool_calls": calls})
+        for i, c in enumerate(calls):
+            fn = (c.get("function") or {})
+            tool = str(fn.get("name", ""))
+            try:
+                args = json.loads(fn.get("arguments") or "{}") if isinstance(fn.get("arguments"), str) else (fn.get("arguments") or {})
+            except ValueError:
+                args = {}
+            yield dict(type="action", step=step, thought=content if i == 0 else "", tool=tool, args=_show(args))
+            if tool == "done":
+                state.update(summary=str(args.get("summary", content)), finished=True)
+                return
+            res = _exec(ws, tool, args)
+            yield dict(type="result", step=step, tool=tool, ok=_is_ok(res), text=res[:1500])
+            messages.append({"role": "tool", "tool_call_id": c.get("id") or f"call_{step}_{i}", "content": res})
+        _trim(messages)
+    state["finished"] = True
+    yield dict(type="info", message=f"Limite de {MAX_STEPS} étapes atteinte : voici ce qui a été fait.")
+
+
+async def _run_text(ws: "Workspace", system: str, task: str, state: dict) -> AsyncIterator[dict]:
+    """Boucle au format texte (```action```) : modèle local, ou API sans outils natifs."""
+    note = ""
+    if ws.changes:
+        note = "\n\nModifications déjà préparées : " + ", ".join(sorted(ws.changes)) + " (relis-les avant d'aller plus loin)."
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": f"Tâche : {task.strip()}{note}"}]
+    bad = 0
+    for step in range(state.get("step", 0) + 1, MAX_STEPS + 1):
+        yield dict(type="thinking", step=step)
+        try:
+            if PROVIDER == "mock":
+                reply = _mock(messages)
+            else:
+                reply = "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
+        except Exception as e:  # noqa: BLE001
+            yield dict(type="error", message=f"Le modèle n'a pas répondu : {e}")
+            return
+        thought, action = _parse(reply)
+        messages.append({"role": "assistant", "content": reply})
+        if not action or "tool" not in action:
+            bad += 1
+            yield dict(type="thought", step=step, text=thought or reply[:500])
+            if bad >= 3:
+                yield dict(type="error", message="L'agent ne respecte pas le format d'action : arrêt.")
+                return
+            messages.append({"role": "user", "content": "Résultat de format : réponse invalide. Termine par UNE action dans un bloc ```action {json}```."})
+            continue
+        bad = 0
+        tool = str(action.get("tool"))
+        yield dict(type="action", step=step, thought=thought, tool=tool, args=_show(action))
+        if tool == "done":
+            state["summary"] = str(action.get("summary", ""))
+            return
+        res = _exec(ws, tool, action)
+        yield dict(type="result", step=step, tool=tool, ok=_is_ok(res), text=res[:1500])
+        messages.append({"role": "user", "content": f"Résultat de {tool} :\n{res}"})
+        _trim(messages)
+    yield dict(type="info", message=f"Limite de {MAX_STEPS} étapes atteinte : voici ce qui a été fait.")
 
 
 async def run(cid: int, task: str, engine: str = "remote") -> AsyncIterator[dict]:
@@ -284,61 +415,23 @@ async def run(cid: int, task: str, engine: str = "remote") -> AsyncIterator[dict
     yield dict(type="start", id=rid, engine=eng, info=why, writable=_writable(ws.col))
     listing = ws.all_paths()
     files = "\n".join(listing[:150]) + (f"\n… ({len(listing)} fichiers au total)" if len(listing) > 150 else "")
-    messages = [{"role": "system", "content": SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)")},
-                {"role": "user", "content": f"Tâche : {task.strip()}"}]
-    summary, bad = "", 0
-    for step in range(1, MAX_STEPS + 1):
-        used: dict = {}
-        yield dict(type="thinking", step=step)
-        try:
-            reply = await _ask(messages, eng, used)
-        except Exception as e:  # noqa: BLE001
-            yield dict(type="error", message=f"Le modèle n'a pas répondu : {e}")
-            break
-        if used.get("fallback"):
+    system = SYSTEM.format(name=ws.col["name"], tree=library.tree(cid, 80), files=files or "(aucun)")
+    summary, finished = "", False
+    step = 0
+    if eng == "remote":
+        state: dict = {}
+        async for ev in _run_native(ws, system, task, state):
+            yield ev
+        step, summary, finished = state.get("step", 0), state.get("summary", ""), state.get("finished", False)
+        if not finished and state.get("fallback"):
             eng = "local"
-            yield dict(type="info", message=f"API indisponible ({used['fallback'][:150]}) : l'agent continue en local.")
-        elif used.get("name"):
-            yield dict(type="engine", name=f"{used['name']} · {used.get('model', '')}")
-        thought, action = _parse(reply)
-        messages.append({"role": "assistant", "content": reply})
-        if not action or "tool" not in action:
-            bad += 1
-            yield dict(type="thought", step=step, text=thought or reply[:500])
-            if bad >= 3:
-                yield dict(type="error", message="L'agent ne respecte pas le format d'action : arrêt.")
-                break
-            messages.append({"role": "user", "content": "Résultat de format : réponse invalide. Termine par UNE action dans un bloc ```action {json}```."})
-            continue
-        bad = 0
-        tool = str(action.get("tool"))
-        yield dict(type="action", step=step, thought=thought, tool=tool,
-                   args={k: (v if k not in ("content", "new", "old") else f"{len(str(v).splitlines())} ligne(s)")
-                         for k, v in action.items() if k != "tool"})
-        if tool == "done":
-            summary = str(action.get("summary", ""))
-            break
-        try:
-            if tool == "list":
-                res = ws.t_list(str(action.get("dir", "")))
-            elif tool == "read":
-                res = ws.t_read(str(action.get("path", "")), action.get("start"), action.get("end"))
-            elif tool == "search":
-                res = ws.t_search(str(action.get("query", "")))
-            elif tool == "edit":
-                res = ws.t_edit(str(action.get("path", "")), str(action.get("old", "")), str(action.get("new", "")))
-            elif tool == "write":
-                res = ws.t_write(str(action.get("path", "")), str(action.get("content", "")))
-            else:
-                res = f"Outil inconnu : {tool}. Outils : list, read, search, edit, write, done."
-        except (ValueError, OSError) as e:
-            res = f"Erreur : {e}"
-        ok = not res.startswith(("Erreur", "Fichier introuvable", "« old »", "Lis d'abord", "Outil inconnu"))
-        yield dict(type="result", step=step, tool=tool, ok=ok, text=res[:1500])
-        messages.append({"role": "user", "content": f"Résultat de {tool} :\n{res}"})
-        _trim(messages)
-    else:
-        yield dict(type="info", message=f"Limite de {MAX_STEPS} étapes atteinte : voici ce qui a été fait.")
+            yield dict(type="info", message=f"API indisponible ({state['fallback'][:180]}) : l'agent continue en local"
+                                            + (" (les modifications déjà préparées sont conservées)." if ws.changes else "."))
+    if eng == "local" and not finished:
+        state = {"step": step}
+        async for ev in _run_text(ws, system, task, state):
+            yield ev
+        summary = state.get("summary", "")
     files = ws.diffs()
     _runs[rid] = {"cid": cid, "files": {f["path"]: (ws.original.get(f["path"]), ws.changes[f["path"]]) for f in files},
                   "at": time.time()}
