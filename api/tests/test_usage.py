@@ -8,12 +8,12 @@ from conftest import chat
 def test_calls_are_journaled_and_summarized(client):
     from app import usage
 
-    before = sum(s["calls"] for s in usage.summary())
+    def local_ok():
+        return next((s["ok"] for s in usage.summary() if s["provider"] == "local"), 0)
+    before, ok_before = sum(s["calls"] for s in usage.summary()), local_ok()
     chat(client, "Bonjour")
-    after = usage.summary()
-    assert sum(s["calls"] for s in after) == before + 1
-    local = next(s for s in after if s["provider"] == "local")
-    assert local["ok"] >= 1 and local["success"] == 100
+    assert sum(s["calls"] for s in usage.summary()) == before + 1
+    assert local_ok() == ok_before + 1          # l'appel du chat est compté comme réussi
     r = client.get("/api/usage").json()
     assert {"summary", "providers", "timeline", "recent", "prefs", "tasks"} <= set(r)
     assert r["recent"][0]["provider"] == "local"

@@ -117,6 +117,7 @@ def _storage() -> list[dict]:
         age = (time.time() - last[0]["created_at"]) / 3600
         out.append(_c("Sauvegarde", "ok" if age < 30 else "warn",
                       f"dernière il y a {age:.0f} h · {len(last)} copie(s)", "" if age < 30 else "vérifie les logs de sauvegarde"))
+    out.append(_offsite())
     out.append(_c("Lecture des scans (OCR)", "ok" if ocr.pdf_available() else "warn",
                   f"Tesseract ({ocr.LANGS})" if ocr.pdf_available() else "absent : PDF scannés et images illisibles",
                   "" if ocr.pdf_available() else "./update.sh (reconstruit l'image avec Tesseract)"))
@@ -137,6 +138,24 @@ def _storage() -> list[dict]:
                   f"{len(cols)} collection(s), {sum(c['chunks'] for c in cols)} passages"
                   + (f" · en erreur : {', '.join(errs)}" if errs else ""), "Bibliothèque → voir le message d'erreur" if errs else ""))
     return out
+
+
+def _offsite() -> dict:
+    from . import offsite
+    st = offsite.status()
+    name = f"Copie sur {st['target']}"
+    if not st["configured"]:
+        return _c(name, "off", "non configurée", "README → Sauvegarde sur un NAS")
+    if not st["reachable"]:
+        return _c(name, "error", f"{st['dir']} non monté ou en lecture seule", "vérifie que le NAS est allumé (docker compose logs atom)")
+    if st.get("last_verify_ok") is False:
+        return _c(name, "error", f"test de restauration en échec : {st.get('last_verify_error', '')[:80]}", "Réglages → Sauvegarde → Vérifier")
+    age = (time.time() - st["last_push"]) / 3600 if st.get("last_push") else None
+    if age is None or age > 30:
+        return _c(name, "warn", "aucune copie récente" if age is None else f"dernière copie il y a {age:.0f} h",
+                  st.get("last_error") or "Réglages → Sauvegarde → Envoyer maintenant")
+    ver = f" · vérifiée il y a {(time.time() - st['last_verify']) / 86400:.0f} j" if st.get("last_verify") else ""
+    return _c(name, "ok", f"{st['count']} copie(s) chiffrée(s), dernière il y a {age:.0f} h{ver}")
 
 
 async def report() -> dict:

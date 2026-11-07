@@ -141,6 +141,7 @@ test("consommation : les appels apparaissent en direct", async ({ page }) => {
   await expect(page.locator("#usFeed li").first()).toContainText("Local");
   await expect(page.locator("#usProv")).toContainText("Local (Ollama)");
   await expect(page.locator(".us-tile").first()).toContainText("Appels");
+  await expect(page.locator("#alInfo")).toContainText("quota atteint");
   // Un appel pendant que la rubrique est ouverte : il doit arriver par le flux, sans rechargement.
   const n = await page.locator("#usFeed li:not(.none)").count();
   await page.evaluate(async () => {
@@ -164,5 +165,36 @@ test("mode Code et bibliothèque s'ouvrent sans erreur", async ({ page }) => {
   await page.evaluate(() => showView("library"));
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => showView("chat"));
+  expect(errors).toEqual([]);
+});
+
+test("sauvegarde : copie chiffrée sur le NAS, puis test de restauration", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => openSettings("backup"));
+  await expect(page.locator("#nasTitle")).toHaveText("Copie sur NAS-VinX");
+  await expect(page.locator("#nasState")).toContainText("joignable");
+  await page.click("#nasPush");
+  await expect(page.locator("#nasList li:not(.none)")).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator("#nasList")).toContainText(".db.enc");
+  await page.click("#nasVerify");
+  await expect(page.locator("#nasState")).toContainText("réussi", { timeout: 15_000 });
+  expect(errors).toEqual([]);
+});
+
+test("tableau de bord : Grafana affiché dans l'interface, à travers Atom", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.click("#navDash");
+  await expect(page.locator("#title")).toHaveText("Tableau de bord");
+  const frame = page.frameLocator("#dashFrame");
+  await expect(frame.locator("#g")).toHaveText("Grafana factice", { timeout: 10_000 });
+  await expect(frame.locator("#path")).toContainText("/grafana/d/atom/atom");
+  await expect(frame.locator("#path")).toContainText("kiosk");
+  await expect(frame.locator("#cookie")).toHaveText("aucun cookie");          // la session d'Atom ne part pas chez Grafana
+  await page.click('#dashRange button[data-r="now-7d"]');
+  await expect(frame.locator("#path")).toContainText("from=now-7d");
+  await page.click("#navDash");                                              // retour à la discussion
+  await expect(page.locator("#dashView")).toBeHidden();
   expect(errors).toEqual([]);
 });

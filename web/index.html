@@ -30,6 +30,7 @@
     <div class="side-nav">
       <button id="navLib"><span data-i="library"></span>Bibliothèque</button>
       <button id="navCode"><span data-i="code"></span>Code</button>
+      <button id="navDash"><span data-i="pulse"></span>Tableau de bord</button>
       <button data-goto="memory"><span data-i="memory"></span>Souvenirs<span class="count" id="navMem"></span></button>
       <button data-goto="reminders"><span data-i="clock"></span>Rappels<span class="count" id="navRem"></span></button>
     </div>
@@ -131,6 +132,15 @@
       </div>
     </section>
     <div id="quickOpen" class="qo" hidden><div class="qo-box"><input class="field" id="qoIn" placeholder="Ouvrir un fichier… (tape une partie du nom)" spellcheck="false" autocomplete="off"><div id="qoList" class="qo-list"></div></div></div>
+    <section id="dashView" hidden>
+      <div class="dash-bar">
+        <div class="seg" id="dashRange"><button data-r="now-1h">1 h</button><button data-r="now-24h" class="on">24 h</button><button data-r="now-7d">7 jours</button><button data-r="now-30d">30 jours</button></div>
+        <span class="dash-src" id="dashSrc"></span>
+        <button class="btn sm" id="dashOpen" title="Ouvrir Grafana dans un nouvel onglet">Ouvrir dans Grafana</button>
+      </div>
+      <iframe id="dashFrame" title="Tableau de bord Grafana d'Atom" hidden></iframe>
+      <div id="dashOff" class="dash-off" hidden></div>
+    </section>
     <section id="libView" hidden>
       <aside class="lib-side">
         <div class="lib-cols" id="libCols"></div>
@@ -378,7 +388,7 @@
         <div class="block">
           <h4>Fournisseurs</h4>
           <p class="desc">Quota du jour, réussite et délai avant le premier mot, mesurés sur les vrais appels.</p>
-          <div class="tbl us-tbl"><table><thead><tr><th>Fournisseur</th><th>Appels</th><th>Réussite</th><th title="entrée / sortie">Tokens</th><th title="délai avant le premier mot">1er mot</th><th>Quota du jour</th><th>Coût</th></tr></thead><tbody id="usProv"></tbody></table></div>
+          <div class="tbl us-tbl" tabindex="0" role="region" aria-label="Fournisseurs : appels, réussite, tokens, quota et coût"><table><thead><tr><th>Fournisseur</th><th>Appels</th><th>Réussite</th><th title="entrée / sortie">Tokens</th><th title="délai avant le premier mot">1er mot</th><th>Quota du jour</th><th>Coût</th></tr></thead><tbody id="usProv"></tbody></table></div>
         </div>
         <div class="block">
           <h4>Routage intelligent</h4>
@@ -386,6 +396,12 @@
           <div class="us-prefs" id="usPrefs"></div>
           <div class="row" style="margin-top:12px"><input class="field" id="usTry" placeholder="Tester : écris une demande pour voir quel modèle répondrait, et pourquoi"><button class="btn" id="usTryGo">Tester</button></div>
           <div id="usTryOut" class="us-try"></div>
+        </div>
+        <div class="block">
+          <h4>Alertes</h4>
+          <p class="desc" id="alInfo"></p>
+          <div class="row"><button class="btn" id="alTest">Envoyer une notification d'essai</button></div>
+          <ul class="list" id="alList" style="margin-top:12px"></ul>
         </div>
         <div class="block">
           <h4>Derniers appels</h4>
@@ -427,6 +443,16 @@
           </div>
           <ul class="list" id="bkList" style="margin-top:14px"></ul>
           <p class="note">Avant toute restauration, l'état actuel est sauvegardé automatiquement : rien n'est perdu par erreur. Garde de temps en temps une copie téléchargée hors du serveur.</p>
+        </div>
+        <div class="block">
+          <h4 id="nasTitle">Copie sur le NAS</h4>
+          <p class="desc" id="nasInfo">Une copie chiffrée de chaque sauvegarde part sur ton NAS, et Atom vérifie chaque semaine qu'elle se restaure.</p>
+          <div class="nas-state" id="nasState"></div>
+          <div class="row" style="flex-wrap:wrap;margin-top:10px" id="nasActs">
+            <button class="btn primary" id="nasPush">Envoyer maintenant</button>
+            <button class="btn" id="nasVerify">Tester la restauration</button>
+          </div>
+          <ul class="list" id="nasList" style="margin-top:14px"></ul>
         </div>
       </section>
 

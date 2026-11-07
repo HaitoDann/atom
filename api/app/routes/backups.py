@@ -6,7 +6,7 @@ import time
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 
-from .. import backup
+from .. import backup, offsite
 
 router = APIRouter()
 
@@ -65,3 +65,41 @@ async def import_db(request: Request):
         raise HTTPException(400, str(e)) from e
     finally:
         tmp.unlink(missing_ok=True)
+
+
+# ---- copie chiffrée sur le NAS
+
+
+@router.get("/api/offsite")
+def offsite_status():
+    return offsite.status()
+
+
+@router.post("/api/offsite/push")
+def offsite_push():
+    """Sauvegarde maintenant et envoie la copie chiffrée sur le NAS."""
+    if not offsite.configured():
+        raise HTTPException(400, "Copie sur le NAS non configurée : voir README → Sauvegarde sur un NAS.")
+    info = backup.create("manual")
+    try:
+        return {**offsite.push(backup.path_of(info["name"])), "status": offsite.status()}
+    except (OSError, RuntimeError) as e:
+        raise HTTPException(502, str(e)) from e
+
+
+@router.post("/api/offsite/verify")
+def offsite_verify():
+    try:
+        return {**offsite.verify(), "status": offsite.status()}
+    except (OSError, RuntimeError, ValueError) as e:
+        raise HTTPException(502, f"Vérification impossible : {e}") from e
+
+
+@router.post("/api/offsite/{name}/restore")
+def offsite_restore(name: str):
+    try:
+        return offsite.restore(name)
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Copie introuvable") from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e

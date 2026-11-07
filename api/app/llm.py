@@ -100,10 +100,13 @@ async def _stream_chat(model: str, messages: list[dict]) -> AsyncIterator[str]:
                     break
 
 
-async def json_chat(model: str, messages: list[dict], schema: dict) -> dict:
-    """Appel non streamé avec sortie JSON contrainte par un schéma."""
+async def json_chat(model: str, messages: list[dict], schema: dict, task: str = "memoire") -> dict:
+    """Appel non streamé avec sortie JSON contrainte par un schéma (mémorisation, classement…).
+    Journalisé comme appel « local » de tâche `task` : le travail en coulisse compte aussi dans la consommation."""
+    from . import usage
     if PROVIDER == "mock":
         return {}
+    t0 = time.time()
     payload = {
         "model": model,
         "messages": messages,
@@ -112,11 +115,18 @@ async def json_chat(model: str, messages: list[dict], schema: dict) -> dict:
         "format": schema,
         "options": _opts(temperature=0.1, num_predict=400),
     }
-    async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
-        r = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
-    if r.status_code != 200:
-        _raise_for(r.status_code, r.text, model)
-    content = r.json().get("message", {}).get("content", "")
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
+            r = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
+        if r.status_code != 200:
+            _raise_for(r.status_code, r.text, model)
+        data = r.json()
+    except Exception as e:
+        usage.record("local", model=model, task=task, ok=False, total_s=time.time() - t0, error=str(e) or e.__class__.__name__)
+        raise
+    usage.record("local", model=model, task=task, ok=True, total_s=time.time() - t0,
+                 prompt_tokens=data.get("prompt_eval_count"), completion_tokens=data.get("eval_count"))
+    content = data.get("message", {}).get("content", "")
     content = re.sub(r"<think>[\s\S]*?</think>", "", content).strip()
     try:
         return json.loads(content)
@@ -133,7 +143,9 @@ async def embed(texts: list[str], kind: str = "document") -> list[np.ndarray] | 
         return []
     if PROVIDER == "mock":
         return [_mock_vec(t) for t in texts]
+    from . import usage
     prefix = "search_query: " if kind == "query" else "search_document: "
+    t0 = time.time()
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(10, read=300)) as client:
             r = await client.post(
@@ -142,10 +154,17 @@ async def embed(texts: list[str], kind: str = "document") -> list[np.ndarray] | 
                       "options": {k: v for k, v in _opts().items() if k == "num_thread"}},
             )
         if r.status_code != 200:
+            usage.record("local", model=EMBED_MODEL, task="embedding", ok=False, total_s=time.time() - t0,
+                         error=f"Ollama a répondu {r.status_code} : {r.text[:120]}")
             return None
-        vecs = r.json().get("embeddings") or []
-    except (httpx.HTTPError, ValueError):
+        data = r.json()
+        vecs = data.get("embeddings") or []
+    except (httpx.HTTPError, ValueError) as e:
+        usage.record("local", model=EMBED_MODEL, task="embedding", ok=False, total_s=time.time() - t0,
+                     error=f"Ollama injoignable ({e.__class__.__name__})")
         return None
+    usage.record("local", model=EMBED_MODEL, task="embedding", ok=True, total_s=time.time() - t0,
+                 prompt_tokens=data.get("prompt_eval_count"), reason=f"{len(texts)} texte(s) · {kind}")
     out = []
     for v in vecs:
         a = np.asarray(v, dtype=np.float32)

@@ -6,3 +6,4 @@ httpx>=0.28,<0.29
 numpy>=2.5,<3
 tzdata>=2026.6
 pypdf>=7,<8
+cryptography>=46,<51      # chiffrement des copies de sauvegarde envoyées sur le NAS
