@@ -373,12 +373,21 @@ Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans p
 
 - **Atom décide** : s'il ne connaît pas la réponse (actualité, prix, météo, horaires…), il lance lui-même une recherche. Réglages → Général → « Atom cherche de lui-même » pour couper ce comportement.
 - **Tu forces** : le bouton globe sous la saisie déclenche une recherche pour ce message.
-- Pendant la recherche, des fragments bleus convergent vers la sphère.
 - Pour désactiver complètement : `ATOM_SEARXNG_URL=` (vide) dans `.env`.
 
 ## L'entité
 
-- **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
+- **États de la maille** (volontairement peu nombreux et bien distincts) :
+  - **Veille** : gris, respiration lente.
+  - **Réflexion** : violet, dilatée.
+  - **Réponse** : vert, elle bat au rythme des mots.
+  - **Satisfaction** : ambre.
+  - **Curiosité** : cyan, en spirale.
+  - **Préoccupé** : bleu terne, contractée.
+  - **Erreur** : rouge, brève secousse puis retour à la veille.
+  - **Sommeil** : éteinte, presque immobile.
+  - **Travail long** (recherche, indexation, lecture, agent, IA distante, atelier) : une seule animation, des signaux plus nombreux et plus gros qui parcourent la maille, teintée selon la source (bleu pour le web, blanc pour les documents, lavande pour une IA distante, ambre pour l'atelier ou l'agent).
+  - En permanence, seulement la respiration, le regard qui suit la souris et un léger frémissement quand tu tapes.
 - **Apparence : maillage** (par défaut) — la sphère est un réseau de ~360 nœuds régulièrement répartis et reliés à leurs voisins, l'arrière estompé dans la profondeur, une poussière intérieure discrète, et des **signaux lumineux** qui parcourent les liens (rares au repos, nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA). Toutes les émotions et animations s'appliquent au réseau ; dans l'atelier, les liens entre amas se rompent. Réglages → Entité → « Fragments » pour revenir à la sphère de poussière d'origine.
 - **Apparence : planète** : une planète vivante dessinée au trait, en monochrome.
   - Des continents aux côtes irrégulières, avec des lignes de relief et des montagnes, des vagues sur les océans et une face de nuit en hachures. L'atmosphère respire, des nuages dérivent plus vite que la surface et une lune tourne sur une orbite en pointillés.
@@ -386,8 +395,6 @@ Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans p
   - Les humeurs passent par la météo : tempête en spirale en réflexion ou par curiosité, aurores aux pôles en activité ou de joie, éclairs et rotation rapide en colère, pluie en tristesse, nuit plus profonde en sommeil.
   - Pour les grosses tâches (recherche, atelier, agent), des satellites tournent autour d'elle et envoient des signaux vers la surface.
   - Réglages → Atom → Entité → « Planète ».
-- Situations : **consulter une IA distante** (ondes de fragments lavande qui partent de la sphère), **atelier** (la sphère se divise en amas qui tournent ensemble, celui qui travaille s'éclaire, puis ils fusionnent pour la réponse finale), **lecture** de code ou de documents (les fragments se rangent en lignes, un balayage lumineux les parcourt), **indexation** (fragments blancs absorbés), **sauvegarde** (contraction et anneau qui se referme), **secours ou erreur** (brève perturbation par bandes). Toutes prévisualisables dans Réglages → Entité.
-- Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation.
 
 ## Accéder à Atom hors de chez toi (Tailscale)
 

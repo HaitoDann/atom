@@ -28,7 +28,7 @@ LIMIT = 4000      # Telegram : 4096 caractères max par message
 
 REACTIONS = {
     "joy": "😁", "sad": "😢", "angry": "😡", "surprise": "🤯",
-    "fear": "😨", "thinking": "🤔", "sleep": "😴",
+    "fear": "😨", "thinking": "🤔", "sleep": "😴", "concerned": "😕", "curious": "🧐",
 }
 
 HELP = (

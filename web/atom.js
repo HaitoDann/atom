@@ -49,21 +49,19 @@ document.querySelectorAll(".topbar .iconbtn[title], .composer .iconbtn[title], .
    ÉTATS ÉMOTIONNELS — seule source de couleur de l'interface
    ============================================================ */
 const ACTIVITIES = {
-  idle:     { label: "Veille",     color: [196, 202, 212], radius: 1.0,  oscAmp: 3,   oscFreq: 0.9,  pulse: 0,     stretchY: 1,    spike: 0,    dim: 0.8  },
-  thinking: { label: "Réflexion",  color: [160, 140, 230], radius: 1.55, oscAmp: 14,  oscFreq: 0.5,  pulse: 0,     stretchY: 1,    spike: 0.06, dim: 0.55 },
-  talking:  { label: "Réponse",    color: [150, 200, 175], radius: 0.96, oscAmp: 6,   oscFreq: 1.6,  pulse: 0.04,  stretchY: 1,    spike: 0,    dim: 0.9  },
-  joy:      { label: "Joie",       color: [235, 170, 110], radius: 1.05, oscAmp: 8,   oscFreq: 2.2,  pulse: 0.08,  stretchY: 0.96, spike: 0,    dim: 1.0  },
-  angry:    { label: "Colère",     color: [235, 62, 62],   radius: 1.08, oscAmp: 16,  oscFreq: 6.5,  pulse: 0.05,  stretchY: 1.04, spike: 0.24, dim: 0.95, jitter: 5, spin: 1.8 },
-  sad:      { label: "Tristesse",  color: [115, 140, 205], radius: 0.86, oscAmp: 1.4, oscFreq: 0.35, pulse: 0,     stretchY: 0.8,  spike: 0,    dim: 0.55, spin: 0.4 },
-  surprise: { label: "Surprise",   color: [150, 220, 235], radius: 1.35, oscAmp: 10,  oscFreq: 3.4,  pulse: 0,     stretchY: 1.25, spike: 0.04, dim: 1.0  },
-  fear:     { label: "Inquiétude", color: [190, 150, 225], radius: 0.8,  oscAmp: 2.5, oscFreq: 5.2,  pulse: 0,     stretchY: 0.9,  spike: 0.02, dim: 0.65, jitter: 1.2 },
-  sleep:    { label: "Sommeil",    color: [120, 128, 150], radius: 0.82, oscAmp: 0.9, oscFreq: 0.22, pulse: 0.015, stretchY: 0.85, spike: 0,    dim: 0.45 },
-  curious:  { label: "Curiosité",  color: [130, 205, 225], radius: 1.12, oscAmp: 6,   oscFreq: 1.2,  pulse: 0.02,  stretchY: 1.05, spike: 0,    dim: 0.95, swirl: 0.8, spin: 1.6 },
-  focus:    { label: "Concentration", color: [205, 210, 220], radius: 0.9, oscAmp: 1.8, oscFreq: 2.6, pulse: 0,    stretchY: 1,    spike: 0,    dim: 1.0,  spin: 3.2 },
-  content:  { label: "Bien-être",  color: [236, 188, 150], radius: 0.95, oscAmp: 1.4, oscFreq: 0.6,  pulse: 0.03,  stretchY: 0.97, spike: 0,    dim: 1.0,  purr: 1 },
+  idle:      { label: "Veille",       color: [196, 202, 212], radius: 1.0,  oscAmp: 3,   oscFreq: 0.8,  pulse: 0,     stretchY: 1,    spike: 0,    dim: 0.8  },
+  thinking:  { label: "Réflexion",    color: [160, 140, 230], radius: 1.4,  oscAmp: 11,  oscFreq: 0.5,  pulse: 0,     stretchY: 1,    spike: 0.05, dim: 0.65, spin: 1.3 },
+  talking:   { label: "Réponse",      color: [150, 200, 175], radius: 0.98, oscAmp: 5,   oscFreq: 1.5,  pulse: 0.05,  stretchY: 1,    spike: 0,    dim: 0.92 },
+  joy:       { label: "Satisfaction", color: [236, 178, 120], radius: 1.06, oscAmp: 6,   oscFreq: 2.0,  pulse: 0.09,  stretchY: 0.97, spike: 0,    dim: 1.0  },
+  curious:   { label: "Curiosité",    color: [130, 205, 225], radius: 1.1,  oscAmp: 5,   oscFreq: 1.1,  pulse: 0.02,  stretchY: 1.04, spike: 0,    dim: 0.95, swirl: 0.8, spin: 1.6 },
+  concerned: { label: "Préoccupé",    color: [118, 138, 190], radius: 0.86, oscAmp: 1.6, oscFreq: 0.4,  pulse: 0,     stretchY: 0.88, spike: 0,    dim: 0.6,  spin: 0.45 },
+  error:     { label: "Erreur",       color: [232, 70, 66],   radius: 1.04, oscAmp: 12,  oscFreq: 6,    pulse: 0.04,  stretchY: 1.02, spike: 0.18, dim: 0.95, jitter: 4, spin: 1.6 },
+  sleep:     { label: "Sommeil",      color: [120, 128, 150], radius: 0.82, oscAmp: 0.8, oscFreq: 0.2,  pulse: 0.012, stretchY: 0.86, spike: 0,    dim: 0.42 },
 };
+// Anciennes émotions (réponses enregistrées, ancien modèle) → jeu réduit
+const EMO_ALIAS = { angry: "concerned", sad: "concerned", fear: "concerned", surprise: "curious", focus: "thinking", content: "joy" };
 const EMOTIONS = Object.keys(ACTIVITIES);
-const VALENCE = { joy: 1, content: 0.8, curious: 0.4, surprise: 0.35, talking: 0.15, focus: 0.1, idle: 0.1, thinking: 0, sleep: -0.05, fear: -0.6, angry: -0.8, sad: -1 };
+const VALENCE = { joy: 1, curious: 0.4, talking: 0.15, idle: 0.1, thinking: 0, sleep: -0.05, concerned: -0.6, error: -0.8 };
 
 /* ============================================================
    ENTITÉ — sphère de fragments, un « familier » vivant
@@ -85,12 +83,15 @@ const entity = {
   fly: { p: 0, from: 0, to: 0, start: 0, dur: 900, active: false, onEnd: null },
   screen: { x: 0, y: 0, r: 0 },   // centre et rayon de la sphère à l'écran (pour les animations DOM)
 };
+let errorTimer = 0;
 function setEmotion(e) {
+  e = EMO_ALIAS[e] || e;
   if (!ACTIVITIES[e]) e = "talking";
   if (entity.activity === e) return;
   entity.activity = e;
-  entity.rippleT = 0;
   $("emoName").textContent = ACTIVITIES[e].label;
+  clearTimeout(errorTimer);
+  if (e === "error") errorTimer = setTimeout(() => { if (entity.activity === "error") setEmotion("idle"); }, 2600);   // l'erreur est brève
 }
 function setEntityState(t) { $("emoState").textContent = t; }
 
@@ -173,7 +174,7 @@ function setEntityState(t) { $("emoState").textContent = t; }
   for (let i = 0; i < N && orbNodes.length < 18; i++) if (isOrb[i]) orbNodes.push(i);
   orbNodes.sort((a, b) => phase[a] - phase[b]);
   // Signaux : de la lumière qui voyage le long des liens.
-  const SIG = 40, sgE = new Int32Array(SIG).fill(-1), sgT = new Float32Array(SIG), sgV = new Float32Array(SIG);
+  const SIG = 90, sgE = new Int32Array(SIG).fill(-1), sgT = new Float32Array(SIG), sgV = new Float32Array(SIG);
   let sigAcc = 0;
   const bucketPaths = Array.from({ length: 10 }, () => null);
 
@@ -476,28 +477,24 @@ function setEntityState(t) { $("emoState").textContent = t; }
 
 
     // ---- micro-comportements
-    if (isIdle && !typing && entity.pet < 0.1) {
-      nextBlink -= dt; nextGlance -= dt;
-      if (nextBlink <= 0) { entity.blink = 1; nextBlink = 7 + Math.random() * 14; }
-      if (nextGlance <= 0 && !entity.hover) {
-        gaze.tx = (Math.random() - 0.5) * 22; gaze.ty = (Math.random() - 0.5) * 12;
-        nextGlance = 6 + Math.random() * 10;
-        setTimeout(() => { if (!entity.hover) { gaze.tx = 0; gaze.ty = 0; } }, 1400 + Math.random() * 1200);
-      }
-    }
     if (typing && P < 0.5) { gaze.tx = -16; gaze.ty = 9; }
     gaze.x += (gaze.tx - gaze.x) * Math.min(1, dt * 3);
     gaze.y += (gaze.ty - gaze.y) * Math.min(1, dt * 3);
     entity.blink = Math.max(0, entity.blink - dt * 6);
     entity.keyKick *= Math.exp(-dt * 7);
+    // ---- une seule animation « travail long » : recherche, indexation, lecture, agent, IA distante, atelier
+    if (entity.glitch > 0.5) setEmotion("error");          // ancien signal d'erreur → état Erreur
+    const work = entity.feeding || entity.remote || entity.split > 0 || entity.scan;
+    entity.workC = entity.remote ? [205, 195, 255] : entity.split > 0 ? [236, 190, 130] : entity.scan ? [225, 225, 232] : entity.feeding ? entity.feedColor : (entity.workC || [110, 170, 255]);
+    entity.workK = (entity.workK || 0) + ((work ? 1 : 0) - (entity.workK || 0)) * Math.min(1, dt * 2.5);
+    entity.blink = 0; entity.grow = 0; entity.seal = 0; entity.glitch = 0; entity.absorb = 0; entity.rippleT = 99;
+    entity.remote = entity.remote; entity.mood = 0; entity.night = false; entity.load = 0;
     entity.absorb *= Math.exp(-dt * 2.2);
     entity.tokenKick *= Math.exp(-dt * 9);
     entity.grow *= Math.exp(-dt * 0.9);
     entity.glitch *= Math.exp(-dt * 2.5);
     entity.seal *= Math.exp(-dt * 1.4);
-    entity.remoteK += ((entity.remote ? 1 : 0) - entity.remoteK) * Math.min(1, dt * 3);
-    entity.scanK += ((entity.scan ? 1 : 0) - entity.scanK) * Math.min(1, dt * 3);
-    entity.splitK += ((entity.split ? 1 : 0) - entity.splitK) * Math.min(1, dt * (entity.split ? 1.6 : 2.4));
+    entity.remoteK = 0; entity.scanK = 0; entity.splitK = 0;   // anciennes animations (ondes, lignes, amas) retirées
 
     // ---- cible : émotion, puis caresse, humeur, nuit, charge, attention
     const T = { r: A.color[0], g: A.color[1], b: A.color[2] };
@@ -509,8 +506,11 @@ function setEntityState(t) { $("emoState").textContent = t; }
     }
     if (entity.night) { T.dim *= 0.72; T.r *= 0.86; T.g *= 0.9; T.oscFreq *= 0.75; }
     if (typing) { T.radius *= 1.04; T.dim = Math.min(1, T.dim + 0.12); }
-    if (entity.hover) T.dim = Math.min(1, T.dim + 0.08);
-    if (entity.feeding) { T.radius *= 1.06; T.spin *= 1.8; T.r += (110 - T.r) * 0.35; T.g += (170 - T.g) * 0.35; T.b += (255 - T.b) * 0.35; }
+    if (entity.workK > 0.01) {
+      const w = entity.workK, c = entity.workC;
+      T.radius *= 1 + 0.05 * w; T.spin *= 1 + 0.6 * w; T.dim = Math.min(1, T.dim + 0.1 * w);
+      T.r += (c[0] - T.r) * 0.3 * w; T.g += (c[1] - T.g) * 0.3 * w; T.b += (c[2] - T.b) * 0.3 * w;   // la maille prend un peu la couleur de la source
+    }
     T.radius *= 1 - entity.snuggle * 0.16;
     if (entity.remoteK > 0.01) { const w = entity.remoteK * 0.45; T.r += (205 - T.r) * w; T.g += (195 - T.g) * w; T.b += (255 - T.b) * w; T.spin *= 1 + entity.remoteK * 0.8; }
     if (entity.scanK > 0.01) { T.spin *= 1 - entity.scanK * 0.85; T.oscAmp *= 1 - entity.scanK * 0.7; T.dim = Math.min(1, T.dim + 0.1 * entity.scanK); }
@@ -568,7 +568,7 @@ function setEntityState(t) { $("emoState").textContent = t; }
     }
     ctx.fillStyle = `rgb(${tint})`;
 
-    const spinSpeed = 0.16 * cur.spin * (1 + entity.load * 0.6) * (entity.hover ? 1.4 : 1) * (1 - entity.snuggle * 0.6);
+    const spinSpeed = 0.16 * cur.spin;
     entity.angle = (entity.angle || 0) + dt * spinSpeed;
     const rotY = entity.angle + gaze.x * 0.012, tilt = gaze.y * 0.01;
     const cosR = Math.cos(rotY), sinR = Math.sin(rotY), cosT = Math.cos(tilt), sinT = Math.sin(tilt), fov = 460;
@@ -707,14 +707,15 @@ function setEntityState(t) { $("emoState").textContent = t; }
       ctx.globalAlpha = 0.16 * globalA * cur.dim; ctx.stroke(ringPath);
 
       // signaux : plus nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA
-      const busyAct = entity.activity === "thinking" || entity.activity === "talking" || entity.activity === "focus" || entity.activity === "curious";
-      const rate = 1.2 + (busyAct ? 9 : 0) + entity.tokenKick * 30 + entity.remoteK * 10 + spK * 8 + (entity.feeding ? 6 : 0) + pw * 4;
+      const busyAct = entity.activity === "thinking" || entity.activity === "talking" || entity.activity === "curious";
+      const rate = 1 + (busyAct ? 7 : 0) + entity.tokenKick * 26 + entity.workK * 22;
       sigAcc += dt * rate;
       while (sigAcc >= 1) {
         sigAcc -= 1;
         for (let k = 0; k < SIG; k++) if (sgE[k] < 0) { sgE[k] = (Math.random() * edges.length) | 0; sgT[k] = 0; sgV[k] = 1.2 + Math.random() * 1.6; break; }
       }
-      ctx.fillStyle = lightT ? "#111" : "#fff";
+      const wc = entity.workC || [255, 255, 255], wk = entity.workK || 0;
+      ctx.fillStyle = wk > 0.3 ? `rgb(${lightT ? wc.map((v) => (v * 0.5) | 0).join(",") : wc.join(",")})` : lightT ? "#111" : "#fff";
       for (let k = 0; k < SIG; k++) {
         if (sgE[k] < 0) continue;
         sgT[k] += dt * sgV[k];
@@ -731,8 +732,9 @@ function setEntityState(t) { $("emoState").textContent = t; }
         const u = sgT[k], x = sxA[a] + (sxA[b] - sxA[a]) * u, y = syA[a] + (syA[b] - syA[a]) * u;
         const z = szA[a] + (szA[b] - szA[a]) * u;
         const al = Math.sin(u * Math.PI) * globalA * (z > 0 ? 0.35 : 0.95);
-        ctx.globalAlpha = al * 0.25; ctx.beginPath(); ctx.arc(x, y, 3.2 * pxSize, 0, 6.283); ctx.fill();
-        ctx.globalAlpha = al; ctx.fillRect(x - pxSize, y - pxSize, pxSize * 2, pxSize * 2);
+        const big = 1 + wk * 0.8;   // signaux plus gros pendant un travail long
+        ctx.globalAlpha = al * 0.25; ctx.beginPath(); ctx.arc(x, y, 3.2 * pxSize * big, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = al; ctx.fillRect(x - pxSize * big, y - pxSize * big, pxSize * 2 * big, pxSize * 2 * big);
       }
 
       // nœuds : petits disques, plus gros et nets à l'avant
@@ -754,7 +756,7 @@ function setEntityState(t) { $("emoState").textContent = t; }
     ctx.fillStyle = `rgb(${entity.feedColor.join(",")})`;
     let alive = 0;
     for (let i = 0; i < F; i++) {
-      if (!fa[i]) { if (entity.feeding && rand() < dt * 6) spawnFeeder(i, R0); continue; }
+      if (!fa[i]) continue;   // (fragments « nourriture » retirés : le travail passe par les signaux)
       alive++;
       const d = Math.hypot(fx[i], fy[i]) || 1;
       fv[i] += dt * 90;
@@ -822,6 +824,8 @@ function signalTo(el, delay = 0) {
 
 /* Un souvenir retenu : un fragment lumineux part du message et entre dans la sphère. */
 function memoryFlight(fromEl) {
+  return;   // animation retirée (entité plus sobre) — le souvenir s'affiche en carte sous la réponse
+
   const r = (fromEl || $("chat")).getBoundingClientRect();
   const sx = r.left + Math.min(40, r.width / 2), sy = r.top + Math.min(20, r.height / 2);
   const tx = entity.screen.x, ty = entity.screen.y;
@@ -2050,14 +2054,10 @@ for (const e of EMOTIONS) {
   $("emos").appendChild(b);
 }
 const DEMOS = [
-  ["Consulte une IA distante", () => { entity.remote = true; setTimeout(() => { entity.remote = false; }, 4000); }],
-  ["Atelier", () => { entity.split = 2; let k = 0; const it = setInterval(() => { entity.activeCluster = ++k; }, 1300); setTimeout(() => { clearInterval(it); entity.split = 0; entity.rippleT = 0; }, 5200); }],
-  ["Lecture", () => { entity.scan = true; setTimeout(() => { entity.scan = false; }, 4000); }],
-  ["Recherche web", () => { entity.feedColor = [110, 170, 255]; entity.feeding = true; setTimeout(() => { entity.feeding = false; }, 3500); }],
-  ["Indexation", () => { entity.feedColor = [235, 235, 240]; entity.feeding = true; setTimeout(() => { entity.feeding = false; entity.feedColor = [110, 170, 255]; }, 3500); }],
-  ["Souvenir retenu", () => memoryFlight($("openSettings"))],
-  ["Sauvegarde", () => { entity.seal = 1; }],
-  ["Secours / erreur", () => { entity.glitch = 1; }],
+  ["Travail long · recherche web", () => { entity.feedColor = [110, 170, 255]; entity.feeding = true; setTimeout(() => { entity.feeding = false; }, 4000); }],
+  ["Travail long · documents", () => { entity.scan = true; setTimeout(() => { entity.scan = false; }, 4000); }],
+  ["Travail long · IA distante", () => { entity.remote = true; setTimeout(() => { entity.remote = false; }, 4000); }],
+  ["Travail long · atelier / agent", () => { entity.split = 2; setTimeout(() => { entity.split = 0; }, 4000); }],
 ];
 const demoRow = document.createElement("div");
 demoRow.className = "emos"; demoRow.style.marginTop = "12px";
