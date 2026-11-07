@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from . import backup, db, hybrid, library, ocr, providers, sandbox, search, telegram
+from . import backup, db, hybrid, library, ocr, providers, proxmox, sandbox, search, telegram
 from .config import (DATA_DIR, DB_PATH, DEFAULT_MODEL, EMBED_MODEL, NTFY_URL, OLLAMA_URL, PROVIDER, SEARXNG_URL,
                      TELEGRAM_ALLOWED, TELEGRAM_TOKEN)
 
@@ -115,6 +115,14 @@ def _storage() -> list[dict]:
     out.append(_c("Lecture des scans (OCR)", "ok" if ocr.pdf_available() else "warn",
                   f"Tesseract ({ocr.LANGS})" if ocr.pdf_available() else "absent : PDF scannés et images illisibles",
                   "" if ocr.pdf_available() else "./update.sh (reconstruit l'image avec Tesseract)"))
+    if proxmox.configured():
+        st = proxmox.state
+        out.append(_c("Proxmox", "ok" if st["ok"] else "error",
+                      f"{len(st['nodes'])} nœud(s), {sum(1 for g in st['guests'] if g['status'] == 'running')}/{len(st['guests'])} invités en marche"
+                      + (f" · {len(proxmox.alerts())} alerte(s)" if proxmox.alerts() else "") if st["ok"] else st["error"] or "en attente du premier relevé",
+                      "" if st["ok"] else "vérifie ATOM_PROXMOX_URL et le jeton (README → Surveillance Proxmox)"))
+    else:
+        out.append(_c("Proxmox", "off", "surveillance non configurée", "README → Surveillance Proxmox"))
     sb = sandbox.status()
     out.append(_c("Bac à sable (tests)", "ok" if sb["enabled"] else "off", "actif : conteneurs jetables sans réseau" if sb["enabled"] else sb["reason"],
                   "" if sb["enabled"] else "README → Bac à sable"))

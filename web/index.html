@@ -268,6 +268,37 @@
         </div>
       </section>
 
+      <section class="pane" data-pane="proxmox">
+        <div class="block" id="pxSetup" hidden>
+          <h4>Surveillance Proxmox (lecture seule)</h4>
+          <p class="desc">Atom relève chaque minute l'état de ton serveur (nœuds, VM, conteneurs, stockages), t'alerte sur Telegram et ntfy, et répond à « comment va le serveur ? ».</p>
+          <ol class="desc" style="padding-left:18px;margin:6px 0">
+            <li>Dans Proxmox : <b>Datacenter → Permissions → API Tokens → Add</b> : utilisateur <code>root@pam</code>, identifiant <code>atom</code>, laisse « Privilege Separation » cochée. Copie le secret affiché (il ne sera plus montré).</li>
+            <li>Puis <b>Datacenter → Permissions → Add → API Token Permission</b> : chemin <code>/</code>, jeton <code>root@pam!atom</code>, rôle <code>PVEAuditor</code>, « Propagate » coché.</li>
+            <li>Dans <code>.env</code> : <code>ATOM_PROXMOX_URL=https://IP-DE-PROXMOX:8006</code>, <code>ATOM_PROXMOX_TOKEN_ID=root@pam!atom</code>, <code>ATOM_PROXMOX_TOKEN_SECRET=…</code></li>
+            <li><code>docker compose up -d atom</code>.</li>
+          </ol>
+          <p class="note">PVEAuditor = lecture seule : Atom ne peut rien démarrer, arrêter ni modifier.</p>
+        </div>
+        <div id="pxBody" hidden>
+          <div class="block"><div class="row" style="justify-content:space-between"><h4 style="margin:0">Serveur</h4><span><span class="note" id="pxUpd"></span> <button class="btn sm" id="pxRefresh">Actualiser</button></span></div>
+            <div id="pxAlerts"></div><div id="pxNodes" class="px-nodes"></div></div>
+          <div class="block"><h4>Machines virtuelles et conteneurs</h4><div id="pxGuests" class="px-guests"></div></div>
+          <div class="block"><h4>Stockages</h4><div id="pxStorages"></div></div>
+          <div class="block"><h4>Alertes</h4>
+            <p class="desc">Envoyées sur Telegram et ntfy, une fois par problème (rappel au plus toutes les heures), avec un message quand c'est rétabli.</p>
+            <label class="switch"><span>Envoyer les alertes</span><input type="checkbox" id="pxNotify"></label>
+            <label class="switch"><span>Prévenir si une VM ou un conteneur s'arrête</span><input type="checkbox" id="pxGuestDown"></label>
+            <div class="px-th">
+              <label>Processeur ≥ <input class="field" type="number" id="pxCpu" min="50" max="100"> %</label>
+              <label>Mémoire ≥ <input class="field" type="number" id="pxMem" min="50" max="100"> %</label>
+              <label>pendant <input class="field" type="number" id="pxMin" min="1" max="120"> min</label>
+              <label>Stockage ≥ <input class="field" type="number" id="pxSto" min="50" max="100"> %</label>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="pane" data-pane="security">
         <div class="block">
           <h4>Appareils connectés</h4>

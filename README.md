@@ -533,6 +533,32 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 6. Accès distant via Tailscale ; plus tard, API externes en secours
 
 
+## Surveillance Proxmox (lecture seule)
+
+Atom relève chaque minute l'état de ton serveur et t'alerte en cas de problème.
+
+**Mise en place** (5 minutes) :
+1. Proxmox → **Datacenter → Permissions → API Tokens → Add**. Utilisateur `root@pam`, identifiant `atom`, « Privilege Separation » laissée cochée. Copie le secret.
+2. **Datacenter → Permissions → Add → API Token Permission** : chemin `/`, jeton `root@pam!atom`, rôle **`PVEAuditor`** (lecture seule), « Propagate » coché.
+3. Dans `.env` :
+   ```
+   ATOM_PROXMOX_URL=https://IP-DE-PROXMOX:8006
+   ATOM_PROXMOX_TOKEN_ID=root@pam!atom
+   ATOM_PROXMOX_TOKEN_SECRET=le-secret
+   ```
+   puis `docker compose up -d atom`. Le certificat auto-signé de Proxmox est accepté par défaut (`ATOM_PROXMOX_VERIFY_TLS=0`).
+
+**Ce que tu obtiens**
+- **Réglages → Système → Serveur Proxmox** : les nœuds (processeur, mémoire, disque, charge, durée de marche), les VM et conteneurs, les stockages et les alertes en cours.
+- **Alertes** sur Telegram et ntfy :
+  - processeur ou mémoire au-dessus du seuil pendant N minutes, ou stockage presque plein ;
+  - VM ou conteneur arrêté, nœud hors ligne, Proxmox injoignable.
+
+  Chaque alerte est envoyée une fois (rappel au plus toutes les heures), avec un message quand c'est **rétabli**. Les seuils se règlent dans la même page.
+- **Dans la discussion** : « comment va le serveur ? », « quelle VM consomme le plus ? »… Atom répond à partir du dernier relevé. Ces données sont traitées comme la bibliothèque : elles ne partent vers une API distante que si tu l'as autorisé.
+- **Telegram** : la commande `/serveur` envoie l'état du serveur.
+- Avec le rôle PVEAuditor, Atom **ne peut rien démarrer, arrêter ni modifier**.
+
 ## Sécurité : ce qu'Atom protège
 
 - **Accès** : toute l'API exige une session (mot de passe haché en scrypt, cookie HttpOnly et SameSite, blocage progressif après 5 échecs). Les requêtes qui modifient quelque chose doivent porter l'en-tête `X-Atom` (protection CSRF). En-têtes ajoutés : `X-Frame-Options`, `nosniff`, `Permissions-Policy`, et HSTS en HTTPS.

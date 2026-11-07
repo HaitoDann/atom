@@ -1079,3 +1079,17 @@ body.presence-ui #presence { opacity: 1; }
   .quick { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .chip { flex: none; }
 }
+
+.px-nodes { display: grid; gap: 10px; margin-top: 10px; }
+.px-node { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--text) 3.5%, transparent); }
+.px-node b { font-weight: 500; color: var(--strong); }
+.px-guests { display: grid; gap: 2px; }
+.px-g { display: flex; align-items: center; gap: 10px; padding: 6px 4px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.px-g.off { opacity: .6; }
+.px-g .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.px-g .n b { font-weight: 500; }
+.px-g small { color: var(--faint); font: 11px var(--mono); }
+.px-g .v { font: 11.5px var(--mono); color: var(--text-2); min-width: 54px; text-align: right; }
+.px-g .v.t { color: var(--faint); min-width: 80px; }
+.px-th { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; font-size: 13px; color: var(--text-2); }
+.px-th input { width: 64px; display: inline-block; padding: 4px 6px; font-size: 13px; }

@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, analysis, auth, backup, canvas, codeedit, research, sandbox, spaces, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
+from . import agent, agentcode, analysis, auth, backup, canvas, codeedit, proxmox, research, sandbox, spaces, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -48,6 +48,7 @@ async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
              asyncio.create_task(backup.scheduler())]
     asyncio.create_task(sandbox.cleanup())
+    tasks.append(asyncio.create_task(proxmox.scheduler()))
     yield
     for t in tasks:
         t.cancel()
@@ -324,6 +325,32 @@ def put_conv_space(cid: int, body: ConvSpaceIn):
         raise HTTPException(404, "Espace introuvable")
     spaces.assign(cid, body.space_id)
     return {"ok": True}
+
+
+# ---- surveillance Proxmox (lecture seule)
+
+
+class ProxmoxIn(BaseModel):
+    cpu: int | None = Field(default=None, ge=50, le=100)
+    mem: int | None = Field(default=None, ge=50, le=100)
+    storage: int | None = Field(default=None, ge=50, le=100)
+    minutes: int | None = Field(default=None, ge=1, le=120)
+    notify: bool | None = None
+    guest_down: bool | None = None
+
+
+@app.get("/api/proxmox")
+async def proxmox_state():
+    if proxmox.configured() and time.time() - proxmox.state.get("updated", 0) > 50:
+        await proxmox.poll()
+    return {**proxmox.state, "configured": proxmox.configured(), "url": proxmox.URL, "alerts": proxmox.alerts(),
+            "settings": proxmox.settings(),
+            "history": {k: list(v)[-180:] for k, v in proxmox.history.items()}}
+
+
+@app.put("/api/proxmox")
+def proxmox_settings(body: ProxmoxIn):
+    return {"settings": proxmox.save_settings({k: v for k, v in body.model_dump().items() if v is not None})}
 
 
 # ---- recherche approfondie, analyse de données, canevas

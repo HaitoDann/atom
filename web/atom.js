@@ -1926,12 +1926,12 @@ const SET_GROUPS = {
   discussion: ["workshop"],
   data: ["memory", "reminders", "backup"],
   connections: ["hybrid"],
-  system: ["status", "lab", "security"],
+  system: ["status", "proxmox", "lab", "security"],
 };
 const PANE_TITLES = { general: "Général", look: "Apparence", entity: "Entité", workshop: "Atelier multi-IA", memory: "Souvenirs",
-  reminders: "Rappels", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", lab: "Modèles locaux", security: "Sécurité" };
+  reminders: "Rappels", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", proxmox: "Serveur Proxmox", lab: "Modèles locaux", security: "Sécurité" };
 const PANE_LOAD = { memory: () => loadMemories(), reminders: () => loadReminders(), backup: () => loadBackups(), status: () => loadStatus(),
-  security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop(), lab: () => loadLab() };
+  security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop(), lab: () => loadLab(), proxmox: () => loadProxmox() };
 const setGroupOf = (pane) => Object.keys(SET_GROUPS).find((g) => SET_GROUPS[g].includes(pane)) || pane;
 document.querySelectorAll(".pane").forEach((p) => {
   const h = document.createElement("h3"); h.className = "pane-title"; h.textContent = PANE_TITLES[p.dataset.pane] || ""; p.prepend(h);
@@ -4008,6 +4008,41 @@ $("cvsDownload").onclick = () => {
   a.download = ($("cvsTitle").value || "document").replace(/[^\w\- ]+/g, "").trim() + (cvs?.kind === "code" ? ".txt" : ".md"); a.click();
 };
 $("cvsClose").onclick = () => { clearTimeout(cvsTimer); if (cvs) send_(`/api/canvas/${cvs.id}`, "PUT", { content: $("cvsText").value, title: $("cvsTitle").value }).catch(() => {}); $("canvasPane").hidden = true; cvs = null; };
+
+/* ============================================================
+   SERVEUR PROXMOX — lecture seule
+   ============================================================ */
+let pxTimer = 0;
+const pxGb = (b) => (b / 1e9).toFixed(b > 1e11 ? 0 : 1).replace(".", ",") + " Go";
+const pxDur = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600); return d ? `${d} j ${h} h` : `${h} h ${Math.floor((s % 3600) / 60)} min`; };
+const pxBar = (pct, warn) => `<div class="bar"><i style="width:${Math.min(100, pct)}%${pct >= warn ? ";background:var(--danger,#e66)" : ""}"></i></div>`;
+async function loadProxmox() {
+  let d; try { d = await getJSON("/api/proxmox"); } catch (e) { return; }
+  $("pxSetup").hidden = d.configured; $("pxBody").hidden = !d.configured;
+  clearTimeout(pxTimer);
+  if (!d.configured) return;
+  const s = d.settings;
+  $("pxUpd").textContent = d.ok ? `relevé à ${new Date(d.updated * 1000).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : "";
+  $("pxAlerts").innerHTML = !d.ok ? `<p class="note" style="color:var(--danger,#e66)">Proxmox injoignable : ${esc(d.error)}</p>`
+    : d.alerts.map((a) => `<p class="note" style="color:var(--danger,#e66)">⚠ ${esc(a.title)} — ${esc(a.body)}</p>`).join("");
+  $("pxNodes").innerHTML = d.nodes.map((n) => `<div class="px-node"><div class="row" style="justify-content:space-between"><b>${esc(n.name)}</b><span class="note">${n.status === "online" ? `en marche depuis ${pxDur(n.uptime)}` : esc(n.status)}</span></div>
+    ${n.model ? `<p class="note" style="margin:2px 0 6px">${esc(n.model)} · ${n.cores} cœurs${n.load ? ` · charge ${n.load.map(esc).join(" / ")}` : ""}</p>` : ""}
+    <div class="metric"><div class="l"><span>Processeur</span><span>${n.cpu.toFixed(0)} %</span></div>${pxBar(n.cpu, s.cpu)}</div>
+    <div class="metric"><div class="l"><span>Mémoire</span><span>${pxGb(n.mem_used)} / ${pxGb(n.mem_total)}</span></div>${pxBar(n.mem, s.mem)}</div>
+    <div class="metric"><div class="l"><span>Disque système</span><span>${n.disk.toFixed(0)} %</span></div>${pxBar(n.disk, s.storage)}</div></div>`).join("");
+  $("pxGuests").innerHTML = d.guests.map((g) => `<div class="px-g ${g.status === "running" ? "" : "off"}"><span class="st-dot ${g.status === "running" ? "ok" : "off"}"></span>
+    <span class="n"><b>${esc(g.name)}</b> <small>${g.type} ${g.id}${d.nodes.length > 1 ? " · " + esc(g.node) : ""}</small></span>
+    ${g.status === "running" ? `<span class="v">${g.cpu.toFixed(0)} %</span><span class="v">${pxGb(g.mem_used)}</span><span class="v t">${pxDur(g.uptime)}</span>` : `<span class="v t">${esc(g.status)}</span>`}</div>`).join("") || '<p class="note">Aucune VM ni conteneur.</p>';
+  $("pxStorages").innerHTML = d.storages.map((st) => `<div class="metric"><div class="l"><span>${esc(st.name)} <small class="note">${esc(st.node)} · ${esc(st.kind || "")}</small></span><span>${pxGb(st.used)} / ${pxGb(st.total)}</span></div>${pxBar(st.pct, s.storage)}</div>`).join("");
+  $("pxNotify").checked = s.notify; $("pxGuestDown").checked = s.guest_down;
+  $("pxCpu").value = s.cpu; $("pxMem").value = s.mem; $("pxMin").value = s.minutes; $("pxSto").value = s.storage;
+  if ($("settings").classList.contains("open")) pxTimer = setTimeout(loadProxmox, 30000);
+}
+const pxSave = (patch) => send_("/api/proxmox", "PUT", patch).then(() => toast("Réglages d'alerte enregistrés.")).catch((e) => toast(esc(e.message)));
+$("pxRefresh").onclick = loadProxmox;
+$("pxNotify").onchange = () => pxSave({ notify: $("pxNotify").checked });
+$("pxGuestDown").onchange = () => pxSave({ guest_down: $("pxGuestDown").checked });
+[["pxCpu", "cpu"], ["pxMem", "mem"], ["pxMin", "minutes"], ["pxSto", "storage"]].forEach(([id, k]) => { $(id).onchange = () => pxSave({ [k]: +$(id).value }); });
 
 /* ============================================================
    THÈME

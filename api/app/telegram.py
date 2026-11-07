@@ -37,6 +37,8 @@ HELP = (
     "/nouveau — commencer une nouvelle conversation\n"
     "/rappels — voir les rappels programmés\n"
     "/souvenirs — ce que je sais de toi\n"
+    "/serveur — état du serveur Proxmox\n"
+    "/agent projet tâche — confier une tâche à l'agent de code\n"
     "/aide — ce message"
 )
 
@@ -234,6 +236,11 @@ async def handle_command(client, chat_id: int, cmd: str) -> None:
         await send_text(client, chat_id,
                         f"**Ce que je sais de toi**\n\n{txt}\n\n_Modifiable depuis l'interface web._"
                         if rows else "Je n'ai encore rien retenu sur toi.")
+    elif cmd == "/serveur":
+        from . import proxmox
+
+        await proxmox.poll()
+        await send_text(client, chat_id, "**Serveur Proxmox**\n\n" + proxmox.summary())
     else:
         await send_text(client, chat_id, "Commande inconnue. /aide pour la liste.")
 

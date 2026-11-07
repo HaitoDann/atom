@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import AsyncIterator
 
 import httpx
 
-from . import db, hybrid, library, llm, memory, reminders, search, spaces
+from . import db, hybrid, library, llm, memory, proxmox, reminders, search, spaces
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
@@ -134,6 +135,11 @@ async def chat_events(
         except Exception:  # noqa: BLE001 — la bibliothèque ne doit pas bloquer la réponse
             import logging
             logging.getLogger("atom.agent").exception("recherche dans la bibliothèque impossible")
+    # Question sur le serveur : l'état Proxmox relevé est ajouté (données privées, comme la bibliothèque)
+    if proxmox.wants(message or ""):
+        if time.time() - proxmox.state.get("updated", 0) > 90:
+            await proxmox.poll()
+        docs_block = (docs_block + "\n\n" if docs_block else "") + proxmox.prompt_block()
     msgs = [{"role": "system", "content": system_prompt(persona, mem_block, web if web == "auto" else "off", "", docs_block)}]
     msgs += [
         {"role": m["role"], "content": with_attachments(m["content"], m["meta"].get("attachments"))}
