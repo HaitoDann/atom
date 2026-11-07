@@ -723,7 +723,7 @@ function agHomeUpdate(runs) {
   const ST = { running: "en cours", done: "terminée", error: "erreur", stopped: "arrêtée", interrupted: "interrompue" };
   const list = runs.slice(0, 6);
   $("agRecentTitle").hidden = !list.length;
-  $("agRecent").innerHTML = list.map((r) => `<button data-id="${r.id}"><span class="t">${esc(r.task)}</span><small>${ST[r.status] || r.status}</small>
+  $("agRecent").innerHTML = list.map((r) => `<button data-id="${esc(r.id)}"><span class="t">${esc(r.task)}</span><small>${esc(ST[r.status] || r.status)}</small>
     <small class="t">${esc(r.summary || "")}</small><small>${new Date(r.created_at * 1000).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}${r.files ? ` · ${r.files} fichier(s)` : ""}</small></button>`).join("");
   $("agRecent").querySelectorAll("button").forEach((b) => { b.onclick = () => { agReset(); store.set(agKey(), b.dataset.id); agFollow(b.dataset.id, true); }; });
 }

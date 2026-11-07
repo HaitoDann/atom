@@ -113,10 +113,10 @@ function loadKatex() {
   if (katexLoading) return katexLoading;
   katexLoading = new Promise((res, rej) => {
     const l = document.createElement("link");
-    l.rel = "stylesheet"; l.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css";
+    l.rel = "stylesheet"; l.href = "/vendor/katex/katex.min.css";
     document.head.appendChild(l);
     const sc = document.createElement("script");
-    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js";
+    sc.src = "/vendor/katex/katex.min.js";
     sc.onload = res; sc.onerror = rej;
     document.head.appendChild(sc);
   });
@@ -138,7 +138,7 @@ function loadMermaid() {
   if (mermaidLoading) return mermaidLoading;
   mermaidLoading = new Promise((res, rej) => {
     const sc = document.createElement("script");
-    sc.src = "https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js";
+    sc.src = "/vendor/mermaid/mermaid.min.js";
     sc.onload = () => res(); sc.onerror = rej; document.head.appendChild(sc);
   });
   return mermaidLoading;
