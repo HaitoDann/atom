@@ -541,3 +541,10 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 - **Réseau** : la recherche web ne lit que des adresses **publiques**, redirections comprises. Une page ne peut donc pas faire interroger par Atom ton réseau local, comme l'interface de Proxmox ou de ta box.
 - **Bac à sable** : les conteneurs n'ont ni réseau ni privilèges, leurs ressources sont limitées et ils sont supprimés après usage. Les conteneurs orphelins sont nettoyés au démarrage. ⚠ Le socket Docker reste un accès puissant : garde Atom derrière Tailscale avec un mot de passe solide.
 - **Données envoyées aux API** : rien de privé (souvenirs, documents, code) ne part sans ton autorisation, et seulement vers les fournisseurs « private ».
+
+
+## Structure du code
+
+- `api/app/` : le serveur FastAPI, un module par fonction (`agent` pour la discussion, `agentcode` pour l'agent du mode Code, `library`, `providers`, `sandbox`, `gitops`, `research`, `analysis`, `canvas`, `spaces`, `proxmox`, `telegram`…).
+- `web/index.html` : la structure de la page. `web/atom.css` : les styles. `web/atom.js` : la logique de l'interface. Les fichiers sont servis avec un numéro de version, donc le navigateur recharge dès qu'ils changent.
+- `api/tests/` : les tests (`cd api && python -m pytest -q`), lancés aussi par GitHub Actions avec une vérification de la syntaxe du JavaScript.

@@ -12,3 +12,5 @@ jobs:
           python-version: "3.12"
       - run: pip install -r api/requirements.txt -r api/requirements-dev.txt
       - run: cd api && python -m pytest -q
+      - name: Syntaxe de l'interface
+        run: node --check web/atom.js && node --check web/sw.js

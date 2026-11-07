@@ -19,7 +19,7 @@ from typing import AsyncIterator
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -1257,9 +1257,16 @@ def service_worker():
                         headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
 
 
+def _asset_version() -> str:
+    """Version des fichiers de l'interface (date de modification) : le navigateur recharge dès qu'ils changent."""
+    m = max((WEB_DIR / f).stat().st_mtime for f in ("atom.css", "atom.js", "index.html") if (WEB_DIR / f).exists())
+    return format(int(m), "x")
+
+
 @app.get("/")
 def index():
-    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+    html = (WEB_DIR / "index.html").read_text("utf-8").replace("__V__", _asset_version())
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 # Fichiers statiques de l'interface (manifest, icônes…)
