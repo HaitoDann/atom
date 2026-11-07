@@ -16,8 +16,14 @@ function watchErrors(page) {
 async function login(page) {
   await page.goto("/");
   await expect(page.locator("#login")).toBeVisible();
+  await page.waitForLoadState("networkidle");
   await page.fill("#loginPw", PASSWORD);
-  if (await page.locator("#loginPw2").isVisible()) await page.fill("#loginPw2", PASSWORD);   // premier lancement
+  // Premier lancement : le champ de confirmation apparaît une fois l'état demandé au serveur.
+  const status = await (await page.request.get("/api/auth/status")).json();
+  if (status.setup_needed) {
+    await expect(page.locator("#loginPw2")).toBeVisible();
+    await page.fill("#loginPw2", PASSWORD);
+  }
   await page.click("#loginBtn");
   await expect(page.locator("#login")).toBeHidden();
   await page.waitForLoadState("networkidle");   // conversations et brouillon restaurés
@@ -67,6 +73,8 @@ test("palette de commandes (Ctrl+K)", async ({ page }) => {
 
 test("mauvais mot de passe refusé", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator("#login")).toBeVisible();
+  await page.waitForLoadState("networkidle");
   await page.fill("#loginPw", "pas-le-bon");
   await page.click("#loginBtn");
   await expect(page.locator("#loginErr")).not.toBeEmpty();
