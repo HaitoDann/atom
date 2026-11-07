@@ -21,8 +21,9 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/agent.py` | Cœur de l'agent : prompt, streaming, commandes (partagé web / Telegram) |
 | `api/app/agentcode.py`, `agenttools.py`, `codeedit.py`, `gitops.py`, `sandbox.py` | Mode Code : boucle de l'agent, outils et espace de travail, modifications validées, Git, tests en bac à sable |
 | `api/app/llm.py`, `providers.py`, `hybrid.py` | Modèle local (Ollama), fournisseurs distants avec relais, mode hybride |
+| `api/app/usage.py`, `observability.py` | Journal des appels aux modèles (tokens, latence, bascules, coût) et flux en direct ; identifiant de requête, journaux JSON, métriques Prometheus |
 | `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
-| `api/app/library.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
+| `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
 | `api/app/canvas.py`, `workshop.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, analyse de données, labo des modèles |
 | `api/app/reminders.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, notifications (ntfy, Telegram), bot et agent Telegram |
@@ -31,6 +32,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
 | `api/tests/` | Tests (`cd api && pip install -r requirements.txt -r requirements-dev.txt && ruff check app tests && python -m pytest -q`) |
 | `docker-compose.yml` | Ollama + téléchargement du modèle + SearXNG + ntfy + backend (images épinglées) |
+| `web/vendor/` | KaTeX, Mermaid et polices Geist embarqués (aucune ressource externe) |
 | `docker-compose.sandbox.yml` | Option : bac à sable Docker via un proxy restreint |
 
 ## Premier essai sur Proxmox (réseau local)
@@ -251,6 +253,47 @@ Pour un fournisseur connu, la clé suffit ; `ATOM_PROVIDERS=…` sert pour un fo
 - **Relais automatique** : si le principal est indisponible (limite atteinte, panne, quota du jour), Atom passe au suivant, du plus fort au plus faible, puis au local. Un fournisseur qui renvoie « limite atteinte » est mis en pause 2 minutes.
 - **Données privées** : un fournisseur avec `ATOM_<ID>_PRIVATE=0` ne reçoit **jamais** tes souvenirs, documents ni fichiers, même si tu les as autorisés. C'est le réglage par défaut pour `gemini` et `openrouter`, dont les offres gratuites peuvent réutiliser les données.
 - Les modèles par défaut changent souvent chez les fournisseurs : si l'un d'eux affiche « modèle introuvable » dans l'écran État, choisis-en un autre dans la liste.
+
+## Consommation des API et routage intelligent
+
+Réglages → Connexions → **Consommation** : tout se met à jour **en direct**, dès qu'un appel se termine.
+
+- **Vue d'ensemble** : appels, tokens, bascules et coût estimé (aujourd'hui, 7 ou 30 jours), tokens heure par heure sur 24 h.
+- **Fournisseurs** : quota du jour, taux de réussite, délai avant le premier mot (mesurés sur les vrais appels, et conservés après un redémarrage), coût.
+- **Derniers appels** : quel modèle a répondu, pourquoi il a été choisi, et les **bascules automatiques** (« ↪ bascule depuis Groq » quand un fournisseur a échoué et qu'un autre a pris le relais).
+
+**Routage intelligent** : quand Atom passe en distant, il classe la demande (question simple, demande complexe, code, texte long, agent de code) et choisit le fournisseur :
+
+| Demande | Ce qui compte |
+|---|---|
+| Question simple | la **vitesse** : le fournisseur qui répond le plus vite en ce moment |
+| Demande complexe, texte long | la **force** du modèle |
+| Code, agent de code | les familles réputées en code (GPT, Qwen, DeepSeek, Claude…) |
+
+Dans tous les cas, Atom écarte un fournisseur dont l'offre n'accepte pas une requête aussi longue, épargne celui dont le quota du jour est presque épuisé (la charge se répartit), et pénalise les pannes récentes. Tu peux **imposer un fournisseur par type de demande**, et le champ **Tester** montre, sans rien envoyer, quel modèle répondrait à une demande et pourquoi.
+
+Coût estimé (facultatif, en dollars par million de tokens) : `ATOM_<ID>_PRICE_IN=0.15` et `ATOM_<ID>_PRICE_OUT=0.60` dans `.env`. Sans tarif, le coût affiché est « — » (offres gratuites). Le journal des appels est gardé 90 jours (`ATOM_USAGE_RETENTION_DAYS`).
+
+## Observabilité
+
+- **Métriques Prometheus** sur `/api/metrics` : requêtes HTTP (nombre, durée, statut par route), appels aux modèles (réussis / en échec, tokens, temps de génération, bascules, coût), quotas restants, santé et pause des fournisseurs, taille de la base. Accessible avec ta session, ou avec un jeton pour un serveur Prometheus :
+
+  ```yaml
+  # prometheus.yml
+  scrape_configs:
+    - job_name: atom
+      metrics_path: /api/metrics
+      authorization: { credentials: "<ATOM_METRICS_TOKEN>" }
+      static_configs: [{ targets: ["atom:8000"] }]
+  ```
+
+  avec `ATOM_METRICS_TOKEN=une-longue-chaîne-aléatoire` dans `.env` (`openssl rand -hex 32`).
+- **Identifiant de requête** : chaque réponse porte un en-tête `X-Request-ID`, repris dans toutes les lignes de journal de cette requête.
+- **Journaux JSON** : `ATOM_LOG_FORMAT=json` dans `.env` donne une ligne JSON par événement (requêtes HTTP avec durée, appels aux modèles avec tokens et raison du choix), facile à exploiter avec `jq`, Loki ou Grafana :
+
+  ```bash
+  docker compose logs atom --no-log-prefix | jq 'select(.event == "model_call")'
+  ```
 
 ## Modèles locaux : essayer et comparer
 

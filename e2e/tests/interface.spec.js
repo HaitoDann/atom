@@ -155,3 +155,14 @@ test("consommation : les appels apparaissent en direct", async ({ page }) => {
   await expect(page.locator("#usTryOut")).toContainText("Code");
   expect(errors).toEqual([]);
 });
+
+test("mode Code et bibliothèque s'ouvrent sans erreur", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => showView("code"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => showView("library"));
+  await page.waitForLoadState("networkidle");
+  await page.evaluate(() => showView("chat"));
+  expect(errors).toEqual([]);
+});

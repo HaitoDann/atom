@@ -14,7 +14,7 @@ jobs:
       - name: Lint (ruff)
         run: cd api && ruff check app tests
       - name: Tests et couverture
-        run: cd api && python -m pytest -q --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=70
+        run: cd api && python -m pytest -q --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=73
       - name: Syntaxe de l'interface
         run: for f in web/js/*.js web/sw.js; do node --check "$f"; done
   docker:

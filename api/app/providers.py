@@ -528,6 +528,7 @@ async def _chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(15, read=180)) as client:
+                t_call = time.time()
                 r = await client.post(f"{p.url}/chat/completions", json=payload, headers={"Authorization": f"Bearer {p.key}"})
         except httpx.HTTPError as e:
             _cooldown[p.id] = time.time() + 60
@@ -561,7 +562,7 @@ async def _chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_
             _cooldown[p.id] = time.time() + 60
         raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:200]}")
     count(p.id)
-    record(p.id, True, r.elapsed.total_seconds() if r.elapsed else None)
+    record(p.id, True, time.time() - t_call)
     try:
         data = r.json()
         msg = (data.get("choices") or [{}])[0].get("message") or {}
