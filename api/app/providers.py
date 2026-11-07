@@ -185,18 +185,59 @@ def available(p: Provider, sensitive: bool = False) -> bool:
             and (p.private or not sensitive))
 
 
-def chain(first: str | None = None, sensitive: bool = False, exclude: set[str] | None = None) -> list[Provider]:
-    """Ordre d'essai : le fournisseur demandé, puis les autres du plus fort au plus faible."""
+# ---- santé mesurée : latence et réussite récentes (sur les vrais appels, pas sur la réputation du modèle)
+HEALTH: dict[str, dict] = {}
+CODE_FAMILIES = {"gpt": 0.4, "qwen": 0.4, "deepseek": 0.4, "claude": 0.4, "llama": 0.1, "mistral": 0.2, "gemini": 0.3}
+
+
+def record(pid: str, ok: bool, latency: float | None = None, err: str = "") -> None:
+    h = HEALTH.setdefault(pid, {"ok": 0, "ko": 0, "lat": None, "consec": 0, "recent": [], "err": ""})
+    h["recent"] = (h["recent"] + [1 if ok else 0])[-20:]
+    if ok:
+        h["ok"] += 1; h["consec"] = 0
+        if latency is not None:
+            h["lat"] = latency if h["lat"] is None else h["lat"] * 0.7 + latency * 0.3
+    else:
+        h["ko"] += 1; h["consec"] += 1; h["err"] = err[:160]
+
+
+def score(p: Provider, task: str | None = None) -> float:
+    """Plus c'est haut, plus on essaie tôt : force estimée, corrigée par les mesures et la nature de la tâche."""
+    h = HEALTH.get(p.id, {})
+    sc = float(p.strength)
+    rec = h.get("recent") or []
+    if len(rec) >= 3:
+        sc -= 1.5 * (1 - sum(rec) / len(rec))          # échecs récents
+    sc -= 0.4 * min(3, h.get("consec", 0))              # échecs consécutifs
+    if h.get("lat"):
+        sc -= min(0.8, max(0.0, (h["lat"] - 4) / 10))   # lenteur (au-delà de 4 s pour un premier mot)
+    if task == "code":
+        sc += CODE_FAMILIES.get(family_of(model_of(p), p.family), 0)
+    return sc
+
+
+def chain(first: str | None = None, sensitive: bool = False, exclude: set[str] | None = None, task: str | None = None) -> list[Provider]:
+    """Ordre d'essai : le fournisseur demandé d'abord (sauf s'il échoue en ce moment), puis par score décroissant."""
     exclude = exclude or set()
     pool = [p for p in ALL if p.id not in exclude and available(p, sensitive)]
-    pool.sort(key=lambda p: (p.id != first, -p.strength))
+    pool.sort(key=lambda p: (not (p.id == first and HEALTH.get(p.id, {}).get("consec", 0) < 2), -score(p, task)))
     return pool
 
 
 def describe(p: Provider) -> dict:
     return {"id": p.id, "name": p.name, "model": model_of(p), "default_model": p.model, "family": family_of(model_of(p), p.family),
             "strength": p.strength, "private": p.private, "configured": p.configured, "limit": p.limit,
-            "used_today": used_today(p.id), "paused": _cooldown.get(p.id, 0) > time.time()}
+            "used_today": used_today(p.id), "paused": _cooldown.get(p.id, 0) > time.time(),
+            "health": _health_public(p.id)}
+
+
+def _health_public(pid: str) -> dict:
+    h = HEALTH.get(pid)
+    if not h:
+        return {}
+    rec = h["recent"]
+    return {"latency": round(h["lat"], 1) if h["lat"] else None, "success": round(100 * sum(rec) / len(rec)) if rec else None,
+            "calls": h["ok"] + h["ko"], "last_error": h["err"] if h["consec"] else ""}
 
 
 # ---------------------------------------------------------------- appels
@@ -404,6 +445,7 @@ async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_t
             _cooldown[p.id] = time.time() + 60
         raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:200]}")
     count(p.id)
+    record(p.id, True, r.elapsed.total_seconds() if r.elapsed else None)
     try:
         data = r.json()
         msg = (data.get("choices") or [{}])[0].get("message") or {}
@@ -421,13 +463,17 @@ async def stream_chain(providers: list[Provider], messages: list[dict], used: di
     errors = []
     for i, p in enumerate(providers):
         got = False
+        t0, first_at = time.time(), None
         try:
             async for t in stream(p, messages, model if i == 0 else None, used.setdefault("stats", {}), max_tokens):
                 got = True
+                first_at = first_at or time.time()
                 yield t
+            record(p.id, True, (first_at or time.time()) - t0)
             used.update(id=p.id, name=p.name, model=used["stats"].get("model", model_of(p)), skipped=errors)
             return
         except Unavailable as e:
+            record(p.id, False, err=str(e))
             if got:
                 raise
             log.info("relais : %s", e)
