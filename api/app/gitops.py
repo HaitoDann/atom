@@ -112,7 +112,10 @@ def new_branch(cid: int, name: str) -> dict:
 
 def switch(cid: int, name: str) -> dict:
     _, root = _repo(cid)
-    r = _git(root, "switch", name, check=False)
+    branches = [b.strip() for b in _git(root, "branch", "--format=%(refname:short)").stdout.splitlines()]
+    if name not in branches:   # jamais un nom arbitraire passé à git (ex. « --orphan=… »)
+        raise GitError(f"Branche inconnue : {name}")
+    r = _git(root, "switch", "--", name, check=False) if False else _git(root, "switch", name, check=False)
     if r.returncode != 0:
         msg = r.stderr or r.stdout
         if "would be overwritten" in msg:

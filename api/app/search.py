@@ -65,6 +65,26 @@ def page_text(raw: str, limit: int = 2500) -> str:
     return "\n".join(lines)[:limit]
 
 
+def _public_host(host: str) -> bool:
+    """Vrai seulement si toutes les adresses de l'hôte sont publiques (pas de réseau local, loopback, etc.)."""
+    import ipaddress
+    import socket
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError):
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            return False
+    return True
+
+
+async def _check_request(request: httpx.Request) -> None:
+    if request.url.scheme not in ("http", "https") or not await asyncio.to_thread(_public_host, request.url.host):
+        raise httpx.RequestError(f"adresse non publique refusée : {request.url.host}", request=request)
+
+
 async def _fetch(client: httpx.AsyncClient, url: str) -> str:
     try:
         r = await client.get(url, headers={"User-Agent": UA, "Accept-Language": "fr,en;q=0.8"})
@@ -92,6 +112,9 @@ async def search(query: str) -> list[dict]:
             "snippet": (it.get("content") or "").strip()[:400],
             "content": "",
         } for it in items if it.get("url", "").startswith("http")]
+    # lecture des pages : client séparé, qui vérifie chaque adresse (et chaque redirection)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(8, read=12), follow_redirects=True,
+                                 event_hooks={"request": [_check_request]}) as client:
         pages = await asyncio.gather(*[_fetch(client, x["url"]) for x in results[:SEARCH_PAGES]])
         for x, content in zip(results, pages):
             x["content"] = content

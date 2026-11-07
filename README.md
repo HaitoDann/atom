@@ -531,3 +531,13 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 4. Documents : import de notes et de PDF, puis recherche dedans
 5. Outils : Proxmox, recherche web, domotique
 6. Accès distant via Tailscale ; plus tard, API externes en secours
+
+
+## Sécurité : ce qu'Atom protège
+
+- **Accès** : toute l'API exige une session (mot de passe haché en scrypt, cookie HttpOnly et SameSite, blocage progressif après 5 échecs). Les requêtes qui modifient quelque chose doivent porter l'en-tête `X-Atom` (protection CSRF). En-têtes ajoutés : `X-Frame-Options`, `nosniff`, `Permissions-Policy`, et HSTS en HTTPS.
+- **Fichiers** : les chemins sont vérifiés comme de vrais chemins, pas par préfixe de texte. Un projet ne peut donc pas lire son voisin, ni un fichier hors de la bibliothèque. L'agent ne sort pas du projet et ne touche pas à `.git`. Les archives piégées (`.docx` ou `.odt` énormes une fois décompressés) sont refusées, et la taille des envois est plafonnée.
+- **Git** : les noms de branche sont validés, ce qui empêche d'injecter des options. Jamais de push sur la branche principale ni de force-push, et le jeton n'est jamais écrit sur le disque.
+- **Réseau** : la recherche web ne lit que des adresses **publiques**, redirections comprises. Une page ne peut donc pas faire interroger par Atom ton réseau local, comme l'interface de Proxmox ou de ta box.
+- **Bac à sable** : les conteneurs n'ont ni réseau ni privilèges, leurs ressources sont limitées et ils sont supprimés après usage. Les conteneurs orphelins sont nettoyés au démarrage. ⚠ Le socket Docker reste un accès puissant : garde Atom derrière Tailscale avec un mot de passe solide.
+- **Données envoyées aux API** : rien de privé (souvenirs, documents, code) ne part sans ton autorisation, et seulement vers les fournisseurs « private ».

@@ -47,6 +47,7 @@ async def run_chat(*args) -> AsyncIterator[bytes]:
 async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
              asyncio.create_task(backup.scheduler())]
+    asyncio.create_task(sandbox.cleanup())
     yield
     for t in tasks:
         t.cancel()
@@ -75,6 +76,9 @@ async def guard(request: Request, call_next):
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if _secure(request):
+        resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
     return resp
 
 
@@ -338,7 +342,7 @@ async def research_run(body: ResearchIn):
 
 class AnalyzeIn(BaseModel):
     name: str = Field(max_length=200)
-    data: str   # base64
+    data: str = Field(max_length=70_000_000)   # base64 (50 Mo)
     question: str = Field(default="", max_length=4000)
     conversation_id: int | None = None
 
@@ -435,7 +439,7 @@ def canvas_delete(cid: int):
 
 class ExtractIn(BaseModel):
     name: str = Field(max_length=200)
-    data: str  # base64
+    data: str = Field(max_length=21_000_000)  # base64 (15 Mo)
 
 
 TEXT_EXT = {"txt", "md", "markdown", "csv", "tsv", "json", "yaml", "yml", "toml", "ini", "cfg", "conf",

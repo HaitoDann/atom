@@ -126,6 +126,8 @@ def extract_pages(name: str, raw: bytes) -> list[tuple[int | None, str]]:
         return pages
     if ext == "docx":
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            if z.getinfo("word/document.xml").file_size > 40 * 1024 * 1024:   # archive piégée (« zip bomb »)
+                raise Unsupported("Document trop volumineux une fois décompressé.")
             xml = z.read("word/document.xml").decode("utf-8", "ignore")
         xml = re.sub(r"</w:p>", "\n", xml)
         xml = re.sub(r"<w:tab/>", "\t", xml)
@@ -134,6 +136,8 @@ def extract_pages(name: str, raw: bytes) -> list[tuple[int | None, str]]:
         return [(None, _h.unescape(text).strip())]
     if ext in {"odt"}:
         with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            if z.getinfo("content.xml").file_size > 40 * 1024 * 1024:
+                raise Unsupported("Document trop volumineux une fois décompressé.")
             xml = z.read("content.xml").decode("utf-8", "ignore")
         xml = re.sub(r"</text:p>|</text:h>", "\n", xml)
         import html as _h
@@ -436,7 +440,7 @@ def _code_root(col: dict) -> Path:
 def resolve_server_path(src: str) -> Path:
     """Les dossiers serveur sont limités à PROJECTS_DIR (montage en lecture seule)."""
     p = (PROJECTS_DIR / src.lstrip("/").removeprefix(str(PROJECTS_DIR).lstrip("/")).lstrip("/")).resolve()
-    if not str(p).startswith(str(PROJECTS_DIR.resolve())):
+    if not p.is_relative_to(PROJECTS_DIR.resolve()):   # vrai test de chemin (pas un simple préfixe de texte)
         raise ValueError(f"Le dossier doit être dans {PROJECTS_DIR}.")
     if not p.is_dir():
         raise ValueError(f"Dossier introuvable : {p}")
@@ -636,7 +640,7 @@ def read_file(cid: int, rel: str) -> str:
         raise FileNotFoundError(rel)
     root = _code_root(col).resolve()
     p = (root / rel).resolve()
-    if not str(p).startswith(str(root)) or not p.is_file():
+    if p == root or not p.is_relative_to(root) or not p.is_file():
         raise FileNotFoundError(rel)
     return p.read_text("utf-8", "ignore")[:400_000]
 

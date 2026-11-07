@@ -329,3 +329,17 @@ async def run_python(files: dict[str, bytes], code: str, timeout: int = 180) -> 
     for k in list(_collected):
         produced.update(_untar(_collected.pop(k)))
     return code_, out, produced
+
+
+async def cleanup() -> None:
+    """Au démarrage : supprime les conteneurs de test restés orphelins (redémarrage pendant un test)."""
+    if not enabled():
+        return
+    try:
+        async with _client() as c:
+            r = await c.get("/containers/json", params={"all": 1, "filters": json.dumps({"label": ["atom=sandbox"]})})
+            for ct in r.json() if r.status_code == 200 else []:
+                await c.delete(f"/containers/{ct['Id']}", params={"force": 1})
+                log.info("conteneur de test orphelin supprimé : %s", ct["Id"][:12])
+    except (httpx.HTTPError, ValueError):
+        pass
