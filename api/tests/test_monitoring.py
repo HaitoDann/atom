@@ -96,7 +96,8 @@ def grafana_up(client, monkeypatch):
     seen = {}
 
     def handler(req):
-        seen.update(url=str(req.url), cookie=req.headers.get("cookie", ""), method=req.method, body=req.content)
+        seen.update(url=str(req.url), cookie=req.headers.get("cookie", ""), method=req.method, body=req.content,
+                    host=req.headers.get("host"))
         # flux non lu, comme une vraie réponse réseau
         return httpx.Response(200, stream=httpx.ByteStream(b"<html>grafana</html>"),
                               headers={"content-type": "text/html", "content-security-policy": "script-src 'self' 'unsafe-eval'"})
@@ -112,8 +113,9 @@ def test_grafana_proxy(client, grafana_up):
     assert "grafana_session=g1" in grafana_up["cookie"] and "atom" not in grafana_up["cookie"].replace("grafana", "")
     assert r.headers["x-frame-options"] == "SAMEORIGIN"                       # affichable dans l'interface
     assert "unsafe-eval" in r.headers["content-security-policy"]              # la CSP de Grafana, pas celle d'Atom
-    r = client.post("/grafana/api/ds/query", json={"q": 1})                    # requêtes des panneaux
+    r = client.post("/grafana/api/ds/query", json={"q": 1}, headers={"Origin": "http://testserver"})   # requêtes des panneaux
     assert r.status_code == 200 and grafana_up["method"] == "POST" and b'"q"' in grafana_up["body"]
+    assert grafana_up["host"] == "testserver"     # Host = adresse vue par le navigateur, sinon Grafana refuse l'Origin
 
 
 def test_grafana_requires_session(grafana_up):
