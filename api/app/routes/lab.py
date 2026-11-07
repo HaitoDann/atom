@@ -38,7 +38,6 @@ async def lab():
         installed = []
     if PROVIDER == "mock":
         installed = ["mock", "qwen3:4b-instruct-2507-q4_K_M"]
-    from .. import system
     snap = await system.snapshot()
     return {"installed": [n for n in installed if n.split(":")[0] != EMBED_MODEL.split(":")[0]],
             "suggested": models_lab.SUGGESTED, "prompts": [{"id": p["id"], "label": p["label"]} for p in models_lab.PROMPTS],
