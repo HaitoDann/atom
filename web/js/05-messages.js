@@ -80,7 +80,7 @@ function msgEl(m, idx, fresh = false) {
   if (isUser || m.error) body.textContent = m.content; else setMd(body, m.content);
   if (isUser && !m.content) body.style.display = "none";
   el.appendChild(body);
-  if (!isUser && m.meta?.workshop) el.insertBefore(workshopEl(m.meta.workshop), body);
+  if (!isUser && m.meta?.workshop) { el.insertBefore(workshopPipe(m.meta.workshop), body); el.insertBefore(workshopEl(m.meta.workshop), body); }
   if (!isUser && m.meta?.docs?.length) el.appendChild(docsEl(m.meta.docs));
   if (!isUser && m.meta?.reminders?.length) for (const r of m.meta.reminders) el.appendChild(reminderCard(r));
   if (!isUser && m.meta?.analysis) el.appendChild(analysisEl(m.meta.analysis));

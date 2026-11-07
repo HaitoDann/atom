@@ -6,7 +6,7 @@
 let workshopCfg = null, workshopNext = false, remoteModels = [];
 async function loadWorkshop() {
   try { workshopCfg = await getJSON("/api/workshop"); } catch { return; }
-  $("wsBtn").style.display = workshopCfg.enabled ? "" : "none";
+  // Le bouton reste visible : il ouvre le lanceur (l'option « activer » sert au passage rapide en un clic).
   if (!workshopCfg.enabled && workshopNext) { workshopNext = false; }
   $("wsBtn").classList.toggle("on", workshopNext);
   $("wsEnabled").checked = workshopCfg.enabled;
@@ -51,8 +51,16 @@ async function saveWorkshop(patch) {
 }
 $("wsEnabled").onchange = () => saveWorkshop({ enabled: $("wsEnabled").checked });
 $("wsRounds").onchange = () => saveWorkshop({ rounds: +$("wsRounds").value });
-$("wsBtn").onclick = () => { workshopNext = !workshopNext; $("wsBtn").classList.toggle("on", workshopNext); input.focus(); };
+$("wsBtn").onclick = () => openWsLauncher(input.value);
 
+function workshopPipe(w) {
+  // Chaîne des étapes d'un atelier terminé : rôle, modèle, durée.
+  const all = [...w.steps, ...(w.final ? [w.final] : [])];
+  const p = document.createElement("div"); p.className = "ws-pipe";
+  p.innerHTML = all.map((st, i) => `${i ? '<span class="ws-arrow" aria-hidden="true">→</span>' : ""}<span class="ws-node done${/relais/.test(st.engine) ? " relay" : ""}">` +
+    `<b>${esc(st.role)}</b><small>${esc(st.engine.replace(" (relais)", ""))}</small><i>✓${st.seconds != null ? ` ${String(st.seconds).replace(".", ",")} s` : ""}</i></span>`).join("");
+  return p;
+}
 function workshopEl(w) {
   const d = document.createElement("details");
   d.className = "ws";
@@ -66,7 +74,7 @@ function workshopEl(w) {
   return d;
 }
 
-async function sendWorkshop(text) {
+async function sendWorkshop(text, opts = {}) {
   exitHero();
   workshopNext = false; $("wsBtn").classList.remove("on");
   $("empty")?.remove();
@@ -77,14 +85,16 @@ async function sendWorkshop(text) {
   setEmotion("focus"); setEntityState("atelier…");
   const el = document.createElement("div");
   el.className = "msg atom";
-  el.innerHTML = `<details class="ws" open><summary>${icon("users")}Atelier en cours…</summary><div class="ws-live"></div></details><div class="body md"></div>`;
+  el.innerHTML = `<div class="ws-pipe" aria-label="Avancement de l'atelier"></div><details class="ws" open><summary>${icon("users")}Atelier en cours…</summary><div class="ws-live"></div></details><div class="body md"></div>`;
   chat.appendChild(el); scroller.scrollTop = scroller.scrollHeight;
-  const live = el.querySelector(".ws-live"), body = el.querySelector(".body"), sum = el.querySelector("summary");
+  const live = el.querySelector(".ws-live"), body = el.querySelector(".body"), sum = el.querySelector("summary"), pipe = el.querySelector(".ws-pipe");
+  const node = (i) => pipe.querySelector(`[data-i="${i}"]`);
+  const setNode = (i, state, extra) => { const n = node(i); if (!n) return; n.className = "ws-node " + state; if (extra != null) n.querySelector("i").textContent = extra; };
   const steps = []; let final = "", asstId = null, q = false;
   controller = new AbortController();
   try {
     const r = await api("/api/workshop/run", { method: "POST", signal: controller.signal,
-      body: JSON.stringify({ message: text, conversation_id: settings.conversationId }) });
+      body: JSON.stringify({ message: text, conversation_id: settings.conversationId, ...opts }) });
     const reader = r.body.getReader(), dec = new TextDecoder();
     let buf = "";
     for (;;) {
@@ -98,7 +108,15 @@ async function sendWorkshop(text) {
         const ev = JSON.parse(line);
         if (ev.type === "meta") { if (settings.conversationId !== ev.conversation_id) { settings.conversationId = ev.conversation_id; saveSettings(); loadConversations(); } }
         else if (ev.type === "ids") { userMsg.id = ev.user_id; }
+        else if (ev.type === "plan") {
+          // Toutes les étapes dès le départ : en attente → en cours → terminée (ou relais).
+          pipe.innerHTML = ev.steps.map((st, i) => `${i ? '<span class="ws-arrow" aria-hidden="true">→</span>' : ""}<span class="ws-node pending" data-i="${i}">` +
+            `<b>${esc(st.role)}</b><small>${esc(st.engine)}</small><i>en attente</i></span>`).join("");
+          sum.innerHTML = `${icon("users")}Atelier · ${esc(ev.name)} · ${ev.steps.length} étapes`;
+        }
         else if (ev.type === "step" && ev.status === "start") {
+          setNode(ev.index, "running", ev.role === "Validée" ? "relecture favorable" : "en cours…");
+          if (node(ev.index)) node(ev.index).querySelector("small").textContent = ev.engine;
           sum.innerHTML = `${icon("users")}Atelier · ${esc(ev.role)} (${esc(ev.engine)})…`;
           entity.tokenKick = 1;
           if (ev.final) { entity.split = 0; entity.rippleT = 0; entity.remote = false; }
@@ -113,9 +131,12 @@ async function sendWorkshop(text) {
           if (!q) { q = true; requestAnimationFrame(() => { q = false; steps.forEach((x) => x && (x.el.querySelector(".md").innerHTML = md(x.text))); }); }
         } else if (ev.type === "step" && ev.status === "engine") {
           const s = steps[ev.index]; if (s) { const sp = s.el.querySelector(".ws-h span"); sp.textContent = ev.engine; sp.title = ev.reason || ""; }
+          if (node(ev.index)) { node(ev.index).querySelector("small").textContent = ev.engine; node(ev.index).classList.add("relay"); }
           if (ev.reason) toast(`<b>Atelier</b> · relais : ${esc(ev.reason)}`);
         } else if (ev.type === "step" && ev.status === "done") {
           const s = steps[ev.index]; if (s) { s.text = ev.text; setMd(s.el.querySelector(".md"), ev.text); }
+          const relay = node(ev.index)?.classList.contains("relay");
+          setNode(ev.index, "done" + (relay ? " relay" : ""), ev.seconds != null ? `✓ ${String(ev.seconds).replace(".", ",")} s` : "✓");
         } else if (ev.type === "token") {
           final += ev.text; entity.tokenKick = 1;
           body.innerHTML = md(final); body.lastElementChild?.classList.add("cursor");

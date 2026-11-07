@@ -31,6 +31,7 @@
       <button id="navLib"><span data-i="library"></span>Bibliothèque</button>
       <button id="navCode"><span data-i="code"></span>Code</button>
       <button id="navDash"><span data-i="pulse"></span>Tableau de bord</button>
+      <button id="navWs"><span data-i="users"></span>Atelier multi-IA</button>
       <button data-goto="memory"><span data-i="memory"></span>Souvenirs<span class="count" id="navMem"></span></button>
       <button data-goto="reminders"><span data-i="clock"></span>Rappels<span class="count" id="navRem"></span></button>
     </div>
@@ -164,7 +165,7 @@
             <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF, tableur, image)" data-i="clip"></button>
             <button class="iconbtn" id="webBtn" type="button" title="Rechercher sur Internet pour ce message" data-i="globe"></button>
             <button class="iconbtn" id="deepBtn" type="button" title="Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé" data-i="library"></button>
-            <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA pour ce message" data-i="users" style="display:none"></button>
+            <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA : plusieurs modèles sur ce message" data-i="users"></button>
             <span class="cbar-sep"></span>
             <div class="scope-wrap" id="engineWrap" style="display:none"><button type="button" class="sel" id="engineBtn" title="Quel modèle répond"></button><div class="scope-menu" id="engineMenu"></div></div>
             <div class="scope-wrap"><button type="button" class="sel" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div>
@@ -414,7 +415,7 @@
       <section class="pane" data-pane="workshop">
         <div class="block">
           <h4>Atelier multi-IA</h4>
-          <p class="desc">Pour une demande importante, plusieurs IA travaillent ensemble : l'une rédige, une autre critique, une troisième corrige ou arbitre. Active-le ici, puis utilise le bouton <b>Atelier</b> sous la saisie pour un message.</p>
+          <p class="desc">Pour une demande importante, plusieurs IA travaillent ensemble : l'une rédige, une autre critique, une troisième corrige ou arbitre. Lance-le depuis <b>Atelier multi-IA</b> dans la barre latérale (ou le bouton sous la saisie) ; les choix ci-dessous sont ceux proposés par défaut. Activer l'option ci-dessous fait passer en atelier le message suivant d'un simple clic.</p>
           <label class="switch"><span>Activer l'atelier</span><input type="checkbox" id="wsEnabled"></label>
         </div>
         <div class="block">
@@ -501,6 +502,35 @@
   </div>
 </div>
 <div id="toast"></div>
+<div id="wsLaunch" class="wl" role="dialog" aria-modal="true" aria-labelledby="wlTitle" hidden>
+  <div class="wl-box">
+    <header class="wl-head">
+      <span class="wl-ic" data-i="users"></span>
+      <div><h2 id="wlTitle">Atelier multi-IA</h2><p>Plusieurs modèles travaillent ensemble sur ta demande, chacun dans un rôle.</p></div>
+      <button class="iconbtn" id="wlClose" type="button" aria-label="Fermer" data-i="x"></button>
+    </header>
+    <div class="wl-body">
+      <label class="wl-label" for="wlText">Ta demande</label>
+      <textarea id="wlText" class="field" rows="4" placeholder="Une question importante, une décision, un texte ou du code à soigner…"></textarea>
+      <div class="wl-ex" id="wlEx" aria-label="Exemples de demandes"></div>
+
+      <div class="wl-label">Comment travaillent-ils ?</div>
+      <div class="wl-patterns" id="wlPatterns" role="radiogroup" aria-label="Schéma de travail"></div>
+      <p class="wl-hint" id="wlHint"></p>
+
+      <div class="wl-label">L'équipe</div>
+      <div class="wl-team" id="wlTeam"></div>
+      <div class="wl-rounds" id="wlRoundsRow"><span>Tours de relecture</span><div class="seg" id="wlRounds"><button data-r="1">1</button><button data-r="2">2</button><button data-r="3">3</button></div></div>
+      <div class="wl-flow" id="wlFlow" aria-label="Étapes prévues"></div>
+      <p class="wl-warn" id="wlWarn" hidden></p>
+    </div>
+    <footer class="wl-foot">
+      <span class="wl-sum" id="wlSum"></span>
+      <label class="wl-keep"><input type="checkbox" id="wlKeep" checked> Mémoriser ces choix</label>
+      <button class="btn primary" id="wlGo" type="button">Lancer l'atelier</button>
+    </footer>
+  </div>
+</div>
 <div id="palette"><div class="pal">
   <div class="pal-in"><span data-i="search"></span><input id="palIn" placeholder="Chercher une conversation, une action, un réglage…" autocomplete="off"><kbd>Échap</kbd></div>
   <div class="pal-list" id="palList"></div>
@@ -604,6 +634,7 @@
 <script src="/js/11c-code-agent.js?v=__V__"></script>
 <script src="/js/11d-code-tests-barres-regles.js?v=__V__"></script>
 <script src="/js/12-atelier-espaces-recherche-canevas.js?v=__V__"></script>
+<script src="/js/12b-atelier-lanceur.js?v=__V__"></script>
 <script src="/js/13-interface-commandes-mobile.js?v=__V__"></script>
 <script src="/js/14-consommation.js?v=__V__"></script>
 <script src="/js/15-demarrage.js?v=__V__"></script>

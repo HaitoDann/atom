@@ -79,3 +79,12 @@ test.describe("téléphone", () => {
     expect(await audit(page, "#settings")).toEqual([]);
   });
 });
+
+test("accessibilité : lanceur d'atelier", async ({ page }) => {
+  await login(page);
+  await page.click("#navWs");
+  await expect(page.locator("#wlGo")).toBeVisible();
+  await page.fill("#wlText", "Compare deux options pour mon serveur");
+  await expect(page.locator("#wlFlow .ws-node").first()).toBeVisible();
+  expect(await audit(page, "#wsLaunch")).toEqual([]);
+});

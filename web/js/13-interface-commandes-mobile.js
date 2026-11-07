@@ -10,7 +10,7 @@ function toolsItems() {
     items.push({ id: "web", ic: "globe", t: "Rechercher sur Internet", d: "Pour ce message · quelques secondes", on: webForce, run: () => $("webBtn").click() });
     items.push({ id: "deep", ic: "library", t: "Recherche approfondie", d: "Plan, lecture de nombreuses pages, rapport sourcé · 1 à 3 min", on: deepNext, run: () => $("deepBtn").click() });
   }
-  if (workshopCfg?.enabled) items.push({ id: "ws", ic: "users", t: "Atelier multi-IA", d: "Plusieurs IA rédigent et se relisent · 3 appels ou plus", on: workshopNext, run: () => $("wsBtn").click() });
+  items.push({ id: "ws", ic: "users", t: "Atelier multi-IA…", d: "Plusieurs modèles sur ta demande : choisir le schéma et l'équipe", on: false, run: () => openWsLauncher(input.value) });
   items.push("hr");
   items.push({ id: "file", ic: "clip", t: "Joindre un fichier", d: "Texte, code, PDF, tableur (analysé en Python), image", run: () => $("attach").click() });
   items.push({ id: "pal", ic: "search", t: "Toutes les actions", d: "Ctrl+K", run: () => openPalette() });
@@ -82,7 +82,7 @@ function palActions() {
     A("Apparence", "panel", "Afficher / masquer le panneau de l'entité", () => $("panelBtn").click()),
   ];
   if (hybridState?.configured) for (const [v, t] of [["local", "Local"], ["auto", "Auto"], ["mistral", hybridState.name]]) list.push(A("Moteur", v === "local" ? "orb" : "spark", `Répondre avec : ${t}`, () => setEngine(v)));
-  if (workshopCfg?.enabled) list.push(A("Actions", "users", "Atelier multi-IA pour le prochain message", () => { workshopNext = true; $("wsBtn").classList.add("on"); }));
+  list.push(A("Actions", "users", "Lancer un atelier multi-IA…", () => openWsLauncher(input.value)));
   for (const o of [...modelSel.options]) if (o.value) list.push(A("Modèle", "spark", `Modèle : ${o.value}`, () => { modelSel.value = o.value; modelSel.onchange(); }));
   for (const t of document.querySelectorAll(".tabs .tab")) list.push(A("Réglages", "settings", `Réglages · ${t.textContent.trim()}`, () => openSettings(t.dataset.tab)));
   list.push(A("Compte", "lock", "Me déconnecter", () => $("secLogout").click()));
