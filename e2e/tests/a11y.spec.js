@@ -18,6 +18,8 @@ async function login(page) {
 
 /** Violations graves ou critiques, sous une forme lisible dans le rapport. */
 async function audit(page, include) {
+  // Analyse une fois les animations terminées (un fondu en cours fausse le calcul des contrastes).
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity));
   let b = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]);
   if (include) b = b.include(include);
   const r = await b.analyze();
@@ -78,4 +80,13 @@ test.describe("téléphone", () => {
     expect(overflow).toBeLessThanOrEqual(1);
     expect(await audit(page, "#settings")).toEqual([]);
   });
+});
+
+test("accessibilité : lanceur d'atelier", async ({ page }) => {
+  await login(page);
+  await page.click("#navWs");
+  await expect(page.locator("#wlGo")).toBeVisible();
+  await page.fill("#wlText", "Compare deux options pour mon serveur");
+  await expect(page.locator("#wlFlow .ws-node").first()).toBeVisible();
+  expect(await audit(page, "#wsLaunch")).toEqual([]);
 });

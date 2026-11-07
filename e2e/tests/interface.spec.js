@@ -31,11 +31,11 @@ async function login(page) {
 
 /** Saisit puis envoie ; recommence si l'interface a vidé le champ entre-temps (restauration du brouillon). */
 async function send(page, text) {
+  // Saisie et clic ensemble : si l'interface vide le champ entre les deux (restauration du brouillon), on recommence.
   await expect(async () => {
     await page.fill("#input", text);
-    await expect(page.locator("#send")).toBeEnabled({ timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
-  await page.click("#send");
+    await page.click("#send", { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 test.describe.configure({ mode: "serial" });
@@ -198,5 +198,50 @@ test("tableau de bord : Grafana affiché dans l'interface, à travers Atom", asy
   await expect(frame.locator("#path")).toContainText("from=now-7d");
   await page.click("#navDash");                                              // retour à la discussion
   await expect(page.locator("#dashView")).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test("atelier : lanceur, schéma conseillé, équipe, suivi des étapes en direct", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.click("#navWs");
+  await expect(page.locator("#wsLaunch")).toBeVisible();
+  await expect(page.locator("#wlGo")).toBeDisabled();
+  await page.fill("#wlText", "Faut-il héberger mes services à la maison ou chez un hébergeur ?");
+  await expect(page.locator('.wl-pat.on[data-p="debate"]')).toBeVisible();          // conseillé et choisi : un débat
+  await expect(page.locator(".wl-sug")).toHaveCount(1);
+  await expect(page.locator("#wlTeam .wl-member")).toHaveCount(3);
+  await expect(page.locator("#wlFlow .ws-node")).toHaveCount(3);
+  await page.click('.wl-pat[data-p="review"]');                                    // choix manuel : rédaction puis relecture
+  await page.click('#wlRounds button[data-r="2"]');
+  await expect(page.locator("#wlFlow .ws-node")).toHaveCount(5);
+  await expect(page.locator("#wlSum")).toContainText("5 appels");
+  await page.click('.wl-pat[data-p="panel"]');
+  await expect(page.locator("#wlFlow .ws-node")).toHaveCount(3);
+  await page.click("#wlGo");
+  await expect(page.locator("#wsLaunch")).toBeHidden();
+  const msg = page.locator(".msg.atom").last();
+  await expect(msg.locator(".ws-pipe .ws-node")).toHaveCount(3);
+  await expect(msg.locator(".ws-node.done")).toHaveCount(3, { timeout: 20_000 });
+  expect(errors).toEqual([]);
+});
+
+test("atelier : exemple en un clic et lancement au clavier (Ctrl+Entrée)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.fill("#input", "Ma demande depuis la saisie");
+  await page.click("#toolsBtn");                                                   // menu « + » sous la saisie
+  await page.locator("#toolsMenu").getByText("Atelier multi-IA…").click();
+  await expect(page.locator("#wlText")).toHaveValue("Ma demande depuis la saisie");
+  await page.click('#wlEx [data-ex="1"]');
+  await expect(page.locator("#wlText")).toHaveValue(/Compare SQLite/);
+  await expect(page.locator('.wl-pat.on[data-p="panel"]')).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#wsLaunch")).toBeHidden();
+  await page.click("#navWs");
+  await expect(page.locator("#wlGo")).toBeEnabled();                              // configuration chargée
+  await page.locator("#wlText").press("Control+Enter");
+  await expect(page.locator("#wsLaunch")).toBeHidden();
+  await expect(page.locator(".msg.atom").last().locator(".ws-node.done")).toHaveCount(3, { timeout: 20_000 });
   expect(errors).toEqual([]);
 });

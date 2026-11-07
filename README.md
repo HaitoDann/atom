@@ -451,9 +451,16 @@ puis `./update.sh`. L'écran État affiche « Bac à sable : actif ».
 
 **Espace disque** : les images sont légères et téléchargées une seule fois, au premier test du langage concerné : `golang:1.23-alpine` environ 250 Mo, `node:22-alpine` environ 150 Mo, `python:3.12-slim` environ 130 Mo, `rust:1-slim` environ 700 Mo. Pour libérer la place : `docker image rm …` et `docker volume rm atom-sandbox-cache`.
 
-## Atelier multi-IA (désactivé par défaut)
+## Atelier multi-IA
 
-Pour une demande importante, plusieurs IA collaborent. Réglages → **Atelier** → « Activer l'atelier », puis le bouton **Atelier** (icône de groupe) sous la saisie pour le message suivant.
+Pour une demande importante, plusieurs IA collaborent. Clique sur **Atelier multi-IA** dans la barre latérale (ou « + » sous la saisie → Atelier, ou Ctrl+K → « Lancer un atelier ») : le **lanceur** réunit tout sur un écran.
+
+1. **Ta demande** — ou un exemple en un clic (une décision, une comparaison, du code, un texte soigné) pour tester.
+2. **Le schéma** — Atom en **conseille** un selon ta demande (« faut-il… », « X ou Y ? » → débat ; « compare », « analyse » → comité ; sinon rédaction puis relecture). Tu peux en choisir un autre.
+3. **L'équipe** — le modèle de chaque rôle (Automatique, local ou un fournisseur précis), avec sa famille, et les **étapes prévues** dans l'ordre, le nombre d'appels et les avertissements (même famille pour rédacteur et relecteur, arbitre trop faible…).
+4. **Lancer l'atelier** (ou Ctrl+Entrée). Pendant le travail, la chaîne des étapes montre qui travaille, ce qui est fait, la durée de chaque étape et les relais ; elle reste affichée sur la réponse pour comparer après coup.
+
+« Mémoriser ces choix » en fait les réglages par défaut (Réglages → Atelier). Pas besoin d'activer l'atelier pour le lancer ; l'option « Activer l'atelier » des réglages sert seulement au passage rapide du message suivant.
 
 - **Rédaction puis relecture** : un rédacteur écrit, un relecteur critique, une version corrigée est produite (1 à 3 tours).
 - **Comité et arbitre** : deux propositions indépendantes, un arbitre fait la synthèse.

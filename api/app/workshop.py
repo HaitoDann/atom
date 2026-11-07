@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from typing import AsyncIterator
 
 from . import db, hybrid, llm, providers
@@ -233,6 +234,37 @@ def _prompts(pattern: str, step: int, request: str, prev: list[str]) -> list[dic
     return [{"role": "system", "content": sys}, {"role": "user", "content": user}]
 
 
+DEBATE_RE = re.compile(r"\b(faut-il|dois-je|devrais-je|vaut-il mieux|est-ce une bonne idée|pour ou contre|"
+                       r"avantages et inconvénients)\b|\b\w+\s+ou\s+[^?]{1,60}\?", re.I)   # « X ou Y ? » : un choix
+PANEL_RE = re.compile(r"\b(compare|comparer|comparatif|analyse|analyser|évalue|évaluer|stratégie|plan d'action|options|"
+                      r"meilleure façon|recommande|propose plusieurs)\b", re.I)
+
+
+def suggest(message: str) -> tuple[str, str]:
+    """Schéma conseillé pour une demande, avec la raison (affichée dans le lanceur)."""
+    m = message or ""
+    if DEBATE_RE.search(m):
+        return "debate", "une décision à prendre : deux positions opposées, puis un arbitre tranche"
+    if PANEL_RE.search(m):
+        return "panel", "une analyse ou une comparaison : deux propositions indépendantes, puis une synthèse"
+    return "review", "un texte ou du code à produire : un rédacteur, un relecteur exigeant, puis une version corrigée"
+
+
+def preview(pattern: str | None, participants: list[str] | None, rounds: int | None, message: str = "") -> dict:
+    """Ce que ferait l'atelier, sans rien lancer : étapes, modèles, appels distants, conseils."""
+    s = settings()
+    suggested, why = suggest(message)
+    pattern = pattern if pattern in ROLES else s["pattern"]
+    participants = participants or s["participants"]
+    rounds = max(1, min(3, int(rounds or s["rounds"])))
+    steps = plan(pattern, participants, rounds)
+    labels = [{"role": r, "engine": engine_label(e), "remote": e.startswith("p:"), "family": _info(e)[1]} for r, e in steps]
+    return {"pattern": pattern, "name": PATTERNS[pattern], "rounds": rounds, "participants": participants,
+            "suggested": suggested, "suggested_name": PATTERNS[suggested], "suggested_reason": why,
+            "steps": labels, "calls": len(steps), "remote_calls": sum(1 for x in labels if x["remote"]),
+            "warnings": warnings(pattern, participants), "roles": ROLES[pattern]}
+
+
 def plan(pattern: str, participants: list[str], rounds: int) -> list[tuple[str, str]]:
     """[(rôle, moteur concret)] dans l'ordre d'exécution."""
     p = assign(pattern, participants)
@@ -245,7 +277,7 @@ def plan(pattern: str, participants: list[str], rounds: int) -> list[tuple[str, 
 
 
 async def run(message: str, conversation_id: int | None, pattern: str | None = None,
-              participants: list[str] | None = None, title: str = "") -> AsyncIterator[dict]:
+              participants: list[str] | None = None, title: str = "", rounds: int | None = None) -> AsyncIterator[dict]:
     """Événements : meta, step (start/token/done), token… (réponse finale), done — ou error."""
     from .agent import make_title
 
@@ -263,7 +295,10 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
     user_id = db.add_message(conversation_id, "user", message)
     yield dict(type="ids", user_id=user_id)
 
-    steps = plan(pattern, participants, s["rounds"])
+    steps = plan(pattern, participants, max(1, min(3, int(rounds or s["rounds"]))))
+    # Le plan complet d'abord : l'interface affiche toutes les étapes à venir (en attente, en cours, terminée).
+    yield dict(type="plan", pattern=pattern, name=PATTERNS[pattern],
+               steps=[{"role": r, "engine": engine_label(e), "remote": e.startswith("p:")} for r, e in steps])
     outputs: list[str] = []
     record = []
     try:
@@ -284,6 +319,7 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
                 i += 1
                 continue
             switched: list = []
+            t_step = time.time()
             yield dict(type="step", status="start", index=i, role=role, engine=engine_label(engine), final=final)
             text, sent = "", 0
             async for tok in _gen(engine, _prompts(pattern, i, request, outputs), lambda e, why: switched.append((e, why))):  # noqa: B023 (consommé dans la même itération)
@@ -305,11 +341,12 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
                 yield dict(type="step", status="engine", index=i, engine=label, reason=" ; ".join(switched[-1][1])[:200])
             text = TAG_RE.sub("", THINK_RE.sub("", text)).strip()
             outputs.append(text)
-            record.append({"role": role, "engine": label, "text": text})
-            yield dict(type="step", status="done", index=i, text=text)
+            record.append({"role": role, "engine": label, "text": text, "seconds": round(time.time() - t_step, 1)})
+            yield dict(type="step", status="done", index=i, text=text, seconds=round(time.time() - t_step, 1))
             i += 1
         final_text = outputs[-1] if outputs else "…"
-        meta = {"workshop": {"pattern": pattern, "name": PATTERNS[pattern], "steps": record[:-1]}}
+        last = {k: v for k, v in record[-1].items() if k != "text"} if record else None
+        meta = {"workshop": {"pattern": pattern, "name": PATTERNS[pattern], "steps": record[:-1], "final": last}}
         asst_id = db.add_message(conversation_id, "assistant", final_text, "focus", meta=meta)
         yield dict(type="done", emotion="focus", id=asst_id, final=final_text)
     except Exception as e:
