@@ -14,7 +14,9 @@ ni souvenirs, ni bibliothèque, ni fichiers.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import re
 import time
 from typing import AsyncIterator
@@ -30,6 +32,7 @@ DEFAULTS = {
     "pattern": "review",
     "participants": ["auto", "auto", "auto"],      # rôles selon le schéma (voir ROLES) : auto | local | p:<id>
     "rounds": 1,                                   # tours de relecture (review)
+    "architect": "auto",                           # architecte en premier : auto (livrables) | on | off
 }
 
 ROLES = {
@@ -70,6 +73,8 @@ def save_settings(new: dict) -> dict:
     while len(s["participants"]) < 3:
         s["participants"].append(s["participants"][-1])
     s["rounds"] = max(1, min(3, int(s.get("rounds", 1))))
+    if s.get("architect") not in ("auto", "on", "off"):
+        s["architect"] = "auto"
     db.kv_set("workshop", json.dumps(s))
     return s
 
@@ -155,20 +160,37 @@ def engine_label(engine: str) -> str:
     return f"Local · {_local_model().split(':')[0]}"
 
 
+RETRY_WAIT = float(os.getenv("ATOM_WORKSHOP_RETRY_WAIT", "45"))
+
+
 async def _gen(engine: str, messages: list[dict], on_engine) -> AsyncIterator[str]:
-    """Jetons du participant ; s'il est indisponible, relais vers un autre fournisseur puis le local."""
+    """Jetons du participant ; s'il est indisponible, relais vers un autre fournisseur, puis — si tous sont seulement
+    en pause pour quelques secondes (limite par minute) — attente et nouvel essai, et le local en dernier recours :
+    un petit modèle local relit mal du code et prend plusieurs minutes."""
     if engine.startswith("p:"):
-        order = providers.chain(engine[2:])
-        used: dict = {}
-        try:
-            # Budget long et reprise automatique : une page web ou un fichier complet n'est plus coupé en route.
-            async for t in providers.stream_complete(order, messages, used, max_tokens=MAX_TOKENS_LONG, task="atelier"):
-                yield t
-            if used.get("id") and f"p:{used['id']}" != engine:
-                on_engine(f"p:{used['id']}", used.get("skipped") or [])
-            return
-        except providers.Unavailable as e:
-            on_engine("local", [str(e)])
+        last = ""
+        for attempt in range(2):
+            order = providers.chain(engine[2:])
+            used: dict = {}
+            got = False
+            try:
+                # Budget long et reprise automatique : une page web ou un fichier complet n'est plus coupé en route.
+                async for t in providers.stream_complete(order, messages, used, max_tokens=MAX_TOKENS_LONG, task="atelier"):
+                    got = True
+                    yield t
+                if used.get("id") and f"p:{used['id']}" != engine:
+                    on_engine(f"p:{used['id']}", used.get("skipped") or [])
+                return
+            except providers.Unavailable as e:
+                if got:
+                    raise
+                last = str(e)
+            wait = providers.soonest_resume()
+            if attempt or wait is None or wait > RETRY_WAIT:
+                break
+            log.info("atelier : fournisseurs en pause, nouvel essai dans %.0f s", wait)
+            await asyncio.sleep(wait + 1)
+        on_engine("local", [last or "aucun fournisseur distant disponible"])
     async for t in llm.stream_chat(_local_model(), messages):
         yield t
 
@@ -216,6 +238,20 @@ DELIVERABLE_GRID = (
 
 def is_deliverable(request: str) -> bool:
     return bool(DELIVERABLE_RE.search(request or ""))
+
+
+ARCHITECT_PROMPT = (
+    " Ton rôle : ARCHITECTE. Tu ne rédiges pas la réponse : tu transformes la demande en cahier des charges précis "
+    "que d'autres modèles suivront. Structure : 1) Objectif et public ; 2) Contenu attendu, partie par partie (pour une "
+    "page web : chaque section avec son contenu réel à écrire — textes, exemples, chiffres plausibles) ; 3) Style "
+    "(palette avec codes couleur, typographie, ambiance, références citées par l'utilisateur) ; 4) Exigences techniques "
+    "(fichiers à livrer, responsive, accessibilité, contraintes) ; 5) Critères de réussite vérifiables. Comble les "
+    "manques par des choix raisonnables et dis-le en une ligne. Sois concret et concis (40 lignes au plus)."
+)
+
+
+def wants_architect(mode: str, request: str) -> bool:
+    return mode == "on" or (mode == "auto" and is_deliverable(request))
 
 
 def review_ok(text: str) -> bool:
@@ -283,7 +319,8 @@ def suggest(message: str) -> tuple[str, str]:
     return "review", "un texte ou du code à produire : un rédacteur, un relecteur exigeant, puis une version corrigée"
 
 
-def preview(pattern: str | None, participants: list[str] | None, rounds: int | None, message: str = "") -> dict:
+def preview(pattern: str | None, participants: list[str] | None, rounds: int | None, message: str = "",
+            architect: str | None = None) -> dict:
     """Ce que ferait l'atelier, sans rien lancer : étapes, modèles, appels distants, conseils."""
     s = settings()
     suggested, why = suggest(message)
@@ -291,11 +328,18 @@ def preview(pattern: str | None, participants: list[str] | None, rounds: int | N
     participants = participants or s["participants"]
     rounds = max(1, min(3, int(rounds or s["rounds"])))
     steps = plan(pattern, participants, rounds)
+    arch_mode = architect if architect in ("auto", "on", "off") else s["architect"]
+    if wants_architect(arch_mode, message):
+        steps = [("Architecte", candidates()[0])] + steps
     labels = [{"role": r, "engine": engine_label(e), "remote": e.startswith("p:"), "family": _info(e)[1]} for r, e in steps]
     return {"pattern": pattern, "name": PATTERNS[pattern], "rounds": rounds, "participants": participants,
             "suggested": suggested, "suggested_name": PATTERNS[suggested], "suggested_reason": why,
             "steps": labels, "calls": len(steps), "remote_calls": sum(1 for x in labels if x["remote"]),
-            "warnings": warnings(pattern, participants), "roles": ROLES[pattern]}
+            "warnings": warnings(pattern, participants) + (
+                ["3 tours de relecture : rarement utile et nettement plus long ; 1 tour avec un bon relecteur suffit souvent."]
+                if pattern == "review" and rounds >= 3 else []),
+            "roles": ROLES[pattern], "architect": arch_mode, "architect_active": steps[0][0] == "Architecte",
+            "deliverable": is_deliverable(message)}
 
 
 def plan(pattern: str, participants: list[str], rounds: int) -> list[tuple[str, str]]:
@@ -310,7 +354,8 @@ def plan(pattern: str, participants: list[str], rounds: int) -> list[tuple[str, 
 
 
 async def run(message: str, conversation_id: int | None, pattern: str | None = None,
-              participants: list[str] | None = None, title: str = "", rounds: int | None = None) -> AsyncIterator[dict]:
+              participants: list[str] | None = None, title: str = "", rounds: int | None = None,
+              architect: str | None = None) -> AsyncIterator[dict]:
     """Événements : meta, step (start/token/done), token… (réponse finale), done — ou error."""
     from .agent import make_title
 
@@ -329,12 +374,28 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
     yield dict(type="ids", user_id=user_id)
 
     steps = plan(pattern, participants, max(1, min(3, int(rounds or s["rounds"]))))
+    arch = ("Architecte", candidates()[0]) if wants_architect(architect or s["architect"], message) else None
+    off = 1 if arch else 0
     # Le plan complet d'abord : l'interface affiche toutes les étapes à venir (en attente, en cours, terminée).
     yield dict(type="plan", pattern=pattern, name=PATTERNS[pattern],
-               steps=[{"role": r, "engine": engine_label(e), "remote": e.startswith("p:")} for r, e in steps])
+               steps=[{"role": r, "engine": engine_label(e), "remote": e.startswith("p:")} for r, e in ([arch] if arch else []) + steps])
     outputs: list[str] = []
     record = []
     try:
+        if arch:
+            # L'architecte transforme la demande en cahier des charges : tous les autres travaillent à partir de lui.
+            t_step, brief, switched = time.time(), "", []
+            yield dict(type="step", status="start", index=0, role="Architecte", engine=engine_label(arch[1]), final=False)
+            msgs = [{"role": "system", "content": BASE + ARCHITECT_PROMPT}, {"role": "user", "content": request}]
+            async for tok in _gen(arch[1], msgs, lambda e, why: switched.append((e, why))):
+                brief += tok
+                yield dict(type="step", status="token", index=0, text=tok)
+            brief = TAG_RE.sub("", THINK_RE.sub("", brief)).strip()
+            label = f"{engine_label(switched[-1][0])} (relais)" if switched else engine_label(arch[1])
+            record.append({"role": "Architecte", "engine": label, "text": brief, "seconds": round(time.time() - t_step, 1)})
+            yield dict(type="step", status="done", index=0, text=brief, seconds=round(time.time() - t_step, 1))
+            if brief:
+                request = f"{request}\n\nCahier des charges établi par l'architecte (à suivre) :\n{brief}"
         i = 0
         while i < len(steps):
             role, engine = steps[i]
@@ -342,18 +403,18 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
             # Relecture favorable : inutile de corriger, la première version devient la réponse finale.
             if pattern == "review" and role == "Correction" and outputs and review_ok(outputs[-1]):
                 draft = outputs[-2]
-                yield dict(type="step", status="start", index=i, role="Validée", engine="relecture favorable", final=final)
+                yield dict(type="step", status="start", index=i + off, role="Validée", engine="relecture favorable", final=final)
                 if final:
                     for piece in re.findall(r"\S+\s*|\s+", draft):
                         yield dict(type="token", text=piece)
                 outputs.append(draft)
                 record.append({"role": "Validée", "engine": "relecture favorable", "text": draft})
-                yield dict(type="step", status="done", index=i, text=draft)
+                yield dict(type="step", status="done", index=i + off, text=draft)
                 i += 1
                 continue
             switched: list = []
             t_step = time.time()
-            yield dict(type="step", status="start", index=i, role=role, engine=engine_label(engine), final=final)
+            yield dict(type="step", status="start", index=i + off, role=role, engine=engine_label(engine), final=final)
             text, sent = "", 0
             async for tok in _gen(engine, _prompts(pattern, i, request, outputs), lambda e, why: switched.append((e, why))):  # noqa: B023 (consommé dans la même itération)
                 text += tok
@@ -363,19 +424,19 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
                 clean = TAG_RE.sub("", THINK_RE.sub("", text))
                 piece, sent = clean[sent:], len(clean)
                 if piece:
-                    yield dict(type="token", text=piece) if final else dict(type="step", status="token", index=i, text=piece)
+                    yield dict(type="token", text=piece) if final else dict(type="step", status="token", index=i + off, text=piece)
             clean = TAG_RE.sub("", THINK_RE.sub("", text))
             if clean[sent:]:
                 piece = clean[sent:]
-                yield dict(type="token", text=piece) if final else dict(type="step", status="token", index=i, text=piece)
+                yield dict(type="token", text=piece) if final else dict(type="step", status="token", index=i + off, text=piece)
             label = engine_label(engine)
             if switched:
                 label = f"{engine_label(switched[-1][0])} (relais)"
-                yield dict(type="step", status="engine", index=i, engine=label, reason=" ; ".join(switched[-1][1])[:200])
+                yield dict(type="step", status="engine", index=i + off, engine=label, reason=" ; ".join(switched[-1][1])[:200])
             text = TAG_RE.sub("", THINK_RE.sub("", text)).strip()
             outputs.append(text)
             record.append({"role": role, "engine": label, "text": text, "seconds": round(time.time() - t_step, 1)})
-            yield dict(type="step", status="done", index=i, text=text, seconds=round(time.time() - t_step, 1))
+            yield dict(type="step", status="done", index=i + off, text=text, seconds=round(time.time() - t_step, 1))
             i += 1
         final_text = outputs[-1] if outputs else "…"
         last = {k: v for k, v in record[-1].items() if k != "text"} if record else None

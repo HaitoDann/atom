@@ -265,3 +265,40 @@ test("code : télécharger le fichier et voir l'aperçu d'une page HTML", async 
   await expect(page.locator("#pvw")).toBeHidden();
   expect(errors).toEqual([]);
 });
+
+test("code : plusieurs fichiers → tout télécharger en .zip", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await send(page, "**index.html**\n\n```html\n<!doctype html><link rel=stylesheet href=style.css><h1>Zip</h1>\n```\n\n**style.css**\n\n```css\nh1 { color: #d32f2f; }\n```");
+  const bar = page.locator(".msg.atom").last().locator(".zip-bar");
+  await expect(bar).toContainText("2 fichiers", { timeout: 15_000 });
+  await expect(bar).toContainText("style.css");
+  const [dl] = await Promise.all([page.waitForEvent("download"), bar.locator("[data-zip]").click()]);
+  expect(dl.suggestedFilename()).toBe("index.zip");
+  // Le zip est valide et contient les deux fichiers complets (relu par Python).
+  const out = require("child_process").execFileSync("python3", ["-c",
+    "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;print('|'.join(n+':'+z.read(n).decode() for n in z.namelist()))",
+    await dl.path()]).toString();
+  expect(out).toContain("index.html:<!doctype html>");
+  expect(out).toContain("style.css:h1 { color: #d32f2f; }");
+  expect(errors).toEqual([]);
+});
+
+test("atelier : architecte en premier pour un livrable", async ({ page }) => {
+  await login(page);
+  await page.click("#navWs");
+  await expect(page.locator("#wlGo")).toBeVisible();
+  await page.fill("#wlText", "Crée une page web pour ma boulangerie à Lyon");
+  await expect(page.locator("#wlFlow .ws-node").first()).toContainText("Architecte");
+  await expect(page.locator("#wlArchNote")).toHaveText("cahier des charges d'abord");
+  await page.click('#wlArch button[data-a="off"]');
+  await expect(page.locator("#wlFlow .ws-node").first()).not.toContainText("Architecte");
+  await page.click('#wlArch button[data-a="auto"]');
+  await page.click('#wlRounds button[data-r="3"]');
+  await expect(page.locator("#wlWarn")).toContainText("3 tours");
+  await page.click('#wlRounds button[data-r="1"]');
+  await page.click("#wlGo");
+  const msg = page.locator(".msg.atom").last();
+  await expect(msg.locator(".ws-node").first()).toContainText("Architecte");
+  await expect(msg.locator(".ws-node.done")).toHaveCount(4, { timeout: 20_000 });
+});

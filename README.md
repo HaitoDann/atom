@@ -464,6 +464,8 @@ Pour une demande importante, plusieurs IA collaborent. Clique sur **Atelier mult
 
 Chaque bloc de code a un bouton **Télécharger** (nom de fichier repris de la réponse, ex. `index.html`) et, pour une page HTML, **Aperçu** : la page s'affiche (ordinateur, tablette, téléphone) dans un bac à sable isolé d'Atom — elle n'a accès ni à ta session ni à l'API.
 
+**Architecte** (lanceur : Auto / Toujours / Jamais) : pour un livrable, un modèle fort transforme d'abord ta demande en cahier des charges (contenu de chaque partie, palette, exigences techniques, critères de réussite) ; tous les autres rôles travaillent à partir de lui. **Relais** : si les fournisseurs distants sont seulement en pause pour quelques secondes (limite par minute), l'atelier attend et réessaie (`ATOM_WORKSHOP_RETRY_WAIT`, 45 s) au lieu de confier l'étape au petit modèle local. Une réponse avec plusieurs fichiers propose **Tout télécharger (.zip)**. Les mêmes exigences de livrable s'appliquent aussi à la discussion normale.
+
 « Mémoriser ces choix » en fait les réglages par défaut (Réglages → Atelier). Pas besoin d'activer l'atelier pour le lancer ; l'option « Activer l'atelier » des réglages sert seulement au passage rapide du message suivant.
 
 - **Rédaction puis relecture** : un rédacteur écrit, un relecteur critique, une version corrigée est produite (1 à 3 tours).

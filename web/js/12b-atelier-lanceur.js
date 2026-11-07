@@ -20,7 +20,7 @@ async function openWsLauncher(text = "") {
   document.body.classList.add("wl-open");
   try { workshopCfg = await getJSON("/api/workshop"); } catch (e) { toast(esc(e.message)); closeWsLauncher(); return; }
   wl = { pattern: workshopCfg.pattern, participants: [...workshopCfg.participants], rounds: workshopCfg.rounds, touched: false,
-         preview: null, timer: 0, options: workshopCfg.options };
+         preview: null, timer: 0, options: workshopCfg.options, architect: workshopCfg.architect || "auto" };
   await wlRefresh();
   requestAnimationFrame(() => { $("wlText").focus(); $("wlText").setSelectionRange($("wlText").value.length, $("wlText").value.length); });
 }
@@ -30,7 +30,7 @@ async function wlRefresh() {
   let r;
   try {
     r = await (await send_("/api/workshop/preview", "POST",
-      { message: $("wlText").value, pattern: wl.pattern, participants: wl.participants, rounds: wl.rounds })).json();
+      { message: $("wlText").value, pattern: wl.pattern, participants: wl.participants, rounds: wl.rounds, architect: wl.architect })).json();
   } catch (e) { $("wlWarn").textContent = e.message; $("wlWarn").hidden = false; return; }
   // Tant que tu n'as pas choisi toi-même, le schéma suit la suggestion d'Atom.
   if (!wl.touched && $("wlText").value.trim() && r.suggested !== wl.pattern) { wl.pattern = r.suggested; return wlRefresh(); }
@@ -72,6 +72,10 @@ function wlRender() {
   }).join("");
   $("wlTeam").querySelectorAll("select").forEach((sel) => sel.onchange = () => { wl.participants[+sel.dataset.slot] = sel.value; wlRefresh(); });
 
+  // Architecte : un modèle fort transforme la demande en cahier des charges avant que les autres travaillent.
+  $("wlArch").querySelectorAll("button").forEach((b) => { b.classList.toggle("on", b.dataset.a === wl.architect); b.setAttribute("aria-checked", b.dataset.a === wl.architect);
+    b.onclick = () => { wl.architect = b.dataset.a; wlRefresh(); }; });
+  $("wlArchNote").textContent = r.architect_active ? "cahier des charges d'abord" : wl.architect === "auto" ? "seulement pour code et pages web" : "";
   $("wlRoundsRow").hidden = r.pattern !== "review";
   $("wlRounds").querySelectorAll("button").forEach((b) => { b.classList.toggle("on", +b.dataset.r === r.rounds); b.onclick = () => { wl.rounds = +b.dataset.r; wlRefresh(); }; });
 
@@ -87,12 +91,12 @@ function wlRender() {
 async function wlLaunch() {
   const text = $("wlText").value.trim(), r = wl.preview;
   if (!text || !r || busy) return;
-  if ($("wlKeep").checked) saveWorkshop({ pattern: r.pattern, participants: wl.participants, rounds: r.rounds });
+  if ($("wlKeep").checked) saveWorkshop({ pattern: r.pattern, participants: wl.participants, rounds: r.rounds, architect: wl.architect });
   closeWsLauncher();
   if (currentView !== "chat") showView("chat");
   input.value = ""; autoGrow();
   $("wlText").value = "";
-  sendWorkshop(text, { pattern: r.pattern, participants: wl.participants, rounds: r.rounds });
+  sendWorkshop(text, { pattern: r.pattern, participants: wl.participants, rounds: r.rounds, architect: wl.architect });
 }
 
 $("wlText").addEventListener("input", () => { $("wlGo").disabled = !$("wlText").value.trim(); wlRefreshSoon(); });

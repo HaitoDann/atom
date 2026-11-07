@@ -180,6 +180,14 @@ def quota_left(pid: str) -> int:
 _cooldown: dict[str, float] = {}
 
 
+def soonest_resume(sensitive: bool = False) -> float | None:
+    """Secondes avant qu'un fournisseur en pause (limite par minute, panne passagère) redevienne disponible."""
+    now = time.time()
+    waits = [_cooldown[p.id] - now for p in ALL if p.configured and quota_left(p.id) > 0
+             and (p.private or not sensitive) and _cooldown.get(p.id, 0) > now]
+    return min(waits) if waits else None
+
+
 def available(p: Provider, sensitive: bool = False) -> bool:
     return (p.configured and quota_left(p.id) > 0 and _cooldown.get(p.id, 0) < time.time()
             and (p.private or not sensitive))
