@@ -56,3 +56,15 @@ def test_code_project_and_path_safety(client, tmpdir_root):
 def test_status_report(client):
     r = client.get("/api/status").json()
     assert r["status"] in ("ok", "warn", "error") and any(c["name"] == "Sauvegarde" for c in r["checks"])
+
+
+def test_migrations_discovered_and_applied(client):
+    from app import db
+    from app.migrations import discover
+
+    found = discover()
+    versions = [v for v, _, _ in found]
+    assert versions == sorted(versions) and versions[:2] == [1, 2]
+    assert all(name and callable(up) for _, name, up in found)
+    assert db.schema_version() == versions[-1]
+    assert db.migrate() == []   # déjà à jour : rien à réappliquer

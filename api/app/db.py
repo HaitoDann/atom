@@ -111,44 +111,13 @@ def init() -> None:
 
 
 # ---------------------------------------------------------------- migrations versionnées
-# Chaque migration est numérotée, appliquée une seule fois et enregistrée dans schema_version.
-# Règle : ne jamais modifier une migration publiée, en ajouter une nouvelle.
+# Une migration par fichier dans app/migrations/ (mNNN_nom.py), appliquée une seule fois
+# et enregistrée dans schema_version. Voir app/migrations/__init__.py.
 
-def _m1_indexes(c) -> None:
-    for sql in (
-        "CREATE INDEX IF NOT EXISTS idx_recall_created ON recall(created_at)",
-        "CREATE INDEX IF NOT EXISTS idx_recall_conv ON recall(conversation_id)",
-        "CREATE INDEX IF NOT EXISTS idx_rem_status_due ON reminders(status, due_at)",
-        "CREATE INDEX IF NOT EXISTS idx_conv_updated ON conversations(updated_at)",
-    ):
-        c.execute(sql)
-    tables = {r["name"] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    if "chunks" in tables:
-        c.execute("CREATE INDEX IF NOT EXISTS idx_chunks_col ON chunks(collection_id)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc ON chunks(document_id)")
-    if "documents" in tables:
-        c.execute("CREATE INDEX IF NOT EXISTS idx_docs_col ON documents(collection_id)")
+def _load_migrations() -> list[tuple[int, str, object]]:
+    from .migrations import discover
 
-
-def _m2_memory_lifecycle(c) -> None:
-    """Souvenirs : type (sémantique / procédurale / épisodique), importance, confiance, révision, archivage."""
-    cols = _columns(c, "memories")
-    for col, ddl in [
-        ("kind", "TEXT NOT NULL DEFAULT 'semantique'"),
-        ("importance", "INTEGER NOT NULL DEFAULT 2"),      # 1 anecdotique · 2 utile · 3 essentiel
-        ("confidence", "REAL NOT NULL DEFAULT 0.8"),
-        ("review_at", "REAL"),                             # à revoir après cette date (faits temporaires)
-        ("archived_at", "REAL"),                           # remplacé ou périmé : gardé pour l'historique
-        ("superseded_by", "INTEGER"),
-        ("hits", "INTEGER NOT NULL DEFAULT 0"),
-        ("last_used", "REAL"),
-    ]:
-        if col not in cols:
-            c.execute(f"ALTER TABLE memories ADD COLUMN {col} {ddl}")
-    c.execute("CREATE INDEX IF NOT EXISTS idx_mem_active ON memories(archived_at, kind)")
-
-
-MIGRATIONS = [(1, "index des requêtes fréquentes", _m1_indexes), (2, "cycle de vie des souvenirs", _m2_memory_lifecycle)]
+    return discover()
 
 
 def schema_version() -> int:
@@ -161,7 +130,7 @@ def schema_version() -> int:
 def migrate() -> list[int]:
     applied = []
     current = schema_version()
-    for v, name, fn in MIGRATIONS:
+    for v, name, fn in _load_migrations():
         if v <= current:
             continue
         with conn() as c:   # une transaction par migration : tout ou rien
