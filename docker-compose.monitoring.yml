@@ -25,7 +25,7 @@ services:
       - prometheus-data:/prometheus
 
   grafana:
-    image: grafana/grafana:13.2.5   # version épinglée
+    image: grafana/grafana:13.3.0   # version épinglée
     restart: unless-stopped
     depends_on: [prometheus]
     environment:
