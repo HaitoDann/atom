@@ -1,0 +1,28 @@
+# Copie chiffrée des sauvegardes sur un NAS (partage SMB/CIFS, ex. NAS-VinX).
+# Activation : dans .env, ajoute
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.nas.yml
+#   (avec le bac à sable : docker-compose.yml:docker-compose.sandbox.yml:docker-compose.nas.yml)
+# puis renseigne NAS_HOST, NAS_SHARE, NAS_USER, NAS_PASSWORD et ATOM_OFFSITE_KEY, et lance ./update.sh.
+#
+# Le partage est monté par Docker (paquet cifs-utils sur le serveur : sudo apt install cifs-utils).
+# Atom n'y écrit que des fichiers chiffrés (AES-256-GCM) : le NAS ne voit jamais tes conversations en clair.
+# NFS plutôt que SMB : remplace driver_opts par
+#   type: nfs
+#   o: addr=${NAS_HOST},nfsvers=4,rw
+#   device: ":${NAS_SHARE}"
+services:
+  atom:
+    environment:
+      - ATOM_OFFSITE_DIR=/offsite
+      - ATOM_OFFSITE_NAME=${NAS_NAME:-${NAS_HOST:-NAS}}
+    volumes:
+      - offsite:/offsite
+
+volumes:
+  offsite:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${NAS_HOST:?NAS_HOST manquant dans .env}/${NAS_SHARE:-atom-backups}"
+      # uid/gid 1000 : l'utilisateur « atom » du conteneur ; vers=3.0 convient aux NAS récents (Synology, QNAP, TrueNAS…)
+      o: "username=${NAS_USER:?NAS_USER manquant dans .env},password=${NAS_PASSWORD:?NAS_PASSWORD manquant dans .env},uid=1000,gid=1000,file_mode=0600,dir_mode=0700,vers=${NAS_SMB_VERSION:-3.0}"

@@ -208,7 +208,31 @@ Si c'est encore lent, vérifie :
 - Réglages → **Sauvegarde** : sauvegarder maintenant, télécharger une copie sur ton PC, restaurer une sauvegarde du serveur ou un fichier `.db`.
 - Avant toute restauration, l'état actuel est sauvegardé automatiquement.
 - Réglables dans `.env` : `ATOM_BACKUP_TIME`, `ATOM_BACKUP_KEEP`.
-- Le dossier `backups/` est sur le même disque que le serveur : télécharge une copie de temps en temps, ou inclus le conteneur dans les sauvegardes Proxmox.
+- Le dossier `backups/` est sur le même disque que le serveur : configure la copie sur un NAS ci-dessous.
+
+### Sauvegarde sur un NAS (ex. NAS-VinX)
+
+Après chaque sauvegarde de la nuit, Atom envoie une **copie chiffrée** sur ton NAS, garde les 30 dernières, et **vérifie chaque semaine** qu'elle se restaure (déchiffrement, intégrité, tables). En cas d'échec (NAS éteint, partage non monté, copie illisible), tu reçois une notification ntfy / Telegram. Le NAS ne voit que des fichiers chiffrés (AES-256-GCM).
+
+1. **Sur le NAS** : crée un dossier partagé `atom-backups` et un utilisateur `atom` qui y a accès en lecture-écriture (SMB activé).
+2. **Sur le serveur Atom** : `sudo apt install cifs-utils` (Docker en a besoin pour monter le partage).
+3. **Dans `.env`** :
+
+   ```bash
+   COMPOSE_FILE=docker-compose.yml:docker-compose.nas.yml
+   NAS_HOST=NAS-VinX          # ou son adresse IP, plus sûre si le nom ne se résout pas depuis le serveur
+   NAS_SHARE=atom-backups
+   NAS_USER=atom
+   NAS_PASSWORD=…             # éviter la virgule, séparateur des options de montage
+   ATOM_OFFSITE_KEY=…         # phrase de chiffrement
+   ```
+
+   Génère la phrase avec `openssl rand -base64 32` et **garde-la aussi ailleurs** (gestionnaire de mots de passe) : sans elle, les copies sont illisibles, y compris pour toi si le serveur est perdu.
+4. `./update.sh`, puis Réglages → **Sauvegarde** → **Envoyer maintenant**, puis **Tester la restauration**. L'écran État affiche aussi « Copie sur NAS-VinX ».
+
+Pour restaurer : Réglages → Sauvegarde → bouton **Restaurer** à côté d'une copie du NAS. Sur un serveur neuf, réinstalle Atom avec la même phrase `ATOM_OFFSITE_KEY` et le même partage : les copies apparaissent dans la liste.
+
+NAS en NFS plutôt qu'en SMB : voir le commentaire en tête de `docker-compose.nas.yml`.
 
 ## Mode hybride (API distantes)
 

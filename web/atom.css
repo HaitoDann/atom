@@ -1168,3 +1168,5 @@ body.presence-ui #presence { opacity: 1; }
 .us-tbl th { text-align: left; font-weight: 500; color: var(--muted); }
 .us-tbl td, .us-tbl th { padding: 6px 8px 6px 0; }
 .us-p b { font-weight: 500; }
+.nas-state .kv span:last-child { text-align: right; color: var(--text-2); }
+.nas-state .st-dot { display: inline-block; margin: 0 4px 0 0; vertical-align: 0; }

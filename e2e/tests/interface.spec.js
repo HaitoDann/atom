@@ -166,3 +166,17 @@ test("mode Code et bibliothèque s'ouvrent sans erreur", async ({ page }) => {
   await page.evaluate(() => showView("chat"));
   expect(errors).toEqual([]);
 });
+
+test("sauvegarde : copie chiffrée sur le NAS, puis test de restauration", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => openSettings("backup"));
+  await expect(page.locator("#nasTitle")).toHaveText("Copie sur NAS-VinX");
+  await expect(page.locator("#nasState")).toContainText("joignable");
+  await page.click("#nasPush");
+  await expect(page.locator("#nasList li:not(.none)")).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator("#nasList")).toContainText(".db.enc");
+  await page.click("#nasVerify");
+  await expect(page.locator("#nasState")).toContainText("réussi", { timeout: 15_000 });
+  expect(errors).toEqual([]);
+});

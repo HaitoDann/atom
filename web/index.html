@@ -428,6 +428,16 @@
           <ul class="list" id="bkList" style="margin-top:14px"></ul>
           <p class="note">Avant toute restauration, l'état actuel est sauvegardé automatiquement : rien n'est perdu par erreur. Garde de temps en temps une copie téléchargée hors du serveur.</p>
         </div>
+        <div class="block">
+          <h4 id="nasTitle">Copie sur le NAS</h4>
+          <p class="desc" id="nasInfo">Une copie chiffrée de chaque sauvegarde part sur ton NAS, et Atom vérifie chaque semaine qu'elle se restaure.</p>
+          <div class="nas-state" id="nasState"></div>
+          <div class="row" style="flex-wrap:wrap;margin-top:10px" id="nasActs">
+            <button class="btn primary" id="nasPush">Envoyer maintenant</button>
+            <button class="btn" id="nasVerify">Tester la restauration</button>
+          </div>
+          <ul class="list" id="nasList" style="margin-top:14px"></ul>
+        </div>
       </section>
 
       <section class="pane" data-pane="look">

@@ -369,3 +369,46 @@ $("benchBtn").onclick = async () => {
     if (r.tok_s) $("speedV").textContent = r.tok_s.toFixed(1) + " tok/s";
   } catch (e) { $("benchInfo").textContent = e.message; }
 };
+
+/* ---- copie chiffrée sur le NAS (réglages → Sauvegarde) */
+const agoTxt = (ts) => { if (!ts) return "jamais"; const h = (Date.now() / 1000 - ts) / 3600; return h < 1 ? "il y a moins d'une heure" : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} jours`; };
+async function loadOffsite() {
+  let st;
+  try { st = await getJSON("/api/offsite"); } catch { return; }
+  $("nasTitle").textContent = `Copie sur ${st.target}`;
+  $("nasActs").hidden = !st.configured;
+  if (!st.configured) {
+    $("nasState").innerHTML = `<p class="note">Non configurée. Dans le fichier <code>.env</code> du serveur : <code>COMPOSE_FILE=docker-compose.yml:docker-compose.nas.yml</code>, puis <code>NAS_HOST</code>, <code>NAS_SHARE</code>, <code>NAS_USER</code>, <code>NAS_PASSWORD</code> et <code>ATOM_OFFSITE_KEY</code> (phrase de chiffrement), et <code>./update.sh</code>. Détails dans le README, « Sauvegarde sur un NAS ».</p>`;
+    $("nasList").innerHTML = "";
+    return;
+  }
+  const verify = st.last_verify_ok === false ? `<span class="us-ko">en échec : ${esc(st.last_verify_error || "")}</span>`
+    : st.last_verify ? `réussi ${agoTxt(st.last_verify)}${st.last_verify_counts ? ` (${fmtN(st.last_verify_counts.messages)} messages, ${fmtN(st.last_verify_counts.memories)} souvenirs)` : ""}` : "pas encore fait";
+  const rows = [
+    ["État", st.reachable ? '<span class="st-dot ok"></span> joignable' : `<span class="st-dot error"></span> injoignable : ${esc(st.dir)} n'est pas monté`],
+    ["Dernière copie", st.last_push ? `${agoTxt(st.last_push)} · ${esc(st.last_push_name || "")}` : "aucune"],
+    ["Test de restauration", verify],
+    ["Copies gardées", `${st.count} / ${st.keep}`],
+  ];
+  if (st.last_error) rows.push(["Dernier incident", `<span class="us-ko">${esc(st.last_error)}</span> · ${agoTxt(st.last_error_at)}`]);
+  $("nasState").innerHTML = rows.map(([k, v]) => `<div class="kv"><span>${k}</span><span>${v}</span></div>`).join("");
+  $("nasList").innerHTML = st.copies.length ? "" : '<li class="none">Aucune copie sur le NAS pour l\'instant.</li>';
+  for (const c of st.copies) {
+    const li = document.createElement("li"); li.style.display = "flex"; li.style.alignItems = "center"; li.style.gap = "10px";
+    li.innerHTML = `<div style="flex:1"><small>${esc(new Date(c.created_at * 1000).toLocaleString("fr-FR"))} · ${fmtBytes(c.size)} · chiffrée</small>${esc(c.name)}</div>`;
+    const b = document.createElement("button"); b.className = "btn sm"; b.textContent = "Restaurer";
+    b.onclick = async () => {
+      if (!confirm(`Restaurer Atom depuis « ${c.name} » (sur le NAS) ? L'état actuel sera sauvegardé avant.`)) return;
+      try { await send_(`/api/offsite/${encodeURIComponent(c.name)}/restore`, "POST"); toast("Restauré depuis le NAS. Rechargement…"); setTimeout(() => location.reload(), 1200); }
+      catch (e) { toast(esc(e.message)); }
+    };
+    li.appendChild(b); $("nasList").appendChild(li);
+  }
+}
+async function nasAction(btn, url, ok) {
+  const label = btn.textContent; btn.disabled = true; btn.innerHTML = '<span class="spin"></span> ' + label;
+  try { await send_(url, "POST"); toast(ok); } catch (e) { toast(esc(e.message)); }
+  finally { btn.disabled = false; btn.textContent = label; loadOffsite(); loadBackups(); }
+}
+$("nasPush").onclick = (e) => nasAction(e.currentTarget, "/api/offsite/push", "Copie chiffrée envoyée sur le NAS.");
+$("nasVerify").onclick = (e) => nasAction(e.currentTarget, "/api/offsite/verify", "La copie la plus récente se restaure correctement.");

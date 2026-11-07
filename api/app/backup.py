@@ -135,6 +135,9 @@ async def scheduler() -> None:
         now = datetime.now(TZ)
         await asyncio.sleep(max(30, (_next_run(now) - now).total_seconds()))
         try:
-            await asyncio.to_thread(create, "auto")
+            info = await asyncio.to_thread(create, "auto")
         except Exception:
             log.exception("sauvegarde quotidienne impossible")
+            continue
+        from . import offsite
+        await offsite.after_backup(_dir() / info["name"])   # copie chiffrée sur le NAS (si configurée)

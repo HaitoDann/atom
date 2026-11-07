@@ -25,6 +25,7 @@ jobs:
         run: |
           SEARXNG_SECRET=ci docker compose config -q
           SEARXNG_SECRET=ci docker compose -f docker-compose.yml -f docker-compose.sandbox.yml config -q
+          SEARXNG_SECRET=ci NAS_HOST=nas NAS_USER=u NAS_PASSWORD=p docker compose -f docker-compose.yml -f docker-compose.nas.yml config -q
       - name: Construction de l'image
         run: docker build -f api/Dockerfile -t atom-ci .
   e2e:

@@ -34,6 +34,10 @@ module.exports = defineConfig({
       ATOM_NTFY_URL: "",
       ATOM_TELEGRAM_TOKEN: "",
       ATOM_PASSWORD: "",
+      // NAS simulé par un dossier local : copie chiffrée, vérification et restauration testées de bout en bout
+      ATOM_OFFSITE_DIR: (fs.mkdirSync(path.join(tmp, "nas"), { recursive: true }), path.join(tmp, "nas")),
+      ATOM_OFFSITE_KEY: "phrase-e2e-pour-le-nas",
+      ATOM_OFFSITE_NAME: "NAS-VinX",
       PATH: process.env.PATH,
     },
   },
