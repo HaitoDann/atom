@@ -135,12 +135,10 @@ async def _notify(title: str, body: str) -> None:
         await telegram.broadcast(f"*{title}*\n{body}")
     except Exception:  # noqa: BLE001
         log.warning("proxmox : erreur gérée", exc_info=True)
-        pass
     try:
         await notify.send(title, body, tags="computer")
     except Exception:  # noqa: BLE001
         log.warning("proxmox : erreur gérée", exc_info=True)
-        pass
 
 
 def _check(key: str, cond: bool, title: str, body: str, sustained: bool, out: list) -> None:

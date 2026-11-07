@@ -32,7 +32,6 @@ async def _ask(messages: list[dict], used: dict) -> str:
             return out
         except Exception:  # noqa: BLE001
             log.warning("research : erreur gérée", exc_info=True)
-            pass
     used["engine"] = "local"
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
 

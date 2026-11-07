@@ -60,7 +60,6 @@ def page_text(raw: str, limit: int = 2500) -> str:
         p.feed(raw)
     except Exception:  # noqa: BLE001 — HTML cassé : on garde ce qu'on a
         log.warning("search : erreur gérée", exc_info=True)
-        pass
     text = html.unescape("".join(p.parts))
     lines = [re.sub(r"[ \t ]+", " ", l).strip() for l in text.split("\n")]
     # On garde les lignes qui ressemblent à du contenu (pas les menus d'un mot).

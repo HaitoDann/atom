@@ -59,7 +59,6 @@ async def _ask(messages: list[dict]) -> str:
             return "".join([t async for t in hybrid.stream(messages, sensitive=True)])
         except Exception:  # noqa: BLE001
             log.warning("analysis : erreur gérée", exc_info=True)
-            pass
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
 
 
