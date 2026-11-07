@@ -1350,8 +1350,9 @@ function renderCards() {
 
 function renderEmpty() {
   const g = greeting().replace(/\.$/, "");
-  chat.innerHTML = `<div id="empty"><div id="heroSlot"></div><h1><span class="orbtxt">${g}</span>.</h1><p>Que puis-je faire pour toi ?</p><div class="cards"></div></div>`;
+  chat.innerHTML = `<div id="empty"><div id="heroSlot"></div><h1><span class="orbtxt">${g}</span>.</h1><p>Que puis-je faire pour toi ?</p><div class="today" id="today"></div><div class="cards"></div></div>`;
   renderCards();
+  renderToday();
   requestAnimationFrame(() => enterHero());
 }
 
@@ -1904,8 +1905,46 @@ async function refreshSystem() {
   } catch {}
 }
 
+// Ligne « aujourd'hui » de l'accueil : rappels du jour, état du serveur, mémoire
+async function renderToday() {
+  const box = $("today"); if (!box) return;
+  const parts = [];
+  try {
+    const r = (await getJSON("/api/reminders")).reminders;
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+    const today = r.filter((x) => x.due_at * 1000 <= end.getTime());
+    parts.push(`<button data-go="reminders"><span class="dot${today.length ? " warn" : ""}"></span>${today.length ? `${today.length} rappel${today.length > 1 ? "s" : ""} aujourd'hui` : "aucun rappel aujourd'hui"}</button>`);
+  } catch {}
+  try {
+    const p = await getJSON("/api/proxmox");
+    if (p.configured) {
+      const n = p.alerts?.length || 0, run = p.guests.filter((g) => g.status === "running").length;
+      parts.push(`<button data-go="proxmox"><span class="dot ${!p.ok ? "err" : n ? "warn" : "ok"}"></span>${!p.ok ? "serveur injoignable" : n ? `${n} alerte${n > 1 ? "s" : ""} serveur` : `serveur OK · ${run} en marche`}</button>`);
+    }
+  } catch {}
+  try {
+    const m = (await getJSON("/api/memories")).memories.length;
+    if (m) parts.push(`<button data-go="memory"><span class="dot"></span>${m} souvenir${m > 1 ? "s" : ""}</button>`);
+  } catch {}
+  if (!$("today")) return;
+  box.innerHTML = parts.join("");
+  box.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => openSettings(b.dataset.go); });
+}
 async function refreshPanel() {
   if (!panelVisible()) return;
+  try {   // serveur Proxmox (si configuré)
+    const p = await getJSON("/api/proxmox");
+    $("pxSec").hidden = !p.configured;
+    if (p.configured) {
+      const n = p.nodes[0], run = p.guests.filter((g) => g.status === "running").length;
+      $("pxMini").innerHTML = !p.ok ? `<p class="alert">Injoignable : ${esc(p.error)}</p>` : `<div class="px-mini">
+        ${(p.alerts || []).map((a) => `<p class="alert">⚠ ${esc(a.title)}</p>`).join("")}
+        ${n ? `<div class="metric"><div class="l"><span>${esc(n.name)} · processeur</span><span>${n.cpu.toFixed(0)} %</span></div><div class="bar"><i style="width:${n.cpu}%"></i></div></div>
+        <div class="metric"><div class="l"><span>Mémoire</span><span>${n.mem.toFixed(0)} %</span></div><div class="bar"><i style="width:${n.mem}%"></i></div></div>` : ""}
+        <div class="kv"><span>Invités en marche</span><span>${run} / ${p.guests.length}</span></div></div>`;
+      $("pxMini").onclick = () => openSettings("proxmox");
+    }
+  } catch { $("pxSec").hidden = true; }
   try {
     const r = (await getJSON("/api/reminders")).reminders.slice(0, 3);
     $("pRem").innerHTML = r.length
@@ -2295,12 +2334,14 @@ function enterHero() {
   entity.target = "hero";
   stageOut("hero-ph");
   document.body.classList.add("hero");
+  requestAnimationFrame(() => { if (placeholder) placeholder.style.height = "0px"; });   // le panneau remonte ses rubriques
   flyTo(1, 1000, () => { heroBusy = false; });
 }
 function exitHero(cb) {
   if (!heroOn) { cb && cb(); return; }
   heroBusy = true;
   document.body.classList.remove("hero");
+  if (placeholder) placeholder.style.height = "360px";   // la place revient pendant le retour de l'entité
   flyTo(0, 750, () => { stageBack(); heroOn = false; heroBusy = false; entity.target = "full"; cb && cb(); });
 }
 

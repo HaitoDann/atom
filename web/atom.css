@@ -216,6 +216,14 @@ kbd { font: 10.5px var(--mono); color: var(--faint); border: 1px solid var(--bor
 #empty { max-width: 640px; margin: 14vh auto 0; padding: 0 8px; }
 #empty h1 { font-size: 26px; font-weight: 500; margin: 0 0 4px; color: var(--strong); letter-spacing: -.01em; }
 #empty p { margin: 0 0 26px; color: var(--muted); }
+#empty .today { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin: -14px 0 24px; font-size: 12.5px; color: var(--faint); min-height: 18px; }
+#empty .today button { display: inline-flex; align-items: center; gap: 7px; }
+#empty .today .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+#empty .today .dot.ok { background: #8fd19e; } #empty .today .dot.warn { background: #e8c76a; } #empty .today .dot.err { background: var(--danger); }
+#empty .today button { background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+#empty .today button:hover { color: var(--text); }
+.px-mini .kv b { font-weight: 500; }
+.px-mini .alert { font-size: 12px; color: var(--danger, #e66); margin: 2px 0 6px; }
 .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .card { text-align: left; background: transparent; border: 1px solid var(--border-2); border-radius: 12px; padding: 12px 14px; color: var(--text-2); }
 .card:hover { background: var(--surface); color: var(--text); }
@@ -847,7 +855,7 @@ body.no-hero #heroSlot { display: none; }
 body.hero .stage.flying { pointer-events: none; z-index: 6; }
 body.hero #empty h1, body.hero #empty p { text-align: center; }
 body.hero #empty { margin-top: 5vh; }
-.stage-ph.hero-ph::after { content: "Atom est au centre"; display: grid; place-items: center; height: 100%; color: var(--faint); font-size: 12px; }
+.stage-ph.hero-ph { transition: height .7s var(--ease-out); overflow: hidden; }   /* se replie quand l'entité est au centre */
 
 /* ---------------------------------------------------------------- signaux vers l'interface */
 .sigfrag { position: fixed; z-index: 90; width: 6px; height: 6px; border-radius: 50%; pointer-events: none;
