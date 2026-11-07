@@ -136,8 +136,10 @@
       <div class="dash-bar">
         <div class="seg" id="dashRange"><button data-r="now-1h">1 h</button><button data-r="now-24h" class="on">24 h</button><button data-r="now-7d">7 jours</button><button data-r="now-30d">30 jours</button></div>
         <span class="dash-src" id="dashSrc"></span>
+        <button class="btn sm" id="dashCheck" title="Exécute chaque requête du tableau et liste les erreurs">Vérifier le tableau</button>
         <button class="btn sm" id="dashOpen" title="Ouvrir Grafana dans un nouvel onglet">Ouvrir dans Grafana</button>
       </div>
+      <div id="dashReport" class="dash-report" hidden></div>
       <iframe id="dashFrame" title="Tableau de bord Grafana d'Atom" hidden></iframe>
       <div id="dashOff" class="dash-off" hidden></div>
     </section>

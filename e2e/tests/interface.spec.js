@@ -192,6 +192,8 @@ test("tableau de bord : Grafana affiché dans l'interface, à travers Atom", asy
   await expect(frame.locator("#path")).toContainText("/grafana/d/atom/atom");
   await expect(frame.locator("#path")).toContainText("kiosk");
   await expect(frame.locator("#cookie")).toHaveText("aucun cookie");          // la session d'Atom ne part pas chez Grafana
+  await page.click("#dashCheck");
+  await expect(page.locator("#dashReport")).toContainText("panneaux répondent sans erreur", { timeout: 10_000 });
   await page.click('#dashRange button[data-r="now-7d"]');
   await expect(frame.locator("#path")).toContainText("from=now-7d");
   await page.click("#navDash");                                              // retour à la discussion

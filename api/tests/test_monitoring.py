@@ -176,3 +176,44 @@ def test_dashboard_layout_and_provisioning():
     assert "uid: atom-prometheus" in ds and "http://prometheus:9090" in ds
     prom = (ROOT / "monitoring/prometheus.yml").read_text()
     assert "/api/metrics" in prom and "__ATOM_METRICS_TOKEN__" in prom
+
+
+def test_dashboard_promql_syntax():
+    """Chaque requête du tableau (et des annotations) est du PromQL valide."""
+    promql_parser = pytest.importorskip("promql_parser")
+    dash = _dashboard()
+    exprs = [(p["title"], t["expr"]) for p in dash["panels"] for t in p.get("targets", [])]
+    exprs += [(a["name"], a["expr"]) for a in dash["annotations"]["list"] if "expr" in a]
+    errors = []
+    for title, e in exprs:
+        try:
+            promql_parser.parse(e.replace("$__range", "1h").replace("$__rate_interval", "1m"))
+        except Exception as ex:  # noqa: BLE001 — on collecte toutes les erreurs pour le rapport
+            errors.append(f"{title} : {ex}")
+    assert not errors, errors
+    assert len(exprs) > 40
+
+
+def test_grafana_check_reports_exact_errors(client, monkeypatch):
+    from app import grafana
+
+    monkeypatch.setenv("ATOM_GRAFANA_URL", "http://grafana:3000")
+    dash = {"dashboard": {"panels": [
+        {"title": "Bon", "targets": [{"refId": "A", "datasource": {"uid": "atom-prometheus"}, "expr": "up"}]},
+        {"title": "Cassé", "targets": [{"refId": "A", "datasource": {"uid": "atom-prometheus"}, "expr": "foo("}]},
+        {"title": "Vide", "targets": [{"refId": "A", "datasource": {"uid": "atom-prometheus"}, "expr": "absent_metric"}]},
+        {"title": "Rangée", "type": "row"}]}}
+
+    def handler(req):
+        if req.url.path.endswith("/api/dashboards/uid/atom"):
+            return httpx.Response(200, json=dash)
+        q = json.loads(req.content)["queries"][0]["expr"]
+        if q == "foo(":
+            return httpx.Response(400, json={"results": {"A": {"error": "bad_data: parse error: unclosed left parenthesis"}}})
+        values = [[1, 2], [3, 4]] if q == "up" else []
+        return httpx.Response(200, json={"results": {"A": {"frames": [{"data": {"values": values}}]}}})
+    monkeypatch.setattr(grafana, "_client", httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    r = client.get("/api/monitoring/check").json()
+    assert r["checked"] == 3 and not r["ok"]
+    assert r["errors"] == [{"panel": "Cassé", "error": "bad_data: parse error: unclosed left parenthesis", "query": "A"}]
+    assert r["empty"] == ["Vide"]

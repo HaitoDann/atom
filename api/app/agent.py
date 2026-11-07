@@ -196,7 +196,8 @@ async def chat_events(
                 messages[0]["content"] = system_for("local")
                 yield {"route": dict(type="route", provider="local", model=model,
                                      reason=f"Fournisseurs distants indisponibles ({log_reason}) : réponse en local.")}
-        async for tok in llm.stream_chat(model, messages):
+        task = hybrid.classify(next((m["content"] for m in reversed(messages) if m["role"] == "user"), ""))
+        async for tok in llm.stream_chat(model, messages, task=task):
             yield tok
 
     async def run_pass(messages: list[dict], state: dict):

@@ -1,14 +1,15 @@
 {
   "uid": "atom",
   "title": "Atom",
-  "description": "Consommation des modèles, fournisseurs d'IA, serveur et base d'Atom.",
+  "description": "Observabilité d'Atom : santé, consommation, routage, rapidité, serveur, qualité, données.",
   "tags": [
     "atom"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": false,
+  "liveNow": false,
   "graphTooltip": 1,
   "refresh": "30s",
   "time": {
@@ -16,26 +17,69 @@
     "to": "now"
   },
   "timepicker": {
+    "hidden": true,
     "refresh_intervals": [
       "15s",
       "30s",
       "1m",
-      "5m",
-      "15m"
+      "5m"
     ]
   },
+  "fiscalYearStartMonth": 0,
+  "weekStart": "monday",
   "templating": {
     "list": []
   },
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "name": "Alertes",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "atom-prometheus"
+        },
+        "enable": true,
+        "iconColor": "#e05d5d",
+        "expr": "changes(atom_alerts_sent_total[2m]) > 0",
+        "step": "60s",
+        "titleFormat": "Alerte : {{kind}}",
+        "textFormat": "Alerte « {{kind}} » envoyée sur ton téléphone",
+        "useValueForTime": false
+      },
+      {
+        "name": "Redémarrages",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "atom-prometheus"
+        },
+        "enable": true,
+        "iconColor": "#9aa0a6",
+        "expr": "resets(atom_uptime_seconds[2m]) > 0",
+        "step": "60s",
+        "titleFormat": "Atom a redémarré",
+        "textFormat": "Mise à jour ou redémarrage",
+        "useValueForTime": false
+      }
+    ]
   },
   "links": [],
   "panels": [
     {
       "id": 1,
       "type": "row",
-      "title": "Vue d'ensemble",
+      "title": "Santé",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -48,8 +92,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Appels aux modèles",
-      "description": "Appels au modèle local et aux API sur la période affichée.",
+      "title": "Fournisseurs en forme",
+      "description": "Fournisseurs distants avec au moins 80 % de réussite sur leurs 20 derniers appels.",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
@@ -66,13 +110,14 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum(increase(atom_model_calls_total[$__range]))",
+          "expr": "count(atom_provider_success_ratio >= 0.8) or vector(0)",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "reduceOptions": {
           "calcs": [
@@ -83,13 +128,17 @@
         },
         "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "textMode": "value",
-        "orientation": "auto"
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": {
             "mode": "thresholds"
           },
@@ -97,7 +146,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#e6e6e6",
+                "color": "#d8d8d8",
                 "value": null
               }
             ]
@@ -110,8 +159,8 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Tokens",
-      "description": "",
+      "title": "Fournisseurs en pause",
+      "description": "Mis en pause quelques minutes après une limite ou une panne.",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
@@ -128,13 +177,14 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum(increase(atom_model_tokens_total[$__range]))",
+          "expr": "sum(atom_provider_paused) or vector(0)",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "reduceOptions": {
           "calcs": [
@@ -145,13 +195,17 @@
         },
         "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "textMode": "value",
-        "orientation": "auto"
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": {
             "mode": "thresholds"
           },
@@ -159,8 +213,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#e6e6e6",
+                "color": "#8fd19e",
                 "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 1
               }
             ]
           },
@@ -172,7 +230,7 @@
     {
       "id": 4,
       "type": "stat",
-      "title": "Taux d'échec",
+      "title": "Échecs (1 h)",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -190,13 +248,14 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum(increase(atom_model_calls_total{result=\"error\"}[$__range])) / clamp_min(sum(increase(atom_model_calls_total[$__range])), 1)",
+          "expr": "sum(increase(atom_model_calls_total{result=\"error\"}[1h])) / clamp_min(sum(increase(atom_model_calls_total[1h])), 1)",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "reduceOptions": {
           "calcs": [
@@ -207,13 +266,17 @@
         },
         "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "textMode": "value",
-        "orientation": "auto"
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
+          "noValue": "0",
           "color": {
             "mode": "thresholds"
           },
@@ -242,8 +305,8 @@
     {
       "id": 5,
       "type": "stat",
-      "title": "Bascules",
-      "description": "Réponses obtenues après l'échec d'un premier fournisseur (relais automatique).",
+      "title": "Premier mot (médiane, 1 h)",
+      "description": "",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
@@ -260,13 +323,14 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum(increase(atom_model_fallback_total[$__range]))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(atom_model_first_token_seconds_bucket[1h])))",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "reduceOptions": {
           "calcs": [
@@ -277,13 +341,17 @@
         },
         "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "textMode": "value",
-        "orientation": "auto"
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
+          "unit": "s",
+          "noValue": "—",
           "color": {
             "mode": "thresholds"
           },
@@ -291,12 +359,20 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#e6e6e6",
+                "color": "#8fd19e",
                 "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 3
+              },
+              {
+                "color": "#e05d5d",
+                "value": 8
               }
             ]
           },
-          "decimals": 0
+          "decimals": 1
         },
         "overrides": []
       }
@@ -304,8 +380,8 @@
     {
       "id": 6,
       "type": "stat",
-      "title": "Coût estimé",
-      "description": "Selon les tarifs ATOM_<ID>_PRICE_IN / _PRICE_OUT.",
+      "title": "Dernière sauvegarde",
+      "description": "Âge de la dernière sauvegarde locale (rouge au-delà de 48 h).",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
@@ -322,13 +398,14 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum(increase(atom_model_cost_dollars_total[$__range]))",
+          "expr": "time() - atom_backup_last_timestamp_seconds",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "reduceOptions": {
           "calcs": [
@@ -339,13 +416,17 @@
         },
         "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "textMode": "value",
-        "orientation": "auto"
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "currencyUSD",
+          "unit": "s",
+          "noValue": "aucune",
           "color": {
             "mode": "thresholds"
           },
@@ -353,12 +434,20 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "#e6e6e6",
+                "color": "#8fd19e",
                 "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 108000
+              },
+              {
+                "color": "#e05d5d",
+                "value": 172800
               }
             ]
           },
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       }
@@ -366,8 +455,8 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "Temps de réponse HTTP (p95)",
-      "description": "",
+      "title": "Copie sur le NAS",
+      "description": "Âge de la dernière copie chiffrée sur le NAS.",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
@@ -384,13 +473,14 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(atom_http_request_duration_seconds_bucket[5m])))",
+          "expr": "time() - atom_offsite_last_push_timestamp_seconds",
           "legendFormat": "__auto",
           "refId": "A",
           "range": false,
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "reduceOptions": {
           "calcs": [
@@ -401,13 +491,17 @@
         },
         "colorMode": "value",
         "graphMode": "none",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "textMode": "value",
-        "orientation": "auto"
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "s",
+          "noValue": "non configurée",
           "color": {
             "mode": "thresholds"
           },
@@ -420,15 +514,15 @@
               },
               {
                 "color": "#e8c76a",
-                "value": 1
+                "value": 108000
               },
               {
                 "color": "#e05d5d",
-                "value": 5
+                "value": 172800
               }
             ]
           },
-          "decimals": 2
+          "decimals": 0
         },
         "overrides": []
       }
@@ -436,7 +530,7 @@
     {
       "id": 8,
       "type": "row",
-      "title": "Modèles et fournisseurs d'IA",
+      "title": "Consommation et coût",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -448,8 +542,417 @@
     },
     {
       "id": 9,
+      "type": "stat",
+      "title": "Appels",
+      "description": "Appels aux modèles (local et API) sur la période.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_model_calls_total[$__range]))",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Tokens",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_model_tokens_total[$__range]))",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Coût sur la période",
+      "description": "Selon les tarifs ATOM_<ID>_PRICE_IN / _PRICE_OUT (0 pour les offres gratuites).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_model_cost_dollars_total[$__range]))",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "gauge",
+      "title": "Budget du mois",
+      "description": "Part du budget mensuel (ATOM_COST_BUDGET) déjà dépensée.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_cost_month_dollars / atom_cost_budget_dollars",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdMarkers": true,
+        "showThresholdLabels": false,
+        "minVizHeight": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "pas de budget",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8fd19e",
+                "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 0.8
+              },
+              {
+                "color": "#e05d5d",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Bascules",
+      "description": "Réponses obtenues après l'échec d'un premier fournisseur : sans relais, ces réponses auraient échoué.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_model_fallback_total[$__range]))",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Alertes envoyées",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_alerts_sent_total[$__range])) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 1
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
       "type": "timeseries",
-      "title": "Tokens par minute, par fournisseur",
+      "title": "Tokens par minute",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -459,7 +962,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 10
       },
       "targets": [
         {
@@ -473,6 +976,7 @@
           "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -487,28 +991,171 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
             "drawStyle": "bars",
             "lineWidth": 2,
-            "fillOpacity": 70,
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
               "mode": "normal",
               "group": "A"
-            },
-            "spanNulls": true
-          }
+            }
+          },
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
-      "id": 10,
+      "id": 16,
       "type": "timeseries",
-      "title": "Appels par minute (réussis / en échec)",
+      "title": "Appels par minute",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -518,7 +1165,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 10
       },
       "targets": [
         {
@@ -526,22 +1173,13 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum by (provider) (rate(atom_model_calls_total{result=\"ok\"}[5m])) * 60",
+          "expr": "sum by (provider) (rate(atom_model_calls_total[5m])) * 60",
           "legendFormat": "{{provider}}",
           "refId": "A",
           "range": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "sum by (provider) (rate(atom_model_calls_total{result=\"error\"}[5m])) * 60",
-          "legendFormat": "{{provider}} — échecs",
-          "refId": "B",
-          "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -556,38 +1194,1130 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 12,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
-              "mode": "none",
+              "mode": "normal",
               "group": "A"
-            },
-            "spanNulls": true
-          }
+            }
+          },
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
-      "id": 11,
-      "type": "bargauge",
-      "title": "Quota du jour restant",
-      "description": "Part du quota quotidien encore disponible. Atom ménage un fournisseur sous 20 %.",
+      "id": 17,
+      "type": "row",
+      "title": "Routage : qui répond à quoi",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "piechart",
+      "title": "Répartition par fournisseur",
+      "description": "Réponses réussies sur la période.",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 8,
         "x": 0,
-        "y": 14
+        "y": 19
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum by (provider) (increase(atom_model_calls_total{result=\"ok\"}[$__range]))",
+          "legendFormat": "{{provider}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 19,
+      "type": "piechart",
+      "title": "Répartition par type de demande",
+      "description": "Classement fait par Atom avant de choisir le modèle.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum by (task) (increase(atom_model_calls_total[$__range]))",
+          "legendFormat": "{{task}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value"
+          ]
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "simple"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Question simple"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "complexe"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Demande complexe"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "code"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Code"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "long"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Texte long"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "agent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Agent de code"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "memoire"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Mémorisation"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "embedding"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Embeddings"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "autre"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Autre"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 20,
+      "type": "bargauge",
+      "title": "Type de demande → fournisseur",
+      "description": "Quel fournisseur a répondu à quel type de demande (le routage intelligent en action).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sort_desc(sum by (task, provider) (increase(atom_model_calls_total{result=\"ok\"}[$__range])) > 0)",
+          "legendFormat": "{{task}} → {{provider}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "auto",
+        "minVizHeight": 14,
+        "maxVizHeight": 26,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": "bargauge",
+      "title": "Erreurs par type",
+      "description": "Pourquoi les appels ont échoué : quota, clé, panne, modèle absent…",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 27
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sort_desc(sum by (kind) (increase(atom_model_errors_total[$__range])) > 0)",
+          "legendFormat": "{{kind}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "auto",
+        "minVizHeight": 14,
+        "maxVizHeight": 26,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e05d5d",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "quota"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Quota / limite"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "cle"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Clé refusée"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trop_long"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Requête trop longue"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "modele_absent"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Modèle absent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "injoignable"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Injoignable"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reponse_vide"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Réponse vide"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "panne"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Panne du fournisseur"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "autre"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Autre"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": "bargauge",
+      "title": "Erreurs par fournisseur",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 27
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sort_desc(sum by (provider) (increase(atom_model_errors_total[$__range])) > 0)",
+          "legendFormat": "{{provider}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "auto",
+        "minVizHeight": 14,
+        "maxVizHeight": 26,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 23,
+      "type": "bargauge",
+      "title": "Quota du jour restant",
+      "description": "Sous 20 %, Atom ménage le fournisseur ; à 0, il bascule sur les autres.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 27
       },
       "targets": [
         {
@@ -602,24 +2332,29 @@
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "orientation": "horizontal",
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "auto",
+        "minVizHeight": 14,
+        "maxVizHeight": 26,
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
           "fields": "",
           "values": false
-        },
-        "minVizHeight": 16
+        }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
+          "noValue": "0",
           "color": {
             "mode": "thresholds"
           },
@@ -646,7 +2381,842 @@
       }
     },
     {
-      "id": 12,
+      "id": 24,
+      "type": "timeseries",
+      "title": "Bascules et pauses",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum by (provider) (increase(atom_model_fallback_total[10m]))",
+          "legendFormat": "{{provider}} (a pris le relais)",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_provider_paused",
+          "legendFormat": "{{provider}} en pause",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 25,
+      "type": "row",
+      "title": "Rapidité",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "panels": []
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Délai avant le premier mot (médiane)",
+      "description": "Ce que tu ressens : le temps avant que la réponse commence à s'écrire.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 43
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le, provider) (rate(atom_model_first_token_seconds_bucket[15m])))",
+          "legendFormat": "{{provider}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "Délai avant le premier mot (cas lents, p95)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 43
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, provider) (rate(atom_model_first_token_seconds_bucket[15m])))",
+          "legendFormat": "{{provider}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Vitesse de génération",
+      "description": "Tokens écrits par seconde une fois la réponse commencée (dernière heure).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 43
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_model_generation_tokens_per_second",
+          "legendFormat": "{{provider}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 29,
       "type": "bargauge",
       "title": "Réussite (20 derniers appels)",
       "description": "",
@@ -655,10 +3225,10 @@
         "uid": "atom-prometheus"
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 8,
-        "x": 8,
-        "y": 14
+        "x": 0,
+        "y": 51
       },
       "targets": [
         {
@@ -673,24 +3243,29 @@
           "instant": true
         }
       ],
+      "transparent": false,
       "options": {
         "orientation": "horizontal",
         "displayMode": "gradient",
         "showUnfilled": true,
         "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "auto",
+        "minVizHeight": 14,
+        "maxVizHeight": 26,
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
           "fields": "",
           "values": false
-        },
-        "minVizHeight": 16
+        }
       },
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
           "min": 0,
+          "noValue": "0",
           "color": {
             "mode": "thresholds"
           },
@@ -717,89 +3292,19 @@
       }
     },
     {
-      "id": 13,
-      "type": "bargauge",
-      "title": "Délai avant le premier mot",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "atom-prometheus"
-      },
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
-        "y": 14
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "atom_provider_latency_seconds",
-          "legendFormat": "{{provider}}",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "options": {
-        "orientation": "horizontal",
-        "displayMode": "gradient",
-        "showUnfilled": true,
-        "valueMode": "color",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "minVizHeight": 16
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "min": 0,
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#8fd19e",
-                "value": null
-              },
-              {
-                "color": "#e8c76a",
-                "value": 3
-              },
-              {
-                "color": "#e05d5d",
-                "value": 8
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 14,
+      "id": 30,
       "type": "timeseries",
-      "title": "Temps de génération par minute",
-      "description": "Secondes passées à générer par minute : la charge réelle de chaque modèle.",
+      "title": "Temps passé à générer, par minute",
+      "description": "La charge réelle de chaque modèle.",
       "datasource": {
         "type": "prometheus",
         "uid": "atom-prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 21
+        "w": 16,
+        "x": 8,
+        "y": 51
       },
       "targets": [
         {
@@ -813,6 +3318,7 @@
           "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -827,28 +3333,1098 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 12,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 31,
+      "type": "row",
+      "title": "Modèle local et serveur",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 59
+      },
+      "panels": []
+    },
+    {
+      "id": 32,
+      "type": "timeseries",
+      "title": "Processeur",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 60
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_system_cpu_ratio",
+          "legendFormat": "processeur",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
               "mode": "none",
               "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
             },
-            "spanNulls": true
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
           }
+        ]
+      }
+    },
+    {
+      "id": 33,
+      "type": "timeseries",
+      "title": "Mémoire",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 60
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_system_memory_bytes{type=\"used\"}",
+          "legendFormat": "utilisée",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_system_memory_bytes{type=\"total\"}",
+          "legendFormat": "totale",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 34,
+      "type": "stat",
+      "title": "Disque libre",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 60
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_disk_bytes{type=\"free\"} / atom_disk_bytes{type=\"total\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e05d5d",
+                "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 0.1
+              },
+              {
+                "color": "#8fd19e",
+                "value": 0.2
+              }
+            ]
+          },
+          "decimals": 0
         },
         "overrides": []
       }
     },
     {
-      "id": 15,
+      "id": 35,
+      "type": "stat",
+      "title": "Modèles chargés (Ollama)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 60
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_ollama_loaded_models",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 36,
+      "type": "stat",
+      "title": "Mémoire des modèles",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 64
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(atom_ollama_loaded_bytes) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 37,
+      "type": "stat",
+      "title": "En service depuis",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 64
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_uptime_seconds",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 38,
+      "type": "row",
+      "title": "Qualité des réponses",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "panels": []
+    },
+    {
+      "id": 39,
+      "type": "stat",
+      "title": "Avis positifs",
+      "description": "Part des 👍 parmi tes avis sur les réponses (depuis le début).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 69
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_feedback_total{value=\"up\"} / clamp_min(sum(atom_feedback_total), 1)",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#e05d5d",
+                "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 0.6
+              },
+              {
+                "color": "#8fd19e",
+                "value": 0.8
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 40,
+      "type": "stat",
+      "title": "👍",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 69
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_feedback_total{value=\"up\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 41,
+      "type": "stat",
+      "title": "👎",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 69
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_feedback_total{value=\"down\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 42,
       "type": "timeseries",
-      "title": "Bascules et pauses",
+      "title": "Avis par jour",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -858,7 +4434,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 21
+        "y": 69
       },
       "targets": [
         {
@@ -866,22 +4442,13 @@
             "type": "prometheus",
             "uid": "atom-prometheus"
           },
-          "expr": "sum by (provider) (increase(atom_model_fallback_total[15m]))",
-          "legendFormat": "bascule vers {{provider}}",
+          "expr": "increase(atom_feedback_total[1d])",
+          "legendFormat": "{{value}}",
           "refId": "A",
-          "range": true
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "atom_provider_paused",
-          "legendFormat": "{{provider}} en pause",
-          "refId": "B",
           "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -896,26 +4463,948 @@
       "fieldConfig": {
         "defaults": {
           "unit": "short",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
-            "drawStyle": "line",
+            "drawStyle": "bars",
             "lineWidth": 2,
-            "fillOpacity": 12,
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
               "mode": "none",
               "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
             },
-            "spanNulls": true
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "up"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "👍"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "down"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "👎"
+              }
+            ]
           }
+        ]
+      }
+    },
+    {
+      "id": 43,
+      "type": "stat",
+      "title": "Erreurs serveur (5xx, 1 h)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 73
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_http_requests_total{status=~\"5..\"}[1h])) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8fd19e",
+                "value": null
+              },
+              {
+                "color": "#e8c76a",
+                "value": 1
+              },
+              {
+                "color": "#e05d5d",
+                "value": 10
+              }
+            ]
+          },
+          "decimals": 0
         },
         "overrides": []
       }
     },
     {
-      "id": 16,
+      "id": 44,
+      "type": "stat",
+      "title": "Réponses sauvées par un relais",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 73
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(increase(atom_model_fallback_total[$__range]))",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 45,
+      "type": "row",
+      "title": "Mémoire et données",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "panels": []
+    },
+    {
+      "id": 46,
+      "type": "bargauge",
+      "title": "Souvenirs par type",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 78
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_memories",
+          "legendFormat": "{{kind}}",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "top",
+        "sizing": "auto",
+        "minVizHeight": 14,
+        "maxVizHeight": 26,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "semantique"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Faits"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "procedurale"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Habitudes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "episodique"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Événements"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 47,
+      "type": "timeseries",
+      "title": "Messages par jour",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 6,
+        "y": 78
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "increase(atom_messages_total[1d])",
+          "legendFormat": "{{role}}",
+          "refId": "A",
+          "range": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
+            "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "user"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "toi"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "assistant"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Atom"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 48,
+      "type": "stat",
+      "title": "Conversations",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 78
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_rows{table=\"conversations\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 49,
+      "type": "stat",
+      "title": "Souvenirs",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 78
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_rows{table=\"memories\"}",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 50,
+      "type": "stat",
+      "title": "Documents",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 82
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "sum(atom_library_documents) or vector(0)",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 51,
+      "type": "stat",
+      "title": "Taille de la base",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "atom-prometheus"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 82
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "atom-prometheus"
+          },
+          "expr": "atom_db_size_bytes",
+          "legendFormat": "__auto",
+          "refId": "A",
+          "range": false,
+          "instant": true
+        }
+      ],
+      "transparent": false,
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "orientation": "auto",
+        "text": {
+          "valueSize": 34
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "0",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#d8d8d8",
+                "value": null
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 52,
       "type": "row",
       "title": "Serveur web",
       "collapsed": false,
@@ -923,12 +5412,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 86
       },
       "panels": []
     },
     {
-      "id": 17,
+      "id": 53,
       "type": "timeseries",
       "title": "Requêtes par seconde, par statut",
       "description": "",
@@ -940,7 +5429,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 30
+        "y": 87
       },
       "targets": [
         {
@@ -954,6 +5443,7 @@
           "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -968,28 +5458,171 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 12,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
-              "mode": "none",
+              "mode": "normal",
               "group": "A"
-            },
-            "spanNulls": true
-          }
+            }
+          },
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
-      "id": 18,
+      "id": 54,
       "type": "timeseries",
-      "title": "Durée des requêtes (p50 / p95 / p99)",
+      "title": "Durée des requêtes",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -999,7 +5632,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 30
+        "y": 87
       },
       "targets": [
         {
@@ -1008,7 +5641,7 @@
             "uid": "atom-prometheus"
           },
           "expr": "histogram_quantile(0.5, sum by (le) (rate(atom_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "p50",
+          "legendFormat": "médiane",
           "refId": "A",
           "range": true
         },
@@ -1033,6 +5666,7 @@
           "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -1047,26 +5681,169 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 12,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
               "mode": "none",
               "group": "A"
-            },
-            "spanNulls": true
-          }
+            }
+          },
+          "min": 0
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
+              }
+            ]
+          }
+        ]
       }
     },
     {
-      "id": 19,
+      "id": 55,
       "type": "timeseries",
       "title": "Routes les plus lentes (p95)",
       "description": "",
@@ -1078,7 +5855,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 30
+        "y": 87
       },
       "targets": [
         {
@@ -1092,6 +5869,7 @@
           "range": true
         }
       ],
+      "transparent": false,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -1106,281 +5884,165 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
+          "noValue": "0",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#d8d8d8"
           },
           "custom": {
             "drawStyle": "line",
             "lineWidth": 2,
-            "fillOpacity": 12,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
             "showPoints": "never",
+            "spanNulls": true,
+            "lineInterpolation": "smooth",
+            "barAlignment": 0,
+            "axisBorderShow": false,
             "stacking": {
               "mode": "none",
               "group": "A"
+            }
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^local\\b.*"
             },
-            "spanNulls": true
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 20,
-      "type": "row",
-      "title": "Base de données et service",
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 38
-      },
-      "panels": []
-    },
-    {
-      "id": 21,
-      "type": "stat",
-      "title": "Taille de la base",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "atom-prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 39
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "atom_db_size_bytes",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "value",
-        "orientation": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
+            "properties": [
               {
-                "color": "#e6e6e6",
-                "value": null
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#cfcfcf"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^groq\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f2a65a"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^gemini\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7aa6f0"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openrouter\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#b48cf2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^mistral\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#f28c8c"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^cerebras\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#6fcf97"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^github\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#9aa0a6"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^openai\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5ec8c8"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^deepseek\\b.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#7f8cf0"
+                }
               }
             ]
           }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 22,
-      "type": "stat",
-      "title": "Messages",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "atom-prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 39
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "atom_rows{table=\"messages\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "value",
-        "orientation": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#e6e6e6",
-                "value": null
-              }
-            ]
-          },
-          "decimals": 0
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 23,
-      "type": "stat",
-      "title": "Souvenirs",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "atom-prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 39
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "atom_rows{table=\"memories\"}",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "value",
-        "orientation": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#e6e6e6",
-                "value": null
-              }
-            ]
-          },
-          "decimals": 0
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 24,
-      "type": "stat",
-      "title": "En service depuis",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "atom-prometheus"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 39
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "atom-prometheus"
-          },
-          "expr": "atom_uptime_seconds",
-          "legendFormat": "__auto",
-          "refId": "A",
-          "range": false,
-          "instant": true
-        }
-      ],
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "textMode": "value",
-        "orientation": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#e6e6e6",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
+        ]
       }
     }
   ]

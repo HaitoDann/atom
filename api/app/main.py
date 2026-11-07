@@ -124,8 +124,10 @@ app.middleware("http")(observability.middleware)
 
 
 @app.get("/api/metrics")
-def metrics():
-    return PlainTextResponse(observability.render(), media_type="text/plain; version=0.0.4")
+async def metrics():
+    from . import system
+    loaded = await system.loaded_models()
+    return PlainTextResponse(await asyncio.to_thread(observability.render, loaded), media_type="text/plain; version=0.0.4")
 
 
 def _ip(request: Request) -> str:

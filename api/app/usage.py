@@ -154,3 +154,64 @@ def last_calls(provider: str, n: int = 20) -> list[dict]:
 def prune(max_days: int = RETENTION_DAYS) -> int:
     with db.conn() as c:
         return c.execute("DELETE FROM api_usage WHERE ts < ?", (time.time() - max_days * 86400,)).rowcount
+
+
+# ---------------------------------------------------------------- détails pour /api/metrics et le tableau Grafana
+
+ERROR_KINDS = [   # (type, motifs dans le message d'erreur) — l'ordre compte
+    ("quota", ("limite", "quota", "429", "rate limit", "trop de requêtes")),
+    ("cle", ("clé api", "401", "403", "unauthorized", "forbidden")),
+    ("trop_long", ("trop longue", "context", "413", "too large")),
+    ("modele_absent", ("n'existe pas", "pas installé", "not found", "404")),
+    ("injoignable", ("injoignable", "connect", "timeout", "timed out")),
+    ("reponse_vide", ("rien répondu", "illisible", "vide")),
+    ("panne", ("500", "502", "503", "504", "a répondu 5")),
+]
+LATENCY_BUCKETS = (0.25, 0.5, 1, 2, 3, 5, 8, 13, 20, 30, 60)
+
+
+def error_kind(error: str) -> str:
+    low = (error or "").lower()
+    for kind, needles in ERROR_KINDS:
+        if any(n in low for n in needles):
+            return kind
+    return "autre"
+
+
+def calls_by_task() -> list[dict]:
+    """Compteurs cumulés par fournisseur, tâche et résultat."""
+    with db.conn() as c:
+        rows = c.execute("SELECT provider, COALESCE(task, 'autre') AS task, ok, COUNT(*) AS n FROM api_usage "
+                         "GROUP BY provider, task, ok").fetchall()
+    return [dict(r) for r in rows]
+
+
+def errors_by_kind() -> dict[tuple[str, str], int]:
+    with db.conn() as c:
+        rows = c.execute("SELECT provider, error FROM api_usage WHERE ok = 0").fetchall()
+    out: dict[tuple[str, str], int] = {}
+    for r in rows:
+        k = (r["provider"], error_kind(r["error"]))
+        out[k] = out.get(k, 0) + 1
+    return out
+
+
+def first_token_histogram() -> dict[str, dict]:
+    """Histogramme cumulé du délai avant le premier mot (appels réussis), par fournisseur."""
+    cols = ", ".join(f"SUM(CASE WHEN first_s <= {b} THEN 1 ELSE 0 END) AS b{i}" for i, b in enumerate(LATENCY_BUCKETS))
+    with db.conn() as c:
+        rows = c.execute(f"SELECT provider, COUNT(*) AS n, SUM(first_s) AS s, {cols} FROM api_usage "
+                         "WHERE ok = 1 AND first_s IS NOT NULL GROUP BY provider").fetchall()
+    return {r["provider"]: {"count": r["n"], "sum": r["s"] or 0,
+                            "buckets": [(b, r[f"b{i}"] or 0) for i, b in enumerate(LATENCY_BUCKETS)]} for r in rows}
+
+
+def generation_speed(window_s: int = 3600) -> dict[str, float]:
+    """Vitesse de génération récente (tokens par seconde, hors délai avant le premier mot), par fournisseur."""
+    with db.conn() as c:
+        rows = c.execute("""
+            SELECT provider, SUM(completion_tokens) AS tok, SUM(total_s - COALESCE(first_s, 0)) AS dur FROM api_usage
+            WHERE ok = 1 AND ts >= ? AND completion_tokens > 0 AND total_s > COALESCE(first_s, 0)
+              AND COALESCE(task, '') NOT IN ('embedding', 'memoire')
+            GROUP BY provider""", (time.time() - window_s,)).fetchall()
+    return {r["provider"]: round(r["tok"] / r["dur"], 2) for r in rows if r["dur"]}
