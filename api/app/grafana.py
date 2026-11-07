@@ -54,6 +54,10 @@ async def proxy(path: str, request: Request):
     gc = _cookies(request.headers.get("cookie", ""))
     if gc:
         headers["cookie"] = gc
+    # Comme tout relais (nginx : proxy_set_header Host $host), on garde l'adresse vue par le navigateur :
+    # Grafana compare l'en-tête Origin des requêtes POST (panneaux) à Host, et les refuse sinon (« origin not allowed »).
+    headers["host"] = request.headers.get("host", "")
+    headers["x-forwarded-host"] = request.headers.get("x-forwarded-host", request.headers.get("host", ""))
     headers["x-forwarded-proto"] = request.headers.get("x-forwarded-proto", request.url.scheme)
     req = _http().build_request(request.method, target, headers=headers,
                                 content=await request.body())
