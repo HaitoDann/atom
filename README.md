@@ -380,13 +380,12 @@ Un moteur **SearXNG** auto-hébergé tourne avec Atom (service `searxng`, sans p
 
 - **Souvenir retenu** : un fragment lumineux part du message et entre dans la sphère.
 - **Apparence : maillage** (par défaut) — la sphère est un réseau de ~360 nœuds régulièrement répartis et reliés à leurs voisins, l'arrière estompé dans la profondeur, une poussière intérieure discrète, et des **signaux lumineux** qui parcourent les liens (rares au repos, nombreux quand Atom réfléchit, parle, cherche ou consulte une autre IA). Toutes les émotions et animations s'appliquent au réseau ; dans l'atelier, les liens entre amas se rompent. Réglages → Entité → « Fragments » pour revenir à la sphère de poussière d'origine.
-- **Apparence : orbe** : une sphère découpée comme un Rubik's cube, dessinée uniquement en lignes.
-  - Elle est coupée en 3 tranches sur chaque axe. N'importe quelle tranche, horizontale, verticale ou en profondeur, pivote d'un quart de tour, et ses gravures suivent le mouvement.
-  - Le décor reprend l'esprit d'un orbe gravé : de grands disques à double anneau au centre des cases, des rainures en arcs qui en rayonnent jusqu'aux tranches, et de fines gravures entre eux (cercles concentriques, spirales, pastilles à tige, arcs).
-  - Des **ondes de couleur** parcourent toutes les rainures, avec une teinte qui varie le long du trajet. Elles sont lentes au repos, plus vives et plus rapides quand Atom travaille. La couleur de base vient de l'émotion : rouge serré en colère, palette plus large en curiosité ou en joie.
-  - Les tranches pivotent plus ou moins souvent selon l'état : à-coups rapides en colère, rotations en séquence sur les trois axes par curiosité, quasi immobile en sommeil.
-  - Pour les grosses tâches, la couronne du haut se soulève et un globe holographique en fil de fer tourne au-dessus.
-  - Réglages → Atom → Entité → « Orbe ».
+- **Apparence : planète** : une planète vivante dessinée au trait, en monochrome.
+  - Des continents aux côtes irrégulières, avec des lignes de relief et des montagnes, des vagues sur les océans et une face de nuit en hachures. L'atmosphère respire, des nuages dérivent plus vite que la surface et une lune tourne sur une orbite en pointillés.
+  - De la lumière court le long des côtes : lente au repos, plus vive quand Atom travaille.
+  - Les humeurs passent par la météo : tempête en spirale en réflexion ou par curiosité, aurores aux pôles en activité ou de joie, éclairs et rotation rapide en colère, pluie en tristesse, nuit plus profonde en sommeil.
+  - Pour les grosses tâches (recherche, atelier, agent), des satellites tournent autour d'elle et envoient des signaux vers la surface.
+  - Réglages → Atom → Entité → « Planète ».
 - Situations : **consulter une IA distante** (ondes de fragments lavande qui partent de la sphère), **atelier** (la sphère se divise en amas qui tournent ensemble, celui qui travaille s'éclaire, puis ils fusionnent pour la réponse finale), **lecture** de code ou de documents (les fragments se rangent en lignes, un balayage lumineux les parcourt), **indexation** (fragments blancs absorbés), **sauvegarde** (contraction et anneau qui se referme), **secours ou erreur** (brève perturbation par bandes). Toutes prévisualisables dans Réglages → Entité.
 - Émotions sans traits humains : la colère rend les fragments rouges et frénétiques, la curiosité les fait tourner en spirale, la concentration accélère leur rotation.
 

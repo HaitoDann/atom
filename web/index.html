@@ -1481,7 +1481,7 @@
       <section class="pane" data-pane="entity">
         <div class="block">
           <h4>Apparence de l'entité</h4>
-          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine. Orbe : une sphère articulée dessinée en points et traits fins, gravée de circuits et de médaillons, dont les bandes pivotent — elle s'ouvre et projette une carte lumineuse pendant les grosses tâches.</p>
+          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine. Planète : une planète vivante dessinée au trait — continents, relief, nuages, lune, météo selon l'humeur, satellites pendant les grosses tâches.</p>
           <div class="row" id="styleRow"></div>
         </div>
         <div class="block">
@@ -1802,217 +1802,235 @@ function setEntityState(t) { $("emoState").textContent = t; }
      Les émotions passent par la façon de tourner et la couleur de la lumière.
      Grosses tâches (recherche, atelier, IA distante, agent) : l'orbe s'ouvre et projette une carte de points. */
   const orb = (() => {
-    // ---- géométrie : sphère découpée en 3 tranches sur chaque axe (comme un Rubik's cube)
-    const TH = 1 / 3, R2 = Math.random;
+    // ---- « Planète vivante » : continents, relief, nuages, lune, météo — tout en traits monochromes
+    const R2 = Math.random;
     const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
-    const cellOf = (p) => p.map((c) => (c > TH ? 1 : c < -TH ? -1 : 0));
-    const pieces = new Map();   // clé "sx,sy,sz" → { c0, M, anim }
-    const piece = (cell) => {
-      const k = cell.join(",");
-      if (!pieces.has(k)) pieces.set(k, { c0: cell.map((x) => x * 0.66), M: [1, 0, 0, 0, 1, 0, 0, 0, 1] });
-      return pieces.get(k);
-    };
-    // segments : [a, b, pièce, chemin, abscisse, type]  — type 0 rainure de tranche, 1 circuit, 2 médaillon/cadre
-    const segs = [], paths = [];
-    const addPath = (pts, type, nudge) => {
-      const path = { len: 0, type, phase: R2() };
-      paths.push(path);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[i], b = pts[i + 1], m = norm([(a[0] + b[0]) / 2 + nudge[0], (a[1] + b[1]) / 2 + nudge[1], (a[2] + b[2]) / 2 + nudge[2]]);
-        const cell = cellOf(m); if (!cell.some((x) => x)) cell[0] = 1;
-        const l = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-        segs.push({ a, b, pc: piece(cell), path, s: path.len, type });
-        path.len += l;
+    const basis = (c) => { const up = Math.abs(c[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]; const u = norm([up[1] * c[2] - up[2] * c[1], up[2] * c[0] - up[0] * c[2], up[0] * c[1] - up[1] * c[0]]); return [u, [c[1] * u[2] - c[2] * u[1], c[2] * u[0] - c[0] * u[2], c[0] * u[1] - c[1] * u[0]]]; };
+    // point à la distance angulaire r de c, dans la direction a
+    const geo = (c, u, v, r, a, alt = 1) => { const cr = Math.cos(r), sr = Math.sin(r), ca = Math.cos(a), sa = Math.sin(a); return [(c[0] * cr + (u[0] * ca + v[0] * sa) * sr) * alt, (c[1] * cr + (u[1] * ca + v[1] * sa) * sr) * alt, (c[2] * cr + (u[2] * ca + v[2] * sa) * sr) * alt]; };
+    const lines = [];   // { pts, kind: "coast" | "topo" | "ridge", len }
+    const continents = [];
+    const NC = 9;
+    for (let k = 0; k < NC; k++) {
+      // répartition régulière (spirale de Fibonacci) pour qu'il y ait toujours des terres en vue
+      const yk = 1 - (k + 0.5) / NC * 2, rk = Math.sqrt(1 - yk * yk), ak = k * 2.39996 + R2() * 0.4;
+      const c = norm([Math.cos(ak) * rk, yk * 0.85, Math.sin(ak) * rk]), [u, v] = basis(c);
+      const rb = 0.26 + R2() * 0.3, harm = Array.from({ length: 5 }, (_, i) => [0.08 + R2() * 0.16 / (i + 1), R2() * 6.28]);
+      const rad = (a, f) => rb * f * (1 + harm.reduce((s, [am, ph], i) => s + am * Math.sin((i + 2) * a + ph), 0));
+      continents.push({ c, u, v, rb });
+      for (const [f, kind] of [[1, "coast"], [0.66, "topo"], [0.38, "topo"]]) {
+        if (kind === "topo" && rb * f < 0.08) continue;
+        const pts = []; for (let i = 0; i <= 72; i++) { const a = (i / 72) * Math.PI * 2; pts.push(geo(c, u, v, rad(a + (f < 1 ? 0.3 : 0), f), a)); }
+        lines.push({ pts, kind });
       }
-    };
-    // rainures de tranches : cercles p·axe = ±1/3, attribués à la tranche extérieure
-    for (let ax = 0; ax < 3; ax++) for (const h of [-TH, TH]) {
-      const r = Math.sqrt(1 - h * h), pts = [];
-      for (let k = 0; k <= 96; k++) {
-        const a = (k / 96) * Math.PI * 2, v = [0, 0, 0];
-        v[ax] = h; v[(ax + 1) % 3] = Math.cos(a) * r; v[(ax + 2) % 3] = Math.sin(a) * r; pts.push(v);
-      }
-      const nudge = [0, 0, 0]; nudge[ax] = Math.sign(h) * 0.05;
-      addPath(pts, 0, nudge);
-
-    }
-    // décor : grands disques reliés par des rainures en arcs, gravures fines entre eux
-    const tangent = (n) => { const up = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]; const u = norm([up[1] * n[2] - up[2] * n[1], up[2] * n[0] - up[0] * n[2], up[0] * n[1] - up[1] * n[0]]); return [u, [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]]]; };
-    const at = (n, u, v, x, y) => norm([n[0] + u[0] * x + v[0] * y, n[1] + u[1] * x + v[1] * y, n[2] + u[2] * x + v[2] * y]);
-    const circle = (n, u, v, cx, cy, r, k = 32) => { const pts = []; for (let i = 0; i <= k; i++) { const a = (i / k) * Math.PI * 2; pts.push(at(n, u, v, cx + Math.cos(a) * r, cy + Math.sin(a) * r)); } return pts; };
-    const medallions = [];
-    for (let sx = -1; sx <= 1; sx++) for (let sy = -1; sy <= 1; sy++) for (let sz = -1; sz <= 1; sz++) {
-      if (!sx && !sy && !sz) continue;
-      const key = [sx, sy, sz].join(","), n = norm([sx, sy, sz]), [u, v] = tangent(n), nz = [sx, sy, sz].filter((x) => x).length;
-      const inCell = (p) => cellOf(p).join(",") === key;
-      const span = nz === 1 ? 0.3 : nz === 2 ? 0.2 : 0.14;
-      // 1) disque (faces : grand, arêtes : moyen), avec un anneau intérieur
-      const pr = nz === 1 ? 0.17 + R2() * 0.05 : nz === 2 ? 0.1 + R2() * 0.03 : 0;
-      const ox = nz === 1 ? 0 : (R2() - 0.5) * span * 0.3, oy = nz === 1 ? 0 : (R2() - 0.5) * span * 0.3;
-      if (pr) {
-        addPath(circle(n, u, v, ox, oy, pr, 40), 2, [0, 0, 0]);
-        addPath(circle(n, u, v, ox, oy, pr * 0.86, 36), 2, [0, 0, 0]);
-        if (R2() < 0.6) addPath(circle(n, u, v, ox + pr * 0.15, oy - pr * 0.1, pr * 0.32, 20), 3, [0, 0, 0]);   // petit glyphe dans le disque
-        medallions.push({ n: at(n, u, v, ox, oy), pc: piece([sx, sy, sz]) });
-      }
-      // 2) rainures qui rayonnent du disque jusqu'au bord de la case (arcs, angles irréguliers)
-      const rays = nz === 1 ? 5 + ((R2() * 2) | 0) : nz === 2 ? 3 : 2;
-      const a0 = R2() * Math.PI * 2;
-      for (let r = 0; r < rays; r++) {
-        const ang = a0 + (r / rays) * Math.PI * 2 + (R2() - 0.5) * 0.5, bend = (R2() - 0.5) * 0.35;
-        const pts = [];
-        for (let k = 0; k <= 40; k++) {
-          const d = (pr || 0.02) + k * 0.012, a = ang + bend * k / 40;
-          const p = at(n, u, v, ox + Math.cos(a) * d, oy + Math.sin(a) * d);
-          if (!inCell(p)) break;
-          pts.push(p);
-        }
-        if (pts.length > 3) addPath(pts, 1, [0, 0, 0]);
-      }
-      // 3) gravures fines : cercles concentriques, spirales, pastilles à tige, arcs
-      const nG = nz === 1 ? 20 : nz === 2 ? 12 : 8;
-      for (let g = 0; g < nG; g++) {
-        let gx, gy, tries = 0;
-        do { gx = (R2() - 0.5) * span * 1.9; gy = (R2() - 0.5) * span * 1.9; tries++; }
-        while (tries < 12 && (Math.hypot(gx - ox, gy - oy) < pr + 0.035 || !inCell(at(n, u, v, gx, gy))));
-        if (tries >= 12) continue;
-        const kind = (R2() * 4) | 0, gr = 0.012 + R2() * 0.022;
-        if (kind === 0) { for (let ring = 1; ring <= 2 + ((R2() * 2) | 0); ring++) addPath(circle(n, u, v, gx, gy, gr * ring * 0.55, 16), 3, [0, 0, 0]); }
-        else if (kind === 1) {   // spirale
-          const pts = []; for (let k = 0; k <= 30; k++) { const a = k * 0.42, rr = gr * 1.3 * k / 30; pts.push(at(n, u, v, gx + Math.cos(a) * rr, gy + Math.sin(a) * rr)); }
-          addPath(pts, 3, [0, 0, 0]);
-        } else if (kind === 2) {   // pastille avec une tige
-          addPath(circle(n, u, v, gx, gy, gr * 0.6, 12), 3, [0, 0, 0]);
-          const ta = R2() * Math.PI * 2, tl = gr * (2 + R2() * 2);
-          addPath([at(n, u, v, gx + Math.cos(ta) * gr * 0.6, gy + Math.sin(ta) * gr * 0.6), at(n, u, v, gx + Math.cos(ta) * tl, gy + Math.sin(ta) * tl)], 3, [0, 0, 0]);
-          addPath(circle(n, u, v, gx + Math.cos(ta) * (tl + gr * 0.35), gy + Math.sin(ta) * (tl + gr * 0.35), gr * 0.35, 10), 3, [0, 0, 0]);
-        } else {   // arc ouvert
-          const pts = [], st0 = R2() * Math.PI * 2; for (let k = 0; k <= 14; k++) { const a = st0 + k * 0.28; pts.push(at(n, u, v, gx + Math.cos(a) * gr * 1.2, gy + Math.sin(a) * gr * 1.2)); }
-          addPath(pts, 3, [0, 0, 0]);
+      // chaînes de montagnes : petits chevrons alignés
+      for (let m = 0; m < (rb > 0.35 ? 2 : 1); m++) {
+        const a0 = R2() * 6.28, r0 = rb * (0.15 + R2() * 0.35);
+        for (let j = 0; j < 5; j++) {
+          const a = a0 + j * 0.25 / Math.max(0.1, r0 * 4), r = r0 + j * 0.02, w = 0.025;
+          const p0 = geo(c, u, v, r - w, a - 0.06), p1 = geo(c, u, v, r + w * 1.3, a), p2 = geo(c, u, v, r - w, a + 0.06);
+          lines.push({ pts: [p0, p1, p2], kind: "ridge" });
         }
       }
     }
-
-    // ---- mouvements : une tranche pivote d'un quart de tour autour d'un axe x, y ou z
-    let move = null, nextMove = 1.5, yaw = 0, pitch = 0.42, openK = 0, lastAxis = 1;
-    const rotM = (ax, ang) => { const c = Math.cos(ang), s = Math.sin(ang); return ax === 0 ? [1, 0, 0, 0, c, -s, 0, s, c] : ax === 1 ? [c, 0, s, 0, 1, 0, -s, 0, c] : [c, -s, 0, s, c, 0, 0, 0, 1]; };
-    const mul = (A, B) => [0, 1, 2].flatMap((i) => [0, 1, 2].map((j) => A[i * 3] * B[j] + A[i * 3 + 1] * B[3 + j] + A[i * 3 + 2] * B[6 + j]));
-    const app = (M, p) => [M[0] * p[0] + M[1] * p[1] + M[2] * p[2], M[3] * p[0] + M[4] * p[1] + M[5] * p[2], M[6] * p[0] + M[7] * p[1] + M[8] * p[2]];
-    const easeIO = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    // vagues des océans : petits « ~ » loin des côtes
+    const waves = [];
+    for (let k = 0; k < 70; k++) {
+      const p = norm([R2() * 2 - 1, R2() * 2 - 1, R2() * 2 - 1]);
+      if (continents.some((c) => Math.acos(Math.max(-1, Math.min(1, p[0] * c.c[0] + p[1] * c.c[1] + p[2] * c.c[2]))) < c.rb * 1.35)) continue;
+      const [u, v] = basis(p);
+      waves.push(Array.from({ length: 7 }, (_, i) => geo(p, u, v, 0.03 * Math.abs(i - 3) / 3 + 0.0001, i < 3 ? Math.PI : 0).map((x, j) => x + v[j] * Math.sin(i * 1.6) * 0.008)));
+    }
+    for (const l of lines) { l.len = 0; for (let i = 1; i < l.pts.length; i++) l.len += Math.hypot(l.pts[i][0] - l.pts[i - 1][0], l.pts[i][1] - l.pts[i - 1][1], l.pts[i][2] - l.pts[i - 1][2]); l.phase = R2(); }
+    // nuages : traits ondulés à basse altitude
+    const clouds = Array.from({ length: 9 }, () => {
+      const lat = (R2() - 0.5) * 2.2, lon = R2() * 6.28, len = 0.35 + R2() * 0.5;
+      return { lat, lon, len, wob: R2() * 6.28, speed: 0.6 + R2() * 0.8 };
+    });
+    const storm = { c: norm([0.3, 0.25, 0.9]), k: 0 };
+    let yaw = R2() * 6.28, cloudYaw = 0, moonA = R2() * 6.28, satA = 0, openK = 0, stormK = 0, flash = 0, flashT = 0;
+    const tilt = 0.41;   // inclinaison de l'axe
 
     function step(dt, st) {
-      nextMove -= dt * st.moveRate;
-      if (!move && nextMove <= 0) {
-        const ax = st.swirl ? (lastAxis + 1) % 3 : (R2() * 3) | 0;
-        lastAxis = ax;
-        const layer = [-1, 0, 1][(R2() * 3) | 0], dir = R2() < 0.5 ? -1 : 1;
-        const sel = [...pieces.values()].filter((pc) => Math.round(app(pc.M, pc.c0)[ax] / 0.66) === layer);
-        move = { ax, dir, k: 0, sel, turns: st.jit ? 0.5 : 1 };
-        nextMove = 0.6 + R2() * 2;
+      yaw += dt * st.spin;
+      cloudYaw += dt * st.spin * st.cloudSpeed;
+      moonA += dt * 0.22 * (st.spin / 0.11);
+      satA += dt * 0.9;
+      openK += ((st.open ? 1 : 0) - openK) * Math.min(1, dt * 2);
+      stormK += ((st.storm ? 1 : 0) - stormK) * Math.min(1, dt * 1.5);
+      flashT -= dt;
+      if (st.lightning && flashT <= 0) { flash = 1; flashT = 0.25 + R2() * 0.9; storm.bolt = { c: norm([R2() - 0.5, R2() * 0.6 - 0.2, 0.8 + R2() * 0.2]), seed: R2() }; }
+      flash *= Math.exp(-dt * 9);
+    }
+    // rotation de la planète puis projection (axe incliné)
+    const T = [0, 0, 0];
+    function proj(p, R, spin, out) {
+      const c = Math.cos(spin), s = Math.sin(spin);
+      const x = p[0] * c + p[2] * s, z = -p[0] * s + p[2] * c;
+      const ct = Math.cos(tilt), stt = Math.sin(tilt);
+      const y = p[1] * ct - z * stt, z2 = p[1] * stt + z * ct;
+      out[0] = x * R; out[1] = -y * R; out[2] = z2;
+      return out;
+    }
+    const L = norm([-0.8, 0.38, 0.45]);   // lumière (haut gauche, de côté : une belle face de nuit)
+
+    function draw(ctx, st) {
+      const R = st.R, A = st.alpha, px = st.px, lit = st.lit, tint = st.tint;
+      const light = document.documentElement.dataset.theme === "light";
+      const ink = light ? "40,40,40" : tint, bgc = getComputedStyle(document.body).backgroundColor;
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      const stroke = (a, w, col = ink) => { ctx.globalAlpha = Math.max(0, Math.min(1, a)) * A; ctx.lineWidth = w * px; ctx.strokeStyle = `rgb(${col})`; };
+      // --- lune et orbite (moitié arrière, avant la planète)
+      const orbit = (front) => {
+        const OR = R * 1.62, ry = OR * 0.26, rot = -0.28;
+        ctx.save(); ctx.rotate(rot);
+        stroke(0.22, 0.7); ctx.setLineDash([3 * px, 5 * px]);
+        ctx.beginPath(); ctx.ellipse(0, 0, OR, ry, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        const inFront = Math.sin(moonA) > 0;
+        if (inFront === front) {
+          const mx = Math.cos(moonA) * OR, my = Math.sin(moonA) * ry, mr = R * 0.13;
+          ctx.fillStyle = bgc; ctx.globalAlpha = A; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+          stroke(0.75, 1); ctx.stroke();
+          stroke(0.35, 0.6);   // croissant d'ombre en hachures
+          for (let k = -3; k <= 3; k++) { const yy = my + k * mr * 0.25, hw = Math.sqrt(Math.max(0, mr * mr - (yy - my) ** 2)); ctx.beginPath(); ctx.moveTo(mx + hw * 0.15, yy); ctx.lineTo(mx + hw, yy); ctx.stroke(); }
+        }
+        ctx.restore();
+      };
+      orbit(false);
+      // --- atmosphère qui respire
+      const br = 1 + Math.sin(st.t * 0.8) * 0.006;
+      stroke(0.14 + lit * 0.12, 0.8); ctx.beginPath(); ctx.arc(0, 0, R * 1.07 * br, 0, Math.PI * 2); ctx.stroke();
+      stroke(0.06 + lit * 0.06, 0.6); ctx.beginPath(); ctx.arc(0, 0, R * 1.14 * br, 0, Math.PI * 2); ctx.stroke();
+      // disque opaque : cache ce qui passe derrière
+      ctx.globalAlpha = A; ctx.fillStyle = bgc; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+      // --- face de nuit en hachures
+      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.clip();
+      const hs = R * 0.055;
+      for (let k = -24; k <= 24; k++) {
+        const off = k * hs;
+        ctx.beginPath(); let pen = false;
+        for (let j = 0; j <= 30; j++) {
+          const tt = (j / 30) * 2 - 1, x = off * 0.7 + tt * R * 0.7, y = -off * 0.7 + tt * R * 0.7;   // diagonales
+          const d2 = 1 - (x * x + y * y) / (R * R); if (d2 <= 0) { pen = false; continue; }
+          const nz = Math.sqrt(d2), dot = (x / R) * L[0] + (-y / R) * L[1] + nz * L[2];
+          const thr = -0.05 - (k % 2 ? 0.25 : 0);   // une ligne sur deux commence plus loin : dégradé
+          if (dot < thr) { if (!pen) { ctx.moveTo(x, y); pen = true; } else ctx.lineTo(x, y); } else pen = false;
+        }
+        stroke(st.night * 0.5, 0.65); ctx.stroke();
       }
-      if (move) {
-        move.k = Math.min(1, move.k + dt * st.moveSpeed);
-        if (move.k >= 1) {
-          const R = rotM(move.ax, move.dir * Math.PI / 2 * (move.turns === 0.5 ? 1 : 1));
-          for (const pc of move.sel) pc.M = mul(R, pc.M).map((x) => Math.round(x));   // quart de tour exact
-          move = null;
+      ctx.restore();
+      // --- continents : côtes, relief, montagnes, avec de la lumière qui court le long des côtes
+      const shade = (p3) => { const d = p3[0] / R * L[0] + -p3[1] / R * L[1] + p3[2] * L[2]; return d > 0 ? 1 : 0.45 + 0.55 * (1 + d); };
+      const pa = [0, 0, 0], pb = [0, 0, 0];
+      const [h0] = toHsl(tint);
+      for (const ln of lines) {
+        const w = ln.kind === "coast" ? 1.15 : ln.kind === "topo" ? 0.6 : 0.8, a0 = ln.kind === "coast" ? 0.85 : ln.kind === "topo" ? 0.35 : 0.55;
+        let s = 0;
+        for (let i = 1; i < ln.pts.length; i++) {
+          proj(ln.pts[i - 1], R, yaw, pa); proj(ln.pts[i], R, yaw, pb);
+          const seg = Math.hypot(ln.pts[i][0] - ln.pts[i - 1][0], ln.pts[i][1] - ln.pts[i - 1][1], ln.pts[i][2] - ln.pts[i - 1][2]); s += seg;
+          if (pa[2] < 0 && pb[2] < 0) continue;
+          const edge = Math.min(1, (pa[2] + pb[2]) * 2.5);   // fondu au bord
+          stroke(a0 * edge * shade(pa), w); ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+          if (ln.kind !== "coast") continue;
+          const wave = Math.pow(Math.max(0, Math.sin((s / 0.45 - st.t * st.flow + ln.phase * 5) * Math.PI)), 12) * (0.2 + lit * 0.9) * edge;
+          if (wave > 0.04) {
+            const hue = h0 + Math.sin(s * 3 + st.t * 0.4) * st.hueSpread;
+            ctx.globalAlpha = A * Math.min(1, wave); ctx.strokeStyle = `hsl(${hue.toFixed(0)},70%,${light ? 42 : 66}%)`; ctx.lineWidth = 1.7 * px; ctx.stroke();
+            ctx.globalAlpha = A * wave * 0.2; ctx.lineWidth = 5 * px; ctx.stroke();
+          }
         }
       }
-      yaw += dt * st.spin;
-      pitch += ((0.42 + st.droop + Math.sin(st.t * 0.23) * 0.12) - pitch) * Math.min(1, dt * 1.5);
-      openK += ((st.open ? 1 : 0) - openK) * Math.min(1, dt * 2.2);
+      // --- vagues
+      for (const wv of waves) {
+        ctx.beginPath(); let pen = false;
+        for (const p of wv) { proj(p, R, yaw, T); if (T[2] < 0.1) { pen = false; continue; } if (!pen) { ctx.moveTo(T[0], T[1]); pen = true; } else ctx.lineTo(T[0], T[1]); }
+        stroke(0.28 * (0.5 + 0.5 * T[2]) * shade(T), 0.6); ctx.stroke();
+      }
+      // --- tempête en spirale (réflexion / curiosité)
+      if (stormK > 0.02) {
+        const [u, v] = basis(storm.c), sp = st.t * 1.6;
+        ctx.beginPath(); let pen = false;
+        for (let k = 0; k <= 60; k++) {
+          const r = 0.01 + k * 0.0035, a = -k * 0.32 + sp;
+          proj(geo(storm.c, u, v, r, a, 1.015), R, cloudYaw + yaw, T);
+          if (T[2] < 0) { pen = false; continue; }
+          if (!pen) { ctx.moveTo(T[0], T[1]); pen = true; } else ctx.lineTo(T[0], T[1]);
+        }
+        stroke(0.7 * stormK, 0.9); ctx.stroke();
+      }
+      // --- nuages : traits ondulés qui dérivent
+      for (const cl of clouds) {
+        ctx.beginPath(); let pen = false, zs = 0, n = 0;
+        for (let k = 0; k <= 16; k++) {
+          const lon = cl.lon + (k / 16) * cl.len, lat = cl.lat + Math.sin(k * 0.8 + cl.wob + st.t * 0.3) * 0.03;
+          const p = [Math.cos(lat) * Math.cos(lon) * 1.03, Math.sin(lat) * 1.03, Math.cos(lat) * Math.sin(lon) * 1.03];
+          proj(p, R, cloudYaw * cl.speed + yaw, T);
+          if (T[2] < 0.05) { pen = false; continue; }
+          zs += T[2]; n++;
+          if (!pen) { ctx.moveTo(T[0], T[1]); pen = true; } else ctx.lineTo(T[0], T[1]);
+        }
+        if (!n) continue;
+        stroke((0.3 + (st.rain ? 0.2 : 0)) * Math.min(1, zs / n * 2), 1.1); ctx.stroke();
+        if (st.rain) {   // pluie : petits traits obliques sous le nuage
+          const lon = cl.lon + cl.len / 2, p = [Math.cos(cl.lat) * Math.cos(lon), Math.sin(cl.lat), Math.cos(cl.lat) * Math.sin(lon)];
+          proj(p, R, cloudYaw * cl.speed + yaw, T);
+          if (T[2] > 0.2) { stroke(0.35, 0.6); for (let k = 0; k < 4; k++) { const x = T[0] + (k - 1.5) * R * 0.03, y = T[1] + R * 0.02 + ((st.t * 40 + k * 7) % 10) * R * 0.004; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - R * 0.012, y + R * 0.03); ctx.stroke(); } }
+        }
+      }
+      // --- éclairs (colère)
+      if (flash > 0.05 && storm.bolt) {
+        proj(storm.bolt.c, R, yaw, T);
+        if (T[2] > 0) {
+          let x = T[0], y = T[1] - R * 0.05;
+          ctx.beginPath(); ctx.moveTo(x, y);
+          for (let k = 0; k < 5; k++) { x += (Math.sin(storm.bolt.seed * 50 + k * 3) * 0.5) * R * 0.05; y += R * 0.035; ctx.lineTo(x, y); }
+          ctx.globalAlpha = A * flash; ctx.strokeStyle = `rgb(${tint})`; ctx.lineWidth = 1.4 * px; ctx.stroke();
+        }
+      }
+      // --- aurores aux pôles (activité, joie)
+      if (st.aurora > 0.02) {
+        for (const pole of [1, -1]) {
+          for (let k = 0; k < 40; k++) {
+            const lon = (k / 40) * Math.PI * 2, lat = pole * (1.2 + Math.sin(lon * 3 + st.t * 0.7) * 0.05);
+            const base = [Math.cos(lat) * Math.cos(lon), Math.sin(lat), Math.cos(lat) * Math.sin(lon)];
+            const hgt = 1.04 + 0.05 * (0.5 + 0.5 * Math.sin(lon * 5 + st.t * 2.2));
+            proj(base.map((x) => x * 1.01), R, yaw, pa); proj(base.map((x) => x * hgt), R, yaw, pb);
+            if (pa[2] < 0) continue;
+            const hue = h0 + Math.sin(lon * 2 + st.t) * st.hueSpread;
+            ctx.globalAlpha = A * st.aurora * 0.7 * (0.4 + 0.6 * pa[2]); ctx.strokeStyle = `hsl(${hue.toFixed(0)},70%,${light ? 45 : 65}%)`; ctx.lineWidth = 0.9 * px;
+            ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+          }
+        }
+      }
+      // --- contour de la planète
+      stroke(0.85, 1.2); ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.stroke();
+      // --- satellites et signaux (grosses tâches)
+      if (openK > 0.02) {
+        for (let k = 0; k < 3; k++) {
+          const a = satA * (1 + k * 0.15) + k * 2.1, SR = R * (1.32 + k * 0.08);
+          const sx = Math.cos(a) * SR, sy = Math.sin(a) * SR * 0.45 - R * 0.1 * k;
+          if (Math.sin(a) < 0 && Math.hypot(sx, sy) < R) continue;   // caché derrière
+          stroke(0.9 * openK, 1.1); ctx.strokeRect(sx - R * 0.03, sy - R * 0.022, R * 0.06, R * 0.044);
+          for (const sg of [-1, 1]) { ctx.strokeRect(sx + sg * R * 0.05 - (sg < 0 ? R * 0.07 : 0), sy - R * 0.018, R * 0.07, R * 0.036); }   // panneaux solaires
+          // faisceau vers la surface, en impulsions
+          const tx = sx * 0.55, ty = sy * 0.55, pulse = (st.t * 1.5 + k * 0.33) % 1;
+          stroke(0.25 * openK, 0.7); ctx.setLineDash([2 * px, 4 * px]); ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+          ctx.globalAlpha = A * openK; ctx.strokeStyle = `hsl(${(h0 + k * 20).toFixed(0)},70%,${light ? 42 : 66}%)`; ctx.lineWidth = 1.6 * px;
+          const qx = sx + (tx - sx) * pulse, qy = sy + (ty - sy) * pulse;
+          ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(qx + (tx - sx) * 0.08, qy + (ty - sy) * 0.08); ctx.stroke();
+        }
+      }
+      orbit(true);
+      ctx.restore();
     }
-
-    // couleur : la teinte de l'émotion, déclinée le long des rainures (±hueSpread)
     const toHsl = (rgb) => {
       const [r, g, b] = rgb.split(",").map((x) => +x / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
       if (mx === mn) return [0, 0, l];
-      const d = mx - mn, s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-      const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
-      return [h * 60, s, l];
+      const d = mx - mn, h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return [h * 60, 0, l];
     };
-    const P3 = [0, 0, 0];
-    function proj(p, R, lift, out) {
-      const cy = Math.cos(yaw), sy = Math.sin(yaw);
-      const x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy;
-      const cp = Math.cos(pitch), sp = Math.sin(pitch);
-      const y = p[1] * cp - z * sp, z2 = p[1] * sp + z * cp;
-      out[0] = x * R; out[1] = -y * R - lift; out[2] = z2;   // z2 > 0 : face avant
-      return out;
-    }
-
-    function draw(ctx, st) {
-      const R = st.R, A = st.alpha, px = st.px, lit = st.lit;
-      const [h0, s0, l0] = toHsl(st.tint);
-      const sat = Math.max(0.35, s0), light = document.documentElement.dataset.theme === "light";
-      const gap = openK * R * 0.38;
-      const mv = move ? rotM(move.ax, move.dir * Math.PI / 2 * easeIO(move.k)) : null;
-      const moving = move ? new Set(move.sel) : null;
-      const pa = [0, 0, 0], pb = [0, 0, 0];
-      ctx.save();
-      ctx.lineCap = "round";
-      // 1) rainures de base (traits fins) + 2) flux de couleur qui les parcourt
-      const flowT = st.t * st.flow;
-      const base = light ? `rgba(40,40,40,` : `rgba(${st.tint},`;
-      for (const sg of segs) {
-        let a = app(sg.pc.M, sg.a), b = app(sg.pc.M, sg.b);
-        if (moving && moving.has(sg.pc)) { a = app(mv, a); b = app(mv, b); }
-        const top = openK > 0.01 && app(sg.pc.M, sg.pc.c0)[1] > 0.3;
-        proj(a, R, top ? gap : 0, pa); proj(b, R, top ? gap : 0, pb);
-        const z = (pa[2] + pb[2]) / 2, front = z > 0;
-        const dA = front ? 0.45 + 0.55 * z : 0.09 * (1 + z);
-        ctx.globalAlpha = A * dA * (sg.type === 0 ? 0.55 : sg.type === 1 ? 0.55 : sg.type === 2 ? 0.6 : 0.3);
-        ctx.strokeStyle = base + "1)";
-        ctx.lineWidth = (sg.type === 0 ? 1.15 : sg.type === 1 ? 1.05 : sg.type === 2 ? 1.1 : 0.6) * px;
-        ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
-        if (!front || (sg.type === 3 && lit < 0.5)) continue;   // les gravures fines ne s'éclairent qu'en activité
-        // onde lumineuse : bandes qui avancent le long du chemin, teinte qui varie avec la position
-        const u = (sg.s / 0.55) - flowT * (sg.type === 0 ? 0.7 : 1.1) + sg.path.phase * 6;
-        const w = Math.pow(Math.max(0, Math.sin(u * Math.PI * 2 / 3)), 10);
-        const I = w * (0.25 + lit * 0.9) * dA;
-        if (I < 0.03) continue;
-        const hue = h0 + Math.sin(sg.s * 2.1 + flowT * 0.35 + sg.path.phase * 4) * st.hueSpread;
-        const L = light ? 42 : Math.min(75, 52 + l0 * 25);
-        ctx.strokeStyle = `hsl(${hue.toFixed(0)},${(sat * 100).toFixed(0)}%,${L}%)`;
-        ctx.globalAlpha = A * Math.min(1, I * 1.2);
-        ctx.lineWidth = (sg.type === 3 ? 0.9 : sg.type === 0 ? 1.8 : 1.5) * px;
-        ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
-        ctx.globalAlpha = A * I * 0.22; ctx.lineWidth = 5 * px; ctx.stroke();   // halo
-      }
-      // contour : un cercle fin
-      ctx.globalAlpha = A * 0.28; ctx.strokeStyle = base + "1)"; ctx.lineWidth = 0.9 * px;
-      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.stroke();
-      // cœur des médaillons : petit anneau qui pulse quand Atom travaille
-      for (const m of medallions) {
-        let p = app(m.pc.M, m.n);
-        if (moving && moving.has(m.pc)) p = app(mv, p);
-        const top = openK > 0.01 && app(m.pc.M, m.pc.c0)[1] > 0.3;
-        proj(p, R, top ? gap : 0, P3);
-        if (P3[2] < 0.1) continue;
-        const k = lit * (0.5 + 0.5 * Math.sin(st.t * 3 + m.n[0] * 7 + m.n[2] * 5)) * P3[2];
-        if (k < 0.05) continue;
-        ctx.globalAlpha = A * k; ctx.strokeStyle = `hsl(${(h0 + Math.sin(st.t + m.n[1] * 4) * st.hueSpread).toFixed(0)},${(sat * 100).toFixed(0)}%,${light ? 40 : 66}%)`;
-        ctx.lineWidth = 1.4 * px; ctx.beginPath(); ctx.arc(P3[0], P3[1], R * 0.022 * (0.6 + P3[2] * 0.6), 0, Math.PI * 2); ctx.stroke();
-      }
-      // carte holographique : un globe en fil de fer qui tourne au-dessus, relié par un faisceau de lignes
-      if (openK > 0.02) {
-        const cyH = -R * 1.32 - gap, HR = R * 0.62, a0 = st.t * 0.4;
-        ctx.globalAlpha = A * openK * 0.55; ctx.lineWidth = 0.7 * px;
-        for (let i = 0; i < 7; i++) {   // méridiens
-          const ang = a0 + (i / 7) * Math.PI;
-          ctx.strokeStyle = `hsl(${(h0 + (i / 7) * st.hueSpread * 2 - st.hueSpread).toFixed(0)},${(sat * 100).toFixed(0)}%,${light ? 45 : 65}%)`;
-          ctx.beginPath(); ctx.ellipse(0, cyH, Math.abs(Math.cos(ang)) * HR, HR * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
-        }
-        for (const f of [-0.6, -0.2, 0.2, 0.6]) {   // parallèles
-          ctx.strokeStyle = `rgba(${st.tint},1)`;
-          ctx.beginPath(); ctx.ellipse(0, cyH + f * HR * 0.5, HR * Math.sqrt(1 - f * f), HR * 0.12 * Math.sqrt(1 - f * f), 0, 0, Math.PI * 2); ctx.stroke();
-        }
-        const yTop = -R * 0.55 - gap * 0.4;
-        ctx.globalAlpha = A * openK * 0.3; ctx.strokeStyle = `rgba(${st.tint},1)`;
-        for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(sgn * R * 0.2, yTop); ctx.lineTo(sgn * HR, cyH + HR * 0.25); ctx.stroke(); }
-      }
-      ctx.restore();
-    }
     return { step, draw };
   })();
 
@@ -2161,15 +2179,15 @@ function setEntityState(t) { $("emoState").textContent = t; }
       const busy = a === "thinking" || a === "talking" || a === "focus" || a === "curious";
       const big = entity.feeding || entity.remoteK > 0.3 || entity.splitK > 0.3 || entity.scan;
       const st = {
-        t, dt, R: R0 * rad * (1 + entity.tokenKick * 0.01), px: pxSize, tint, alpha: globalA,
-        lit: Math.max(0.1, cur.dim) * Math.min(1, (busy ? 0.8 : 0.2) + entity.tokenKick * 0.5 + (a === "angry" ? 0.6 : 0) + (a === "joy" ? 0.4 : 0) + entity.absorb * 0.6 + entity.seal * 0.5) * (a === "sleep" ? 0.25 : 1),
-        flow: (a === "sleep" ? 0.15 : busy ? 1.6 : 0.55) * (a === "angry" ? 2.4 : a === "joy" ? 1.4 : a === "sad" ? 0.5 : 1),
-        hueSpread: a === "angry" ? 14 : a === "joy" ? 45 : a === "curious" ? 70 : a === "sleep" ? 10 : a === "sad" ? 18 : 38,
-        spin: (a === "sleep" ? 0.03 : 0.11) * cur.spin * (a === "surprise" ? 3 : 1) + gaze.x * 0.002,
-        moveRate: a === "sleep" ? 0 : a === "angry" ? 3 : a === "joy" ? 1.6 : busy ? 1.2 : a === "sad" ? 0.12 : 0.35,
-        moveSpeed: a === "angry" ? 5 : a === "sad" ? 0.7 : a === "joy" ? 2.4 : 1.5,
-        jit: cur.jitter, swirl: a === "curious", 
-        droop: (a === "sad" ? 0.3 : a === "sleep" ? 0.2 : 0) + gaze.y * 0.004, open: big,
+        t, dt, R: R0 * rad * 0.82 * (1 + entity.tokenKick * 0.008), px: pxSize, tint, alpha: globalA,
+        lit: Math.max(0.1, cur.dim) * Math.min(1, (busy ? 0.8 : 0.2) + entity.tokenKick * 0.5 + (a === "joy" ? 0.4 : 0) + entity.absorb * 0.6 + entity.seal * 0.5) * (a === "sleep" ? 0.25 : 1),
+        flow: (a === "sleep" ? 0.15 : busy ? 1.4 : 0.45) * (a === "angry" ? 2.2 : a === "joy" ? 1.3 : 1),
+        hueSpread: a === "angry" ? 10 : a === "joy" ? 40 : a === "curious" ? 60 : 28,
+        spin: (a === "sleep" ? 0.025 : a === "angry" ? 0.3 : 0.08) * cur.spin * (a === "surprise" ? 2.5 : 1) + gaze.x * 0.002,
+        cloudSpeed: a === "angry" ? 2.5 : a === "curious" ? 1.8 : 1.3,
+        night: a === "sleep" ? 1.5 : a === "sad" ? 1.2 : 1,
+        storm: a === "thinking" || a === "curious" || a === "focus", lightning: a === "angry", rain: a === "sad",
+        aurora: Math.max(a === "joy" ? 1 : 0, busy ? 0.6 : 0) * (a === "sleep" ? 0 : 1), open: big,
       };
       orb.step(dt, st);
       orb.draw(ctx, st);
@@ -3783,7 +3801,7 @@ function choiceRow(id, key, options) {
   }
 }
 choiceRow("densityRow", "density", [["comfort", "Confortable"], ["compact", "Compacte"]]);
-choiceRow("styleRow", "entityStyle", [["mesh", "Maillage"], ["fragments", "Fragments"], ["orb", "Orbe"]]);
+choiceRow("styleRow", "entityStyle", [["mesh", "Maillage"], ["fragments", "Fragments"], ["orb", "Planète"]]);
 choiceRow("widthRow", "width", [["normal", "Normale"], ["narrow", "Étroite"], ["wide", "Large"]]);
 
 /* ============================================================
