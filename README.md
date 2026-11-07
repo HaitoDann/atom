@@ -533,6 +533,18 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 6. Accès distant via Tailscale ; plus tard, API externes en secours
 
 
+## Agent de code depuis Telegram
+
+- `/agent` liste tes projets de code.
+- `/agent leyo ajoute des tests pour Parse` lance l'agent sur le projet (le nom peut être abrégé). Il tourne sur le serveur et un message suit sa progression.
+- À la fin, tu reçois le **résumé** et la liste des fichiers modifiés, avec des boutons :
+  - **Voir le diff** affiche chaque fichier modifié ;
+  - **Appliquer** écrit les modifications (dépôts clonés uniquement) ;
+  - **Abandonner** jette tout.
+- Après **Appliquer** : **Commit**. Atom crée une branche `atom/…` si tu es sur la branche principale et écrit le message de commit à partir du diff. Ensuite : **Pousser sur GitHub**, avec le lien pour ouvrir une pull request.
+- **Réponds au message de résultat** pour poursuivre la tâche : l'agent garde son contexte et les modifications non appliquées.
+- Mêmes garde-fous que dans l'interface : rien n'est écrit sans un clic, jamais de push sur la branche principale ni de force-push, et seuls les identifiants de `ATOM_TELEGRAM_ALLOWED` peuvent utiliser les boutons.
+
 ## Surveillance Proxmox (lecture seule)
 
 Atom relève chaque minute l'état de ton serveur et t'alerte en cas de problème.

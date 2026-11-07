@@ -217,7 +217,8 @@ async def keep_typing(client, chat_id: int, stop: asyncio.Event) -> None:
             pass
 
 
-async def handle_command(client, chat_id: int, cmd: str) -> None:
+async def handle_command(client, chat_id: int, text: str) -> None:
+    cmd, _, args = text.partition(" ")
     cmd = cmd.split("@")[0].lower()
     if cmd in ("/start", "/aide", "/help"):
         await send_text(client, chat_id, HELP)
@@ -236,6 +237,11 @@ async def handle_command(client, chat_id: int, cmd: str) -> None:
         await send_text(client, chat_id,
                         f"**Ce que je sais de toi**\n\n{txt}\n\n_Modifiable depuis l'interface web._"
                         if rows else "Je n'ai encore rien retenu sur toi.")
+    elif cmd == "/agent":
+        import sys
+
+        from . import tgagent
+        await tgagent.start(sys.modules[__name__], client, chat_id, args.strip())
     elif cmd == "/serveur":
         from . import proxmox
 
@@ -262,7 +268,14 @@ async def handle_message(client, msg: dict) -> None:
         await send_text(client, chat_id, "Je ne lis que le texte pour l'instant.")
         return
     if text.startswith("/"):
-        await handle_command(client, chat_id, text.split()[0])
+        await handle_command(client, chat_id, text)
+        return
+    # Réponse au résultat de l'agent : on poursuit la même tâche
+    from . import tgagent
+    rid = tgagent.run_for_reply(chat_id, msg.get("reply_to_message"))
+    if rid:
+        import sys
+        await tgagent.start(sys.modules[__name__], client, chat_id, text, parent=rid)
         return
 
     stop_typing = asyncio.Event()
@@ -344,6 +357,8 @@ async def run() -> None:
                 {"command": "nouveau", "description": "Nouvelle conversation"},
                 {"command": "rappels", "description": "Rappels programmés"},
                 {"command": "souvenirs", "description": "Ce qu'Atom sait de toi"},
+                {"command": "agent", "description": "Confier une tâche à l'agent de code"},
+                {"command": "serveur", "description": "État du serveur Proxmox"},
                 {"command": "aide", "description": "Aide"},
             ])
         except (TelegramError, httpx.HTTPError) as e:
@@ -360,7 +375,7 @@ async def run() -> None:
             while True:
                 try:
                     updates = await call(client, "getUpdates", offset=offset, timeout=50,
-                                         allowed_updates=["message"])
+                                         allowed_updates=["message", "callback_query"])
                 except (TelegramError, httpx.HTTPError) as e:
                     log.warning("getUpdates : %s — nouvel essai dans 10 s", e)
                     await asyncio.sleep(10)
@@ -369,5 +384,12 @@ async def run() -> None:
                     offset = u["update_id"] + 1
                     if "message" in u:
                         await queue.put(u["message"])
+                    elif "callback_query" in u:   # boutons (agent : diff, appliquer, commit…)
+                        cq = u["callback_query"]
+                        if cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message"):
+                            import sys
+
+                            from . import tgagent
+                            asyncio.create_task(tgagent.on_button(sys.modules[__name__], client, cq))
         finally:
             w.cancel()
