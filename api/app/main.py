@@ -56,7 +56,7 @@ async def lifespan(_app: FastAPI):
                 n = await asyncio.to_thread(usage.prune)
                 if n:
                     logging.getLogger("atom").info("rétention : %d appels de modèles supprimés du journal", n)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logging.getLogger("atom").exception("maintenance")
             await asyncio.sleep(86400)
     tasks.append(asyncio.create_task(maintenance()))
@@ -79,10 +79,10 @@ auth.init()
 providers.restore_health()   # santé des fournisseurs reconstituée depuis le journal des appels
 app = FastAPI(title="Atom", lifespan=lifespan)
 
-from .routes import canvas as _r_canvas, git as _r_git  # noqa: E402
+from .routes import canvas as _r_canvas, git as _r_git
 app.include_router(_r_canvas.router)
 app.include_router(_r_git.router)
-import importlib  # noqa: E402
+import importlib
 
 log = logging.getLogger("atom.main")
 for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes'):
@@ -378,7 +378,7 @@ def extract(body: ExtractIn):
                 pages = [got.get(i + 1, t) for i, t in enumerate(pages)]
                 ocr_used = bool(got)
             text = "\n\n".join(f"--- page {i + 1} ---\n{t.strip()}" for i, t in enumerate(pages) if t.strip())
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("main : erreur gérée", exc_info=True)
             raise HTTPException(400, f"PDF illisible : {e}") from e
         if not text.strip():
@@ -419,13 +419,13 @@ def service_worker():
 
 
 # Politique de sécurité du contenu : seuls les scripts servis par Atom s'exécutent (KaTeX et Mermaid sont
-# embarqués dans web/vendor/) ; aucun script en ligne, aucun eval, aucun appel réseau hors d'Atom.
+# embarqués dans web/vendor/, comme les polices) ; aucun script en ligne, aucun eval, aucune ressource hors d'Atom.
 # Les styles en ligne restent permis (attributs style= de l'interface, SVG de Mermaid).
 CSP = "; ".join([
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' data: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "worker-src 'self'",

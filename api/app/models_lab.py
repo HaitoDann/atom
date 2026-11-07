@@ -73,7 +73,7 @@ async def install(name: str) -> None:
                     if ev.get("total"):
                         st["total"], st["completed"] = ev["total"], ev.get("completed", 0)
         st.update(status="terminé", done=True)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("models_lab : erreur gérée", exc_info=True)
         msg = str(e)
         if "file does not exist" in msg or "not found" in msg.lower():
@@ -127,7 +127,7 @@ async def compare(models: list[str], prompts: list[dict], keep: str | None = Non
                 yield dict(type="result", model=m, prompt=p["id"], text=text,
                            first_s=round((first or time.time()) - t0, 2), wall_s=round(time.time() - t0, 2),
                            tok_s=s.get("tok_s"), prompt_tok_s=s.get("prompt_tok_s"), load_s=s.get("load_s"), tokens=s.get("tokens"))
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log.warning("models_lab : erreur gérée", exc_info=True)
                 yield dict(type="error", model=m, prompt=p["id"], message=str(e)[:300])
                 break   # modèle en échec (absent, mémoire insuffisante) : on passe au suivant

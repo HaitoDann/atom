@@ -22,7 +22,7 @@ import numpy as np
 
 from . import db, llm
 from .config import DATA_DIR, GITHUB_TOKEN, PROJECTS_DIR
-from .extract import Unsupported, chunk_code, chunk_text, extract_pages  # noqa: F401 (API publique)
+from .extract import Unsupported, chunk_code, chunk_text, extract_pages
 
 log = logging.getLogger("atom.library")
 FILES_DIR = DATA_DIR / "library"

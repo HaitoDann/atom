@@ -1,10 +1,7 @@
 """Routes : mode hybride."""
 from __future__ import annotations
 
-import asyncio, base64, io, json, time  # noqa: F401
-from typing import AsyncIterator  # noqa: F401
 
-import httpx  # noqa: F401
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -47,7 +44,7 @@ def get_hybrid():
 async def hybrid_models(provider: str | None = None):
     try:
         return {"models": await hybrid.list_models(provider)}
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("hybrid_routes : erreur gérée", exc_info=True)
         raise HTTPException(502, f"Liste des modèles indisponible : {e}") from e
 

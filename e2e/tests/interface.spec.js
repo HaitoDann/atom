@@ -89,6 +89,16 @@ test("en-têtes de sécurité : CSP stricte", async ({ page }) => {
   expect(csp).toContain("frame-ancestors 'none'");
   expect(csp).not.toMatch(/script-src[^;]*'unsafe-(inline|eval)'/);
   expect(r.headers()["x-frame-options"]).toBe("DENY");
+  expect(csp).not.toContain("googleapis");
+});
+
+test("polices embarquées chargées (aucune ressource externe)", async ({ page }) => {
+  const external = [];
+  page.on("request", (req) => { if (!req.url().startsWith("http://127.0.0.1")) external.push(req.url()); });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  expect(await page.evaluate(async () => { await document.fonts.ready; return document.fonts.check("14px Geist"); })).toBe(true);
+  expect(external).toEqual([]);
 });
 
 test("du HTML dans une réponse n'est jamais exécuté", async ({ page }) => {

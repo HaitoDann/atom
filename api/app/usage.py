@@ -52,7 +52,7 @@ def record(provider: str, *, model: str = "", task: str | None = None, ok: bool 
                 (ev["ts"], provider, model, task, int(ok), ev["first_s"], ev["total_s"], prompt_tokens, completion_tokens,
                  ev["error"], ev["reason"], fallback_from))
             ev["id"] = cur.lastrowid
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.warning("journal de consommation indisponible", exc_info=True)
     ev["cost"] = round(cost(provider, prompt_tokens, completion_tokens), 6)
     log.info("appel %s", provider, extra={"event": "model_call", **{k: v for k, v in ev.items() if v not in (None, "")}})

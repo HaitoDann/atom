@@ -318,7 +318,7 @@ def restore_health() -> None:
     for p in ALL:
         try:
             calls = usage.last_calls(p.id)
-        except Exception:  # noqa: BLE001 — base pas encore migrée
+        except Exception:
             log.warning("santé des fournisseurs non restaurée", exc_info=True)
             return
         for c in calls:

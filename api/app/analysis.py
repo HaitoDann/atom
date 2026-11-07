@@ -57,7 +57,7 @@ async def _ask(messages: list[dict]) -> str:
     if hybrid.configured() and s.get("allow_docs"):
         try:
             return "".join([t async for t in hybrid.stream(messages, sensitive=True)])
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("analysis : erreur gérée", exc_info=True)
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
 
@@ -144,7 +144,7 @@ async def run(name: str, raw: bytes, question: str, conversation_id: int | None)
             async for t in hybrid.stream(final_msgs, sensitive=True):
                 text += t
                 yield dict(type="token", text=t)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("analysis : erreur gérée", exc_info=True)
             text = ""
     if not text:

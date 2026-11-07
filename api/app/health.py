@@ -61,7 +61,7 @@ async def _telegram() -> dict:
         async with httpx.AsyncClient(timeout=6) as client:
             me = await telegram.call(client, "getMe")
         return _c("Telegram", "ok", f"@{me.get('username')} · {len(TELEGRAM_ALLOWED)} utilisateur(s) autorisé(s)")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("health : erreur gérée", exc_info=True)
         return _c("Telegram", "error", str(e)[:120], "vérifie le jeton dans .env")
 
@@ -78,7 +78,7 @@ async def _remote() -> list[dict]:
         base = f"{m} · {providers.used_today(p.id)}/{p.limit} aujourd'hui" + ("" if p.private else " · sans données privées")
         try:
             models = await providers.list_models(p)
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("health : erreur gérée", exc_info=True)
             models = None   # pas de liste (ex. GitHub Models) : on vérifie par un appel minimal
         if models is None or not models:

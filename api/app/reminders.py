@@ -162,6 +162,6 @@ async def scheduler() -> None:
         try:
             for r in db.due_reminders(time.time()):
                 await fire(r)
-        except Exception:  # noqa: BLE001 — le planificateur ne doit jamais s'arrêter
+        except Exception:
             log.exception("erreur du planificateur")
         await asyncio.sleep(SCHEDULER_INTERVAL)

@@ -1,10 +1,7 @@
 """Routes : mode Code : modifications proposées."""
 from __future__ import annotations
 
-import asyncio, base64, io, json, time  # noqa: F401
-from typing import AsyncIterator  # noqa: F401
 
-import httpx  # noqa: F401
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -35,7 +32,7 @@ async def code_propose(cid: int, body: ProposeIn):
         raise HTTPException(415, "Fichier non texte") from e
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("code : erreur gérée", exc_info=True)
         raise HTTPException(502, f"Le modèle n'a pas répondu : {e}") from e
 

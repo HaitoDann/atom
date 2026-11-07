@@ -134,7 +134,7 @@ async def chat_events(
                     docs_block += f"\n\nStructure du projet « {c['name']} » :\n{library.tree(c['id'], 60)}"
                 if doc_refs or code_cols:
                     yield dict(type="docs", refs=doc_refs)
-        except Exception:  # noqa: BLE001 — la bibliothèque ne doit pas bloquer la réponse
+        except Exception:
             import logging
             logging.getLogger("atom.agent").exception("recherche dans la bibliothèque impossible")
     # Question sur le serveur : l'état Proxmox relevé est ajouté (données privées, comme la bibliothèque)
@@ -187,7 +187,7 @@ async def chat_events(
                     got = True
                     yield tok
                 return
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log.warning("agent : erreur gérée", exc_info=True)
                 if got:
                     raise
@@ -246,7 +246,7 @@ async def chat_events(
         yield dict(type="search", status="start", query=query)
         try:
             results = await search.search(query)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("agent : erreur gérée", exc_info=True)
             yield dict(type="search", status="error", query=query, message=str(e))
             return
@@ -306,7 +306,7 @@ async def chat_events(
         if not saved and partial.strip():
             db.add_message(conversation_id, "assistant", partial.strip() + " …", emotion or "talking", meta=asst_meta)
         raise
-    except Exception as e:  # noqa: BLE001 — on renvoie l'erreur à l'interface
+    except Exception as e:
         log.warning("agent : erreur gérée", exc_info=True)
         msg = str(e) or e.__class__.__name__
         if isinstance(e, httpx.ConnectError):
