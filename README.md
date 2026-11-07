@@ -53,7 +53,7 @@ curl -fsSL https://get.docker.com | sudo sh
 ### 3. Récupérer et lancer Atom
 
 ```bash
-git clone -b claude/new-session-q4ozge https://github.com/HaitoDann/atom.git
+git clone https://github.com/HaitoDann/atom.git
 ```
 
 ```bash
