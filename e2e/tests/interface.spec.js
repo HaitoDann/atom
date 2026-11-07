@@ -245,3 +245,23 @@ test("atelier : exemple en un clic et lancement au clavier (Ctrl+Entrée)", asyn
   await expect(page.locator(".msg.atom").last().locator(".ws-node.done")).toHaveCount(3, { timeout: 20_000 });
   expect(errors).toEqual([]);
 });
+
+test("code : télécharger le fichier et voir l'aperçu d'une page HTML", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await send(page, "**index.html**\n\n```html\n<!doctype html><html><body><h1 id=\"t\">Bonjour Mint</h1></body></html>\n```");
+  const block = page.locator(".msg.atom").last().locator(".code").first();
+  await expect(block.locator(".code-h span")).toHaveText("index.html", { timeout: 15_000 });
+  const [dl] = await Promise.all([page.waitForEvent("download"), block.locator("[data-dl]").click()]);
+  expect(dl.suggestedFilename()).toBe("index.html");
+  const content = require("fs").readFileSync(await dl.path(), "utf8");
+  expect(content).toContain('<h1 id="t">Bonjour Mint</h1>');
+  await block.locator("[data-preview]").click();
+  await expect(page.locator("#pvw")).toBeVisible();
+  await expect(page.frameLocator("#pvwFrame").locator("#t")).toHaveText("Bonjour Mint");
+  await page.click('#pvw .seg button[data-w="390px"]');
+  await expect(page.locator("#pvwFrame")).toHaveCSS("width", "390px");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#pvw")).toBeHidden();
+  expect(errors).toEqual([]);
+});

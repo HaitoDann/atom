@@ -274,7 +274,20 @@ function markLast() {
   if (lastAtom && lastAtom === chat.lastElementChild) lastAtom.classList.add("last");
 }
 
-chat.addEventListener("click", (e) => {
+chat.addEventListener("click", async (e) => {
+  const dl = e.target.closest("[data-dl]"), pv = e.target.closest("[data-preview]");
+  if (dl || pv) {
+    const box = (dl || pv).closest(".code"), code = box.querySelector("pre").textContent;
+    if (dl) {
+      const name = box.dataset.name || "fichier.txt";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([code], { type: name.endsWith(".html") ? "text/html" : "text/plain" }));
+      a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast(`${esc(name)} téléchargé.`);
+    } else openPreview(code, box.dataset.name || "page.html");
+    return;
+  }
   const b = e.target.closest("[data-copy]");
   if (!b) return;
   copyText(b.closest(".code").querySelector("pre").innerText);
@@ -326,3 +339,23 @@ scroller.addEventListener("scroll", () => {
   $("topbar").classList.toggle("scrolled", scroller.scrollTop > 4);
 });
 $("toBottom").onclick = () => scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+
+
+/* Aperçu d'une page HTML : servie par Atom dans un bac à sable (origine isolée), affichée dans un cadre. */
+async function openPreview(html, name) {
+  let r;
+  try { r = await (await send_("/api/preview", "POST", { html })).json(); } catch (e) { toast(esc(e.message)); return; }
+  $("pvwTitle").textContent = name;
+  $("pvwFrame").src = r.url;
+  $("pvwOpen").onclick = () => window.open(r.url, "_blank", "noopener");
+  $("pvwDl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" })); a.download = name; a.click(); };
+  $("pvw").hidden = false;
+}
+function closePreview() { $("pvw").hidden = true; $("pvwFrame").src = "about:blank"; }
+$("pvwClose").onclick = closePreview;
+$("pvw").addEventListener("click", (e) => { if (e.target.id === "pvw") closePreview(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("pvw").hidden) closePreview(); });
+document.querySelectorAll("#pvw .seg button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("#pvw .seg button").forEach((x) => x.classList.toggle("on", x === b));
+  $("pvwFrame").style.width = b.dataset.w;
+});

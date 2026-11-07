@@ -38,3 +38,50 @@ def test_run_without_enabling_and_plan_event(client):
     done = [e for e in events if e["type"] == "step" and e["status"] == "done"]
     assert len(done) == 3 and all("seconds" in e for e in done)
     assert events[-1]["type"] == "done"
+
+
+def test_preview_is_sandboxed(client):
+    r = client.post("/api/preview", json={"html": "<!doctype html><h1>Salut</h1><script>1</script>"}).json()
+    page = client.get(r["url"])
+    assert page.status_code == 200 and "<h1>Salut</h1>" in page.text
+    csp = page.headers["content-security-policy"]
+    assert csp.startswith("sandbox ") and "allow-same-origin" not in csp     # origine isolée : pas d'accès à Atom
+    assert page.headers["x-frame-options"] == "SAMEORIGIN"
+    assert client.get("/api/preview/inconnu").status_code == 404
+
+
+def test_deliverable_prompts():
+    from app import workshop
+    req = "Crée une page web de présentation de mon entreprise, style Linux Mint, thème rouge"
+    writer = workshop._prompts("review", 0, req, [])[0]["content"]
+    reviewer = workshop._prompts("review", 1, req, ["v1"])[0]["content"]
+    fixer = workshop._prompts("review", 2, req, ["v1", "relecture"])[0]["content"]
+    assert "LIVRABLE" in writer and "Lorem" in writer and "responsive" in writer
+    assert "5. Livrable" in reviewer and reviewer.count("Termine par") == 1
+    assert "COMPLÈTE" in fixer and "LIVRABLE" in fixer
+    assert "LIVRABLE" not in workshop._prompts("review", 0, "Faut-il acheter un NAS ?", [])[0]["content"]
+
+
+def test_continuation_when_cut(client, monkeypatch):
+    """Réponse coupée (finish_reason=length) : la suite est redemandée au même fournisseur et recollée."""
+    import asyncio
+
+    from app import providers
+
+    p = providers.Provider("pc", "PC", "u", "k", "m", 100, "llama", 2, True)
+    calls = []
+
+    async def fake_stream(prov, messages, model=None, stats=None, max_tokens=None):
+        calls.append((messages[-1]["content"][:30], max_tokens))
+        part = "<html><body>début " if len(calls) == 1 else "fin</body></html>"
+        stats.update(tokens=5, model="m", finish_reason="length" if len(calls) == 1 else "stop")
+        yield part
+    monkeypatch.setattr(providers, "stream", fake_stream)
+
+    async def go():
+        used = {}
+        out = "".join([t async for t in providers.stream_complete([p], [{"role": "user", "content": "page"}], used, max_tokens=8000)])
+        return out, used
+    out, used = asyncio.run(go())
+    assert out == "<html><body>début fin</body></html>" and used["continued"] == 1
+    assert len(calls) == 2 and calls[1][0].startswith("Ta réponse a été coupée") and calls[1][1] == 8000

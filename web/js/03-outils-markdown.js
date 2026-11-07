@@ -172,6 +172,20 @@ function md(src) {
   mathStore = [];
   return restoreMath(mdRaw(protectMath(src)));
 }
+/* Nom du fichier d'un bloc de code : celui écrit juste avant (« **index.html** »), sinon d'après le langage. */
+const CODE_EXT = { html: "html", htm: "html", css: "css", js: "js", javascript: "js", ts: "ts", typescript: "ts", py: "py", python: "py",
+  json: "json", sh: "sh", bash: "sh", shell: "sh", yaml: "yml", yml: "yml", sql: "sql", md: "md", markdown: "md", java: "java",
+  go: "go", rust: "rs", rs: "rs", php: "php", ruby: "rb", c: "c", cpp: "cpp", xml: "xml", svg: "svg", dockerfile: "Dockerfile" };
+function codeFileName(lines, at, lang) {
+  for (let k = at - 1; k >= Math.max(0, at - 3); k--) {
+    const t = lines[k].trim(); if (!t) continue;
+    const f = t.match(/([\w][\w.-]*\.(?:html?|css|js|mjs|ts|tsx|jsx|py|json|ya?ml|sh|sql|md|txt|java|go|rs|php|rb|c|cpp|h|xml|svg|toml|ini|env))\b/i);
+    if (f) return f[1];
+    break;
+  }
+  const ext = CODE_EXT[lang];
+  return ext === "Dockerfile" ? ext : ext ? `${{ html: "page", css: "style", js: "script", py: "script" }[ext] || "fichier"}.${ext}` : "";
+}
 function mdRaw(src) {
   const lines = src.replace(/\r/g, "").split("\n");
   let out = "", i = 0, para = [];
@@ -180,6 +194,7 @@ function mdRaw(src) {
     const l = lines[i];
     let m;
     if ((m = l.match(/^\s*```\s*([\w+#.-]*)/))) {
+      const start = i;
       flush();
       const buf = [];
       i++;
@@ -187,8 +202,14 @@ function mdRaw(src) {
       i++;
       if ((m[1] || "").toLowerCase() === "mermaid") {
         out += `<div class="mm-box"><div class="mm" data-src="${esc(buf.join("\n"))}"><pre class="mm-wait">${esc(buf.join("\n"))}</pre></div><div class="mm-acts"><button data-mmcode>Voir le code</button><button data-mmsvg>Télécharger (SVG)</button></div></div>`;
-      } else
-      out += `<div class="code"><div class="code-h"><span>${esc(m[1] || "code")}</span><button data-copy>${icon("copy")}Copier</button></div><pre><code>${highlight(buf.join("\n"))}</code></pre></div>`;
+      } else {
+        const lang = (m[1] || "").toLowerCase(), name = codeFileName(lines, start, lang);
+        const isHtml = lang === "html" || lang === "htm" || /\.html?$/.test(name) || /^\s*<!doctype html/i.test(buf[0] || "");
+        out += `<div class="code" data-name="${esc(name)}"><div class="code-h"><span>${esc(name || m[1] || "code")}</span>` +
+          (isHtml ? `<button data-preview title="Voir la page (isolée d'Atom)">${icon("eye")}Aperçu</button>` : "") +
+          `<button data-dl title="Télécharger ${esc(name)}">${icon("download")}Télécharger</button>` +
+          `<button data-copy>${icon("copy")}Copier</button></div><pre><code>${highlight(buf.join("\n"))}</code></pre></div>`;
+      }
       continue;
     }
     if (isRow(l) && i + 1 < lines.length && isSep(lines[i + 1])) {

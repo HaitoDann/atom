@@ -502,6 +502,19 @@
   </div>
 </div>
 <div id="toast"></div>
+<div id="pvw" class="pvw" role="dialog" aria-modal="true" aria-labelledby="pvwTitle" hidden>
+  <div class="pvw-box">
+    <header class="pvw-head">
+      <b id="pvwTitle">page.html</b>
+      <span class="pvw-note">Aperçu isolé d'Atom (bac à sable)</span>
+      <div class="seg" aria-label="Largeur"><button data-w="100%" class="on">Ordinateur</button><button data-w="820px">Tablette</button><button data-w="390px">Téléphone</button></div>
+      <button class="btn sm" id="pvwDl" type="button">Télécharger</button>
+      <button class="btn sm" id="pvwOpen" type="button">Nouvel onglet</button>
+      <button class="iconbtn" id="pvwClose" type="button" aria-label="Fermer l'aperçu" data-i="x"></button>
+    </header>
+    <div class="pvw-stage"><iframe id="pvwFrame" title="Aperçu de la page" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe></div>
+  </div>
+</div>
 <div id="wsLaunch" class="wl" role="dialog" aria-modal="true" aria-labelledby="wlTitle" hidden>
   <div class="wl-box">
     <header class="wl-head">

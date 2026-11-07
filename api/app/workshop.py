@@ -20,7 +20,7 @@ import time
 from typing import AsyncIterator
 
 from . import db, hybrid, llm, providers
-from .config import DEFAULT_MODEL
+from .config import DEFAULT_MODEL, MAX_TOKENS_LONG
 import logging
 
 log = logging.getLogger("atom.workshop")
@@ -161,7 +161,8 @@ async def _gen(engine: str, messages: list[dict], on_engine) -> AsyncIterator[st
         order = providers.chain(engine[2:])
         used: dict = {}
         try:
-            async for t in providers.stream_chain(order, messages, used):
+            # Budget long et reprise automatique : une page web ou un fichier complet n'est plus coupé en route.
+            async for t in providers.stream_complete(order, messages, used, max_tokens=MAX_TOKENS_LONG, task="atelier"):
                 yield t
             if used.get("id") and f"p:{used['id']}" != engine:
                 on_engine(f"p:{used['id']}", used.get("skipped") or [])
@@ -190,6 +191,33 @@ REVIEW_GRID = (
 )
 
 
+# Livrables (code, page web, document) : des consignes précises font toute la différence avec une réponse « simpliste ».
+DELIVERABLE_RE = re.compile(r"\b(page web|site( web)?|landing|html|css|javascript|application|script|fonction|programme|"
+                            r"composant|api|code)\b|```", re.I)
+DELIVERABLE_RULES = (
+    " La demande porte sur un LIVRABLE (code, page web, fichier). Exigences :\n"
+    "- Commence par 3 à 6 lignes « Choix de conception » (structure, sections, palette, typographie, ton), puis livre.\n"
+    "- Livre chaque fichier EN ENTIER dans son propre bloc de code, avec son nom sur la ligne juste avant "
+    "(ex. « **index.html** »). Jamais de « … », de « reste inchangé » ni de fichier coupé.\n"
+    "- Aucun texte d'exemple (« Nom de votre entreprise », « Lorem ipsum », « votre slogan ici ») : invente un contenu "
+    "réaliste et cohérent avec la demande, et signale en une ligne à la fin ce que l'utilisateur doit personnaliser.\n"
+    "- Page web : un seul fichier HTML autonome (CSS et JS intégrés) sauf demande contraire ; plusieurs sections riches "
+    "(en-tête avec navigation, présentation, services ou produits détaillés, équipe ou valeurs, témoignages, contact, pied "
+    "de page) ; responsive (mobile d'abord) ; contrastes lisibles (WCAG AA), y compris les liens de navigation ; états "
+    "survol et focus ; respecte précisément le style demandé (couleurs, ambiance, références).\n"
+    "- Code : fonctionnel tel quel, gestion des erreurs et des cas limites, commentaires utiles, sans dépendance inutile."
+)
+DELIVERABLE_GRID = (
+    "\n5. Livrable : fichier complet ou coupé ? textes d'exemple restants (« Nom de votre entreprise », « Lorem ») ? "
+    "contenu trop pauvre (sections vides, une phrase par section) ? style demandé respecté ? contrastes (texte et liens "
+    "lisibles sur leur fond) ? responsive ? le code fonctionne-t-il tel quel ?"
+)
+
+
+def is_deliverable(request: str) -> bool:
+    return bool(DELIVERABLE_RE.search(request or ""))
+
+
 def review_ok(text: str) -> bool:
     t = text.lower()
     return bool(re.search(r"verdict\s*:\s*ok\b", t)) and "[bloquant" not in t and "[important" not in t
@@ -197,28 +225,33 @@ def review_ok(text: str) -> bool:
 
 def _prompts(pattern: str, step: int, request: str, prev: list[str]) -> list[dict]:
     """Messages pour l'étape `step` du schéma, à partir des sorties précédentes."""
+    deliv = is_deliverable(request)
+    rules = DELIVERABLE_RULES if deliv else ""
     if pattern == "review":
         if step == 0:
-            sys = BASE + " Ton rôle : RÉDACTEUR. Produis la meilleure réponse complète possible."
+            sys = BASE + " Ton rôle : RÉDACTEUR. Produis la meilleure réponse complète possible." + rules
             user = request
         elif step % 2 == 1:
-            sys = BASE + REVIEW_GRID
+            sys = BASE + REVIEW_GRID.replace("Termine par", (DELIVERABLE_GRID + "\n") if deliv else "Termine par", 1) \
+                + ("Termine par" if deliv else "")
             user = f"Demande :\n{request}\n\nRéponse à relire :\n{prev[-1]}"
         else:
             sys = BASE + (" Ton rôle : RÉDACTEUR. Réécris ta réponse en corrigeant tous les points [bloquant] et "
                           "[important] de la relecture (et les [mineur] si c'est simple). Pour chaque affirmation listée "
                           "comme « non vérifiable », retire-la ou signale clairement l'incertitude. "
-                          "Donne uniquement la version finale, sans parler de la relecture.")
+                          "Donne uniquement la version finale COMPLÈTE (tous les fichiers en entier), sans parler de la relecture.")
+            sys += rules
             user = f"Demande :\n{request}\n\nTa première version :\n{prev[-2]}\n\nRelecture :\n{prev[-1]}"
     elif pattern == "panel":
         if step < 2:
-            sys = BASE + " Propose ta meilleure réponse, de façon indépendante."
+            sys = BASE + " Propose ta meilleure réponse, de façon indépendante." + rules
             user = request
         else:
             sys = BASE + (" Ton rôle : ARBITRE. Compare les propositions point par point : là où elles divergent, "
                           "détermine laquelle est juste et pourquoi ; là où aucune n'est sûre, dis-le. Garde ce qui est juste "
                           "et utile dans chacune, corrige ce qui est faux, et rédige la réponse finale. "
                           "Donne uniquement la réponse finale (avec, si besoin, une courte mention des incertitudes restantes).")
+            sys += rules
             user = f"Demande :\n{request}\n\nProposition A :\n{prev[0]}\n\nProposition B :\n{prev[1]}"
     else:  # debate
         if step == 0:

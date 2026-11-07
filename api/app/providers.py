@@ -430,7 +430,7 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
             yield w
         count(p.id)
         if stats is not None:
-            stats.clear(); stats.update(tokens=12, tok_s=40.0, provider=p.id, name=p.name, model=model)
+            stats.clear(); stats.update(tokens=12, tok_s=40.0, provider=p.id, name=p.name, model=model, finish_reason="stop")
         return
     payload = {"model": model, "messages": messages, "stream": True, "temperature": 0.6, "max_tokens": max_tokens or MAX_TOKENS}
     headers = {"Authorization": f"Bearer {p.key}", "Accept": "text/event-stream"}
@@ -452,6 +452,7 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                     raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:160]}")
                 count(p.id)
                 usage: dict = {}
+                finish = None
                 other: list[str] = []   # lignes hors SSE : certains fournisseurs renvoient un JSON entier
                 async for line in r.aiter_lines():
                     if not line.startswith("data:"):
@@ -469,6 +470,7 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                         raise Unavailable(f"{p.name} : {str(chunk['error'])[:160]}")
                     usage = chunk.get("usage") or usage
                     for ch in chunk.get("choices") or []:
+                        finish = ch.get("finish_reason") or finish
                         text = (ch.get("delta") or {}).get("content") or ""
                         if text:
                             first = first or time.time()
@@ -478,7 +480,9 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                     try:
                         body = json.loads("\n".join(other))
                         usage = body.get("usage") or usage
-                        text = ((body.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+                        choice = (body.get("choices") or [{}])[0]
+                        finish = choice.get("finish_reason") or finish
+                        text = (choice.get("message") or {}).get("content") or ""
                         if body.get("error"):
                             raise Unavailable(f"{p.name} : {str(body['error'])[:160]}")
                     except ValueError:
@@ -500,7 +504,8 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
     if stats is not None:
         stats.clear()
         stats.update(tokens=toks, tok_s=round(toks / dur, 1) if dur > 0 else None, provider=p.id, name=p.name, model=model,
-                     prompt_tokens=usage.get("prompt_tokens"), total_s=round(time.time() - t0, 2))
+                     prompt_tokens=usage.get("prompt_tokens"), total_s=round(time.time() - t0, 2),
+                     finish_reason=locals().get("finish"))
 
 
 async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_tokens: int = 4096) -> dict:
@@ -610,6 +615,36 @@ async def stream_chain(providers: list[Provider], messages: list[dict], used: di
             prev = p.id
     used["skipped"] = errors
     raise Unavailable(" ; ".join(errors) or "aucun fournisseur distant disponible")
+
+
+CONTINUE_PROMPT = ("Ta réponse a été coupée faute de place. Continue EXACTEMENT là où tu t'es arrêté, au caractère près, "
+                   "sans rien répéter, sans introduction ni commentaire. Si tu étais dans un bloc de code, reste dans ce bloc.")
+
+
+async def stream_complete(providers: list[Provider], messages: list[dict], used: dict, model: str | None = None,
+                          max_tokens: int | None = None, task: str | None = None, reason: str = "",
+                          continuations: int | None = None) -> AsyncIterator[str]:
+    """Comme stream_chain, mais si la réponse est coupée faute de place (finish_reason = length), redemande la suite
+    au même fournisseur (jusqu'à ATOM_MAX_CONTINUATIONS fois) : une page web ou un long fichier arrive en entier."""
+    from .config import MAX_CONTINUATIONS
+    left = MAX_CONTINUATIONS if continuations is None else continuations
+    text = ""
+    async for t in stream_chain(providers, messages, used, model, max_tokens, task, reason):
+        text += t
+        yield t
+    while left > 0 and (used.get("stats") or {}).get("finish_reason") == "length" and used.get("id"):
+        left -= 1
+        p = next((x for x in providers if x.id == used["id"]), None) or get(used["id"])
+        if not p:
+            break
+        log.info("réponse coupée chez %s : reprise automatique", p.name)
+        used["continued"] = used.get("continued", 0) + 1
+        follow = messages + [{"role": "assistant", "content": text}, {"role": "user", "content": CONTINUE_PROMPT}]
+        part: dict = {}
+        async for t in stream_chain([p], follow, part, used.get("model"), max_tokens, task, "reprise après coupure"):
+            text += t
+            yield t
+        used["stats"] = part.get("stats", {})
 
 
 def _mock_tools(messages: list[dict]) -> dict:

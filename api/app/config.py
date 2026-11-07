@@ -11,6 +11,11 @@ DB_PATH = Path(os.getenv("ATOM_DB", "data/atom.db"))
 WEB_DIR = Path(os.getenv("ATOM_WEB", Path(__file__).resolve().parents[2] / "web"))
 CONTEXT_TURNS = int(os.getenv("ATOM_CONTEXT_TURNS", "20"))
 MAX_TOKENS = int(os.getenv("ATOM_MAX_TOKENS", "1500"))
+# Budget des réponses longues (code, page web, texte long, atelier) chez les fournisseurs distants : une page complète
+# dépasse vite 1 500 tokens, et les modèles « qui réfléchissent » (gpt-oss…) en consomment une partie avant d'écrire.
+MAX_TOKENS_LONG = int(os.getenv("ATOM_MAX_TOKENS_LONG", "8000"))
+# Reprises automatiques quand une réponse est coupée faute de place (finish_reason = length).
+MAX_CONTINUATIONS = int(os.getenv("ATOM_MAX_CONTINUATIONS", "3"))
 
 # Mémoire
 FACTS_IN_PROMPT = int(os.getenv("ATOM_FACTS_IN_PROMPT", "8"))

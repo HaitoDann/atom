@@ -87,7 +87,7 @@ app.include_router(_r_git.router)
 import importlib
 
 log = logging.getLogger("atom.main")
-for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes'):
+for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes', 'preview'):
     _m = importlib.import_module(f".routes.{_n}", __package__)
     app.include_router(_m.router)
 
