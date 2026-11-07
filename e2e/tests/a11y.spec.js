@@ -18,6 +18,8 @@ async function login(page) {
 
 /** Violations graves ou critiques, sous une forme lisible dans le rapport. */
 async function audit(page, include) {
+  // Analyse une fois les animations terminées (un fondu en cours fausse le calcul des contrastes).
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getTiming().iterations === Infinity));
   let b = new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]);
   if (include) b = b.include(include);
   const r = await b.analyze();

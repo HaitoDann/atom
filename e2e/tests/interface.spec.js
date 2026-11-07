@@ -31,11 +31,11 @@ async function login(page) {
 
 /** Saisit puis envoie ; recommence si l'interface a vidé le champ entre-temps (restauration du brouillon). */
 async function send(page, text) {
+  // Saisie et clic ensemble : si l'interface vide le champ entre les deux (restauration du brouillon), on recommence.
   await expect(async () => {
     await page.fill("#input", text);
-    await expect(page.locator("#send")).toBeEnabled({ timeout: 1000 });
-  }).toPass({ timeout: 10_000 });
-  await page.click("#send");
+    await page.click("#send", { timeout: 1000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 test.describe.configure({ mode: "serial" });
