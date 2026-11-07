@@ -150,10 +150,12 @@
       <div class="composer-in">
         <button id="toBottom" title="Aller en bas" data-i="down"></button>
         <form id="form" autocomplete="off">
+          <div class="modes" id="modes"></div>
           <div class="tray" id="tray"></div>
           <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
           <div class="cbar">
-            <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF)" data-i="clip"></button>
+            <div class="tools-wrap"><button class="iconbtn" id="toolsBtn" type="button" title="Outils : recherche, recherche approfondie, atelier…" data-i="plus"></button><div class="tools-menu" id="toolsMenu"></div></div>
+            <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF, tableur, image)" data-i="clip"></button>
             <button class="iconbtn" id="webBtn" type="button" title="Rechercher sur Internet pour ce message" data-i="globe"></button>
             <button class="iconbtn" id="deepBtn" type="button" title="Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé" data-i="library"></button>
             <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA pour ce message" data-i="users" style="display:none"></button>

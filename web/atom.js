@@ -3923,7 +3923,7 @@ function renderDeepBtn() {
   b.classList.toggle("on", deepNext);
   b.title = deepNext ? "Recherche approfondie activée pour le prochain message (clic pour annuler)" : "Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé";
 }
-$("deepBtn").onclick = () => { deepNext = !deepNext; if (deepNext) { webForce = false; renderWebBtn(); } renderDeepBtn(); input.focus(); if (deepNext) toast("Recherche approfondie : compte 1 à 3 minutes. Atom lit plusieurs sources et rédige un rapport."); };
+$("deepBtn").onclick = () => { deepNext = !deepNext; if (deepNext) { webForce = false; renderWebBtn(); } renderDeepBtn(); input.focus(); };
 setInterval(renderDeepBtn, 3000); renderDeepBtn();
 function analysisEl(a) {
   const d = document.createElement("div");
@@ -4084,6 +4084,45 @@ $("pxRefresh").onclick = loadProxmox;
 $("pxNotify").onchange = () => pxSave({ notify: $("pxNotify").checked });
 $("pxGuestDown").onchange = () => pxSave({ guest_down: $("pxGuestDown").checked });
 [["pxCpu", "cpu"], ["pxMem", "mem"], ["pxMin", "minutes"], ["pxSto", "storage"]].forEach(([id, k]) => { $(id).onchange = () => pxSave({ [k]: +$(id).value }); });
+
+/* ============================================================
+   ZONE DE SAISIE — outils derrière « + », modes actifs en pastilles
+   (divulgation progressive : l'essentiel visible, le reste à un clic)
+   ============================================================ */
+function toolsItems() {
+  const items = [];
+  if (searchAvailable) {
+    items.push({ id: "web", ic: "globe", t: "Rechercher sur Internet", d: "Pour ce message · quelques secondes", on: webForce, run: () => $("webBtn").click() });
+    items.push({ id: "deep", ic: "library", t: "Recherche approfondie", d: "Plan, lecture de nombreuses pages, rapport sourcé · 1 à 3 min", on: deepNext, run: () => $("deepBtn").click() });
+  }
+  if (workshopCfg?.enabled) items.push({ id: "ws", ic: "users", t: "Atelier multi-IA", d: "Plusieurs IA rédigent et se relisent · 3 appels ou plus", on: workshopNext, run: () => $("wsBtn").click() });
+  items.push("hr");
+  items.push({ id: "file", ic: "clip", t: "Joindre un fichier", d: "Texte, code, PDF, tableur (analysé en Python), image", run: () => $("attach").click() });
+  items.push({ id: "pal", ic: "search", t: "Toutes les actions", d: "Ctrl+K", run: () => openPalette() });
+  return items;
+}
+function renderTools() {
+  $("toolsMenu").innerHTML = toolsItems().map((x, i) => x === "hr" ? "<hr>" :
+    `<button type="button" data-k="${i}" class="${x.on ? "on" : ""}">${icon(x.ic)}<b>${esc(x.t)}</b><small>${esc(x.d)}</small></button>`).join("");
+  const items = toolsItems();
+  $("toolsMenu").querySelectorAll("[data-k]").forEach((b) => { b.onclick = () => { $("toolsMenu").classList.remove("open"); items[+b.dataset.k].run(); renderModes(); }; });
+}
+$("toolsBtn").onclick = (e) => { e.stopPropagation(); renderTools(); $("toolsMenu").classList.toggle("open"); };
+document.addEventListener("click", (e) => { if (!e.target.closest(".tools-wrap")) $("toolsMenu").classList.remove("open"); });
+function renderModes() {
+  const m = [];
+  if (webForce) m.push(["globe", "Recherche web", () => $("webBtn").click()]);
+  if (deepNext) m.push(["library", "Recherche approfondie · 1 à 3 min", () => $("deepBtn").click()]);
+  if (workshopNext) m.push(["users", "Atelier multi-IA", () => $("wsBtn").click()]);
+  const box = $("modes");
+  const key = m.map((x) => x[1]).join("|");
+  if (box.dataset.k === key) return;
+  box.dataset.k = key;
+  box.innerHTML = m.map(([ic, t], i) => `<span class="mode-chip">${icon(ic)}${esc(t)}<button type="button" data-x="${i}" title="Désactiver">${icon("x")}</button></span>`).join("");
+  box.querySelectorAll("[data-x]").forEach((b) => { b.onclick = () => { m[+b.dataset.x][2](); renderModes(); input.focus(); }; });
+  $("toolsBtn").classList.toggle("on", m.length > 0);
+}
+setInterval(renderModes, 400);
 
 /* ============================================================
    THÈME
