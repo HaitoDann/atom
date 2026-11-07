@@ -116,3 +116,32 @@ test("formules et schémas rendus sans violation de la CSP", async ({ page }) =>
   expect(errors.filter((e) => /Content Security Policy|Refused to/i.test(e))).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("consommation : les appels apparaissent en direct", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => openSettings("usage"));
+  await expect(page.locator("#usLive")).toHaveClass(/on/, { timeout: 10_000 });
+  const before = await page.locator("#usFeed li:not(.none)").count();
+  await page.evaluate(() => closeSettings());
+  await send(page, "Combien de tokens ?");
+  await expect(page.locator(".msg.atom").last()).toContainText("Combien de tokens", { timeout: 15_000 });
+  await page.evaluate(() => openSettings("usage"));
+  await expect(page.locator("#usFeed li:not(.none)")).toHaveCount(before + 1, { timeout: 10_000 });
+  await expect(page.locator("#usFeed li").first()).toContainText("Local");
+  await expect(page.locator("#usProv")).toContainText("Local (Ollama)");
+  await expect(page.locator(".us-tile").first()).toContainText("Appels");
+  // Un appel pendant que la rubrique est ouverte : il doit arriver par le flux, sans rechargement.
+  const n = await page.locator("#usFeed li:not(.none)").count();
+  await page.evaluate(async () => {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json", "X-Atom": "1" },
+      body: JSON.stringify({ message: "En direct", auto_memory: false, web: "off", scope: "none" }) });
+    await r.text();
+  });
+  await expect(page.locator("#usFeed li:not(.none)")).toHaveCount(n + 1, { timeout: 10_000 });
+  await expect(page.locator("#usFeed li.fresh")).toHaveCount(1);
+  await page.fill("#usTry", "Corrige ce bug dans ma fonction python");
+  await page.click("#usTryGo");
+  await expect(page.locator("#usTryOut")).toContainText("Code");
+  expect(errors).toEqual([]);
+});
