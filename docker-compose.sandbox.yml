@@ -3,15 +3,34 @@
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.sandbox.yml
 # puis ./update.sh
 #
-# ⚠ Le socket Docker donne à Atom le contrôle de Docker sur ce serveur. Atom ne s'en sert que pour créer
-# des conteneurs de test isolés (sans réseau, sans privilèges, limités, supprimés après usage), mais garde
-# un mot de passe solide et n'expose pas Atom sur Internet sans Tailscale.
+# Sécurité : Atom ne reçoit PAS le socket Docker. Il passe par un proxy qui n'autorise que les conteneurs
+# et les images (pas d'exécution dans les autres conteneurs, pas de réseaux, volumes, secrets, plugins…).
+# Atom ajoute sa propre liste blanche : conteneurs étiquetés « atom=sandbox », sans privilèges ni dossier de l'hôte.
+# Le socket reste une frontière sensible : garde Atom derrière Tailscale avec un mot de passe solide.
 services:
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0   # version épinglée
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - POST=1
+      - EXEC=0
+      - NETWORKS=0
+      - VOLUMES=0
+      - SERVICES=0
+      - SWARM=0
+      - SECRETS=0
+      - PLUGINS=0
+      - SYSTEM=0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [default]
   atom:
+    depends_on: [docker-proxy]
     environment:
       - ATOM_SANDBOX=1
+      - ATOM_DOCKER_HOST=tcp://docker-proxy:2375
       - ATOM_SANDBOX_TIMEOUT=${ATOM_SANDBOX_TIMEOUT:-300}
       - ATOM_SANDBOX_MEMORY_MB=${ATOM_SANDBOX_MEMORY_MB:-2048}
       - ATOM_SANDBOX_CPUS=${ATOM_SANDBOX_CPUS:-2}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock

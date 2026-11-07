@@ -20,6 +20,9 @@ from typing import AsyncIterator
 
 from . import db, hybrid, llm, providers
 from .config import DEFAULT_MODEL
+import logging
+
+log = logging.getLogger("atom.workshop")
 
 DEFAULTS = {
     "enabled": False,
@@ -283,7 +286,7 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
             switched: list = []
             yield dict(type="step", status="start", index=i, role=role, engine=engine_label(engine), final=final)
             text, sent = "", 0
-            async for tok in _gen(engine, _prompts(pattern, i, request, outputs), lambda e, why: switched.append((e, why))):
+            async for tok in _gen(engine, _prompts(pattern, i, request, outputs), lambda e, why: switched.append((e, why))):  # noqa: B023 (consommé dans la même itération)
                 text += tok
                 # On retient le début le temps d'écarter un éventuel tag d'émotion ou bloc de réflexion.
                 if len(text) < 30 and "]" not in text[:25]:
@@ -310,4 +313,5 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
         asst_id = db.add_message(conversation_id, "assistant", final_text, "focus", meta=meta)
         yield dict(type="done", emotion="focus", id=asst_id, final=final_text)
     except Exception as e:  # noqa: BLE001
+        log.warning("workshop : erreur gérée", exc_info=True)
         yield dict(type="error", message=f"Atelier interrompu : {e}")

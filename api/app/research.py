@@ -16,6 +16,9 @@ from typing import AsyncIterator
 
 from . import db, hybrid, llm, search
 from .config import DEFAULT_MODEL
+import logging
+
+log = logging.getLogger("atom.research")
 
 MAX_QUERIES = 6
 
@@ -28,7 +31,7 @@ async def _ask(messages: list[dict], used: dict) -> str:
             used["engine"] = hybrid.last_used.get("name") or "distant"
             return out
         except Exception:  # noqa: BLE001
-            pass
+            log.warning("research : erreur gérée", exc_info=True)
     used["engine"] = "local"
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
 
@@ -43,6 +46,7 @@ async def _stream(messages: list[dict], used: dict) -> AsyncIterator[str]:
             used["engine"] = hybrid.last_used.get("name") or "distant"
             return
         except Exception:  # noqa: BLE001
+            log.warning("research : erreur gérée", exc_info=True)
             if got:
                 raise
     used["engine"] = "local"
@@ -98,6 +102,7 @@ async def run(question: str, conversation_id: int | None) -> AsyncIterator[dict]
         try:
             results = await search.search(q)
         except Exception as e:  # noqa: BLE001
+            log.warning("research : erreur gérée", exc_info=True)
             yield dict(type="progress", text=f"Recherche impossible ({e})")
             return
         fresh = []
@@ -113,7 +118,8 @@ async def run(question: str, conversation_id: int | None) -> AsyncIterator[dict]
             return
         yield dict(type="sources", sources=sources)
         yield dict(type="progress", text=f"Lecture de {len(readable)} page(s) : " + ", ".join(r["domain"] for _, r in readable))
-        block = "\n\n".join(f"[{n}] {r['title']} — {r['domain']}\n{(r.get('content') or r.get('snippet'))[:2200]}" for n, r in readable)
+        from .security import UNTRUSTED_RULE, untrusted
+        block = UNTRUSTED_RULE + "\n\n" + "\n\n".join(f"[{n}] " + untrusted(f"{r['title']} — {r['domain']}\n{(r.get('content') or r.get('snippet'))[:2200]}", f"page web {r['domain']}") for n, r in readable)
         note = _clean(await _ask([{"role": "system", "content": SYS}, {"role": "user", "content":
             f"Question générale : {question}\nRecherche en cours : {q}\n\nSources :\n{block}\n\n"
             "Extrais les faits utiles à la question, sous forme de puces courtes. Chaque puce se termine par le numéro de "

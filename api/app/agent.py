@@ -12,8 +12,12 @@ from typing import AsyncIterator
 
 import httpx
 
+from .security import UNTRUSTED_RULE, untrusted
 from . import db, hybrid, library, llm, memory, proxmox, reminders, search, spaces
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
+import logging
+
+log = logging.getLogger("atom.agent")
 
 TAG_RE = re.compile(r"^\s*\[([a-zA-Z]+)\]\s*")
 _background: set[asyncio.Task] = set()
@@ -67,8 +71,8 @@ def with_attachments(text: str, attachments: list[dict] | None) -> str:
     for a in attachments:
         body = (a.get("text") or "")[:ATTACH_MAX_CHARS]
         cut = " (tronqué)" if len(a.get("text") or "") > ATTACH_MAX_CHARS else ""
-        parts.append(f"[Fichier joint : {a.get('name', 'fichier')}{cut}]\n```\n{body}\n```")
-    return "\n\n".join(parts) + "\n\n" + (text or "Que peux-tu me dire de ce fichier ?")
+        parts.append(f"[Fichier joint : {a.get('name', 'fichier')}{cut}]\n" + untrusted(body, "fichier joint"))
+    return UNTRUSTED_RULE + "\n\n" + "\n\n".join(parts) + "\n\n" + (text or "Que peux-tu me dire de ce fichier ?")
 
 
 async def chat_events(
@@ -184,6 +188,7 @@ async def chat_events(
                     yield tok
                 return
             except Exception as e:  # noqa: BLE001
+                log.warning("agent : erreur gérée", exc_info=True)
                 if got:
                     raise
                 log_reason = str(e) or e.__class__.__name__
@@ -242,6 +247,7 @@ async def chat_events(
         try:
             results = await search.search(query)
         except Exception as e:  # noqa: BLE001
+            log.warning("agent : erreur gérée", exc_info=True)
             yield dict(type="search", status="error", query=query, message=str(e))
             return
         sources.extend({"title": r["title"], "url": r["url"], "domain": r["domain"],
@@ -301,6 +307,7 @@ async def chat_events(
             db.add_message(conversation_id, "assistant", partial.strip() + " …", emotion or "talking", meta=asst_meta)
         raise
     except Exception as e:  # noqa: BLE001 — on renvoie l'erreur à l'interface
+        log.warning("agent : erreur gérée", exc_info=True)
         msg = str(e) or e.__class__.__name__
         if isinstance(e, httpx.ConnectError):
             msg = f"Impossible de joindre Ollama sur {OLLAMA_URL}."

@@ -19,9 +19,10 @@ from .config import DB_PATH
 @contextmanager
 def conn():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    c = sqlite3.connect(DB_PATH)
+    c = sqlite3.connect(DB_PATH, timeout=15)
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys = ON")
+    c.execute("PRAGMA busy_timeout = 15000")   # tâches longues en parallèle : on attend le verrou au lieu d'échouer
     with closing(c):
         with c:
             yield c
@@ -104,6 +105,39 @@ def init() -> None:
             if col not in mem_cols:
                 c.execute(f"ALTER TABLE memories ADD COLUMN {col} {ddl}")
         c.execute("CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, id)")
+        # mode WAL : lectures pendant les écritures (agent, indexation, discussion en même temps)
+        c.execute("PRAGMA journal_mode = WAL")
+    migrate()
+
+
+# ---------------------------------------------------------------- migrations versionnées
+# Une migration par fichier dans app/migrations/ (mNNN_nom.py), appliquée une seule fois
+# et enregistrée dans schema_version. Voir app/migrations/__init__.py.
+
+def _load_migrations() -> list[tuple[int, str, object]]:
+    from .migrations import discover
+
+    return discover()
+
+
+def schema_version() -> int:
+    with conn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT, applied_at REAL)")
+        r = c.execute("SELECT MAX(version) AS v FROM schema_version").fetchone()
+    return int(r["v"] or 0)
+
+
+def migrate() -> list[int]:
+    applied = []
+    current = schema_version()
+    for v, name, fn in _load_migrations():
+        if v <= current:
+            continue
+        with conn() as c:   # une transaction par migration : tout ou rien
+            fn(c)
+            c.execute("INSERT INTO schema_version (version, name, applied_at) VALUES (?, ?, ?)", (v, name, time.time()))
+        applied.append(v)
+    return applied
 
 
 # ---------------------------------------------------------------- conversations
@@ -241,10 +275,12 @@ def from_blob(b: bytes | None) -> np.ndarray | None:
     return None if b is None else np.frombuffer(b, dtype=np.float32)
 
 
-def list_memories() -> list[dict]:
+def list_memories(active_only: bool = True) -> list[dict]:
     with conn() as c:
         rows = c.execute(
-            "SELECT id, content, source, created_at, updated_at, embedding FROM memories ORDER BY id"
+            "SELECT id, content, source, created_at, updated_at, embedding, kind, importance, confidence, "
+            "review_at, archived_at, superseded_by, hits, last_used FROM memories "
+            + ("WHERE archived_at IS NULL " if active_only else "") + "ORDER BY id"
         ).fetchall()
     out = []
     for r in rows:
@@ -254,14 +290,33 @@ def list_memories() -> list[dict]:
     return out
 
 
-def add_memory(content: str, source: str, embedding: np.ndarray | None) -> int:
+def add_memory(content: str, source: str, embedding: np.ndarray | None, kind: str = "semantique",
+               importance: int = 2, confidence: float = 0.8, review_at: float | None = None) -> int:
     now = time.time()
     with conn() as c:
         return c.execute(
-            "INSERT INTO memories (content, source, embedding, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (content, source, to_blob(embedding), now, now),
+            "INSERT INTO memories (content, source, embedding, created_at, updated_at, kind, importance, confidence, review_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (content, source, to_blob(embedding), now, now, kind, importance, confidence, review_at),
         ).lastrowid
+
+
+def set_memory_fields(mid: int, **f) -> None:
+    f["updated_at"] = time.time()
+    cols = ", ".join(f"{k} = ?" for k in f)
+    with conn() as c:
+        c.execute(f"UPDATE memories SET {cols} WHERE id = ?", (*f.values(), mid))
+
+
+def archive_memory(mid: int, superseded_by: int | None = None) -> None:
+    set_memory_fields(mid, archived_at=time.time(), superseded_by=superseded_by)
+
+
+def touch_memories(ids: list[int]) -> None:
+    if not ids:
+        return
+    with conn() as c:
+        c.executemany("UPDATE memories SET hits = hits + 1, last_used = ? WHERE id = ?", [(time.time(), i) for i in ids])
 
 
 def update_memory(mid: int, content: str, embedding: np.ndarray | None) -> bool:
@@ -298,10 +353,23 @@ def add_recall(cid: int, text: str, embedding: np.ndarray) -> None:
         )
 
 
-def list_recall() -> list[dict]:
+def list_recall(limit: int = 3000, exclude_conversation: int | None = None) -> list[dict]:
+    """Les échanges indexés les plus récents seulement (borne la mémoire et le calcul)."""
     with conn() as c:
-        rows = c.execute("SELECT conversation_id, text, embedding, created_at FROM recall").fetchall()
+        rows = c.execute("SELECT conversation_id, text, embedding, created_at FROM recall "
+                         "WHERE conversation_id IS NOT ? ORDER BY created_at DESC LIMIT ?",
+                         (exclude_conversation, limit)).fetchall()
     return [{**dict(r), "embedding": from_blob(r["embedding"])} for r in rows]
+
+
+def prune_recall(max_days: int, max_rows: int) -> int:
+    """Rétention : supprime les échanges indexés trop anciens, et au-delà du plafond."""
+    cutoff = time.time() - max_days * 86400
+    with conn() as c:
+        n = c.execute("DELETE FROM recall WHERE created_at < ?", (cutoff,)).rowcount
+        n += c.execute("DELETE FROM recall WHERE id NOT IN (SELECT id FROM recall ORDER BY created_at DESC LIMIT ?)",
+                       (max_rows,)).rowcount
+    return n
 
 
 # ---------------------------------------------------------------- rappels (tâches)

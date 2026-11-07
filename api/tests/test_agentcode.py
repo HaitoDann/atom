@@ -1,4 +1,3 @@
-import json
 import subprocess
 import time
 
@@ -130,3 +129,21 @@ def test_rate_limit_pause(client, monkeypatch):
         hybrid.save_settings({"allow_docs": False})
     assert any(l["type"] == "info" and "pause" in l["message"] for l in lines)
     assert lines[-1]["files"] and not any("en local" in l.get("message", "") for l in lines)
+
+
+def test_validation_and_permissions():
+    ro = {"read"}
+    assert "non autorisé" in agentcode.validate("edit", {"path": "a.py", "old": "x", "new": "y"}, ro)
+    assert agentcode.validate("read", {"path": "a.py", "start": 1}, ro) is None
+    assert "numéro de ligne" in agentcode.validate("read", {"path": "a.py", "start": "1; rm"}, ro)
+    assert "trop long" in agentcode.validate("search", {"query": "x" * 400}, ro)
+    assert "texte" in agentcode.validate("read", {"path": ["a"]}, ro)
+    names = [t["function"]["name"] for t in agentcode.tools({"read"})]
+    assert "edit" not in names and "write" not in names and "read" in names
+
+
+def test_readonly_run_makes_no_change(client):
+    cid, root = _project()
+    rid, lines = _go(client, cid, task="ajoute un commentaire", engine="local", readonly=True)
+    done = lines[-1]
+    assert done["files"] == [] and any(l["type"] == "result" and "non autorisé" in l["text"] for l in lines)

@@ -21,8 +21,6 @@ from . import db
 COOKIE = "atom_session"
 SESSION_DAYS = int(os.getenv("ATOM_SESSION_DAYS", "90"))
 MIN_LEN = 8
-_attempts: dict[str, list[float]] = {}
-_blocked: dict[str, float] = {}
 
 
 def init() -> None:
@@ -73,28 +71,40 @@ def check_password(password: str) -> bool:
 # ---------------------------------------------------------------- limite d'essais
 
 
+# Compteurs enregistrés en base : un redémarrage du serveur ne remet pas les essais à zéro.
+def _rl(ip: str) -> dict:
+    import json
+    try:
+        return json.loads(db.kv_get(f"auth:rl:{ip}") or "{}")
+    except ValueError:
+        return {}
+
+
+def _rl_save(ip: str, d: dict) -> None:
+    import json
+    db.kv_set(f"auth:rl:{ip}", json.dumps(d))
+
+
 def blocked_for(ip: str) -> int:
-    until = _blocked.get(ip, 0)
+    until = _rl(ip).get("until", 0)
     return max(0, int(until - time.time()))
 
 
 def record_failure(ip: str) -> None:
     now = time.time()
-    hist = [t for t in _attempts.get(ip, []) if now - t < 600] + [now]
-    _attempts[ip] = hist
+    d = _rl(ip)
+    hist = [t for t in d.get("attempts", []) if now - t < 600] + [now]
+    d["attempts"] = hist
     if len(hist) >= 5:
-        # 1 min, puis 5, puis 30 au-delà
-        prev = _blocked.get(ip + ":level", 0)
-        level = int(prev) + 1
-        _blocked[ip + ":level"] = level
-        _blocked[ip] = now + (60 if level == 1 else 300 if level == 2 else 1800)
-        _attempts[ip] = []
+        # 1 min, puis 5, puis 30 au-delà (le niveau redescend après 24 h sans échec)
+        level = (d.get("level", 0) if now - d.get("last_block", 0) < 86400 else 0) + 1
+        d.update(level=level, until=now + (60 if level == 1 else 300 if level == 2 else 1800), last_block=now, attempts=[])
+    _rl_save(ip, d)
 
 
 def record_success(ip: str) -> None:
-    _attempts.pop(ip, None)
-    _blocked.pop(ip, None)
-    _blocked.pop(ip + ":level", None)
+    with db.conn() as c:
+        c.execute("DELETE FROM kv WHERE key = ?", (f"auth:rl:{ip}",))
 
 
 # ---------------------------------------------------------------- sessions

@@ -330,7 +330,7 @@ async def handle_message(client, msg: dict) -> None:
         try:
             await send_text(client, chat_id, f"⚠ Erreur : {e}")
         except Exception:  # noqa: BLE001
-            pass
+            log.warning("telegram : erreur gérée", exc_info=True)
     finally:
         stop_typing.set()
         typing.cancel()

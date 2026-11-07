@@ -16,7 +16,6 @@ import json
 import os
 import logging
 import re
-from datetime import datetime
 from typing import AsyncIterator
 
 from . import db, providers
@@ -122,7 +121,10 @@ def decide(engine: str, message: str, needs_memory: bool, needs_docs: bool) -> t
     if engine == "mistral":
         return "mistral", "demandé"
     m = message.strip()
-    if len(m) > 600 or COMPLEX.search(m) or m.count("\n") > 8:
+    kind = classify(m)
+    if kind == "code":
+        return "mistral", "demande de code : modèle distant fort en code"
+    if kind == "complexe":
         return "mistral", "demande longue ou complexe"
     return "local", ""
 
@@ -134,11 +136,27 @@ async def list_models(pid: str | None = None) -> list[str]:
     return await providers.list_models(p)
 
 
-async def stream(messages: list[dict], model_name: str | None = None, sensitive: bool = False) -> AsyncIterator[str]:
+CODE = re.compile(r"```|\b(code|fonction|classe|bug|erreur de compilation|stack ?trace|regex|sql|python|javascript|"
+                  r"typescript|golang|rust|bash|script|api|refactor|débogue|debug|compile|test unitaire)\b", re.I)
+
+
+def classify(message: str) -> str:
+    """Nature de la demande : « code », « complexe » ou « simple » (sert à choisir le fournisseur)."""
+    m = message or ""
+    if CODE.search(m):
+        return "code"
+    if len(m) > 600 or COMPLEX.search(m) or m.count("\n") > 8:
+        return "complexe"
+    return "simple"
+
+
+async def stream(messages: list[dict], model_name: str | None = None, sensitive: bool = False, task: str | None = None) -> AsyncIterator[str]:
     """Flux depuis le fournisseur principal, avec relais vers les autres s'il est indisponible.
     sensitive=True : la demande contient souvenirs/documents → seulement les fournisseurs « private »."""
     p = primary()
-    order = providers.chain(p.id if p else None, sensitive)
+    if task is None:
+        task = classify(next((m["content"] for m in reversed(messages) if m["role"] == "user"), ""))
+    order = providers.chain(p.id if p else None, sensitive, task=task)
     used: dict = {}
     try:
         async for t in providers.stream_chain(order, messages, used, model_name):

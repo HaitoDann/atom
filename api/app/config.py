@@ -18,6 +18,10 @@ RECALL_IN_PROMPT = int(os.getenv("ATOM_RECALL_IN_PROMPT", "3"))
 FACT_MIN_SCORE = float(os.getenv("ATOM_FACT_MIN_SCORE", "0.45"))
 RECALL_MIN_SCORE = float(os.getenv("ATOM_RECALL_MIN_SCORE", "0.55"))
 DUPLICATE_SCORE = float(os.getenv("ATOM_DUPLICATE_SCORE", "0.9"))
+RELATED_SCORE = float(os.getenv("ATOM_RELATED_SCORE", "0.72"))        # au-delà : même sujet → fusion ou contradiction ?
+RECALL_SCAN = int(os.getenv("ATOM_RECALL_SCAN", "3000"))            # échanges récents examinés à chaque message
+RECALL_MAX_DAYS = int(os.getenv("ATOM_RECALL_MAX_DAYS", "540"))      # rétention des échanges indexés
+RECALL_MAX_ROWS = int(os.getenv("ATOM_RECALL_MAX_ROWS", "30000"))
 
 EMOTIONS = ["idle", "thinking", "talking", "joy", "curious", "concerned", "sleep",
             "angry", "sad", "surprise", "fear", "focus"]   # les dernières : anciennes, ramenées au jeu réduit par l'interface
