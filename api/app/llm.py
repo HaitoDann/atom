@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import random
 import re
 from typing import AsyncIterator
@@ -37,7 +38,30 @@ def _raise_for(status: int, body: str, model: str) -> None:
     raise RuntimeError(f"Ollama a répondu {status} : {body[:300]}")
 
 
-async def stream_chat(model: str, messages: list[dict]) -> AsyncIterator[str]:
+async def stream_chat(model: str, messages: list[dict], task: str | None = None) -> AsyncIterator[str]:
+    """Flux du modèle local (Ollama), journalisé dans usage.py comme fournisseur « local »."""
+    from . import usage
+    t0, first, ok, err = time.time(), None, False, ""
+    last_stats.clear()
+    try:
+        async for t in _stream_chat(model, messages):
+            first = first or time.time()
+            yield t
+        ok = True
+    except GeneratorExit:   # réponse interrompue par l'utilisateur : l'appel a bien eu lieu
+        ok = first is not None
+        raise
+    except Exception as e:
+        err = str(e) or e.__class__.__name__
+        raise
+    finally:
+        st = dict(last_stats) if ok else {}
+        usage.record("local", model=model, task=task, ok=ok, first_s=(first - t0) if first else None,
+                     total_s=time.time() - t0, prompt_tokens=st.get("prompt_tokens"), completion_tokens=st.get("tokens"),
+                     error=err)
+
+
+async def _stream_chat(model: str, messages: list[dict]) -> AsyncIterator[str]:
     if PROVIDER == "mock":
         async for t in _mock_stream(messages):
             yield t

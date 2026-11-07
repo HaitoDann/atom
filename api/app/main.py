@@ -17,12 +17,12 @@ from typing import AsyncIterator
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, analysis, auth, backup, canvas, proxmox, research, sandbox, spaces, db, ocr, library, llm, reminders, search, telegram
+from . import agent, agentcode, analysis, auth, backup, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +53,9 @@ async def lifespan(_app: FastAPI):
                 n = await asyncio.to_thread(db.prune_recall, RECALL_MAX_DAYS, RECALL_MAX_ROWS)
                 if n:
                     logging.getLogger("atom").info("rétention : %d échanges indexés supprimés", n)
+                n = await asyncio.to_thread(usage.prune)
+                if n:
+                    logging.getLogger("atom").info("rétention : %d appels de modèles supprimés du journal", n)
             except Exception:  # noqa: BLE001
                 logging.getLogger("atom").exception("maintenance")
             await asyncio.sleep(86400)
@@ -65,6 +68,7 @@ async def lifespan(_app: FastAPI):
 
 from . import security as _security
 _security.install_log_masking()   # aucune clé ni jeton dans les journaux
+observability.setup_logging()     # identifiant de requête ; JSON si ATOM_LOG_FORMAT=json
 
 db.init()
 library.init()
@@ -72,6 +76,7 @@ agentcode.init()
 spaces.init()
 canvas.init()
 auth.init()
+providers.restore_health()   # santé des fournisseurs reconstituée depuis le journal des appels
 app = FastAPI(title="Atom", lifespan=lifespan)
 
 from .routes import canvas as _r_canvas, git as _r_git  # noqa: E402
@@ -80,7 +85,7 @@ app.include_router(_r_git.router)
 import importlib  # noqa: E402
 
 log = logging.getLogger("atom.main")
-for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab'):
+for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes'):
     _m = importlib.import_module(f".routes.{_n}", __package__)
     app.include_router(_m.router)
 
@@ -89,7 +94,8 @@ for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'mem
 @app.middleware("http")
 async def guard(request: Request, call_next):
     path = request.url.path
-    if path.startswith("/api/") and not path.startswith("/api/auth/"):
+    metrics_token = path == "/api/metrics" and observability.token_ok(request.headers.get("authorization"))
+    if path.startswith("/api/") and not path.startswith("/api/auth/") and not metrics_token:
         if not auth.is_set() or not auth.session_for(request.cookies.get(auth.COOKIE)):
             return JSONResponse({"detail": "Connexion requise", "auth": True}, status_code=401)
         # Protection CSRF : les requêtes qui modifient quelque chose doivent venir de l'interface.
@@ -104,6 +110,15 @@ async def guard(request: Request, call_next):
     if _secure(request):
         resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
     return resp
+
+
+# Identifiant de requête, durée et statut (métriques, journaux) : enregistré après « guard », donc exécuté avant lui.
+app.middleware("http")(observability.middleware)
+
+
+@app.get("/api/metrics")
+def metrics():
+    return PlainTextResponse(observability.render(), media_type="text/plain; version=0.0.4")
 
 
 def _ip(request: Request) -> str:
