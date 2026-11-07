@@ -2948,7 +2948,8 @@ async function loadHybrid() {
         <span class="prov-tags"><span>${esc(p.family)}</span><span title="Force estimée (1 à 3)">${"●".repeat(p.strength)}${"○".repeat(3 - p.strength)}</span>${p.private ? "" : "<span>sans données privées</span>"}${p.paused ? "<span>en pause</span>" : ""}</span></div>
       <div class="row prov-model"><select class="field"><option value="${esc(p.model)}">${esc(p.model)}</option><option value="__other">Autre… (saisir un nom)</option></select><input class="field" hidden value="${esc(p.model)}" spellcheck="false" autocomplete="off" placeholder="nom exact du modèle"><button class="btn sm">Enregistrer</button></div>
       <p class="note prov-note" hidden></p>
-      <div class="metric"><div class="l"><span>${p.used_today} / ${p.limit} aujourd'hui</span><span></span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+      <div class="metric"><div class="l"><span>${p.used_today} / ${p.limit} aujourd'hui</span><span></span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`
+      + (p.health && p.health.calls ? `<p class="note">Mesuré : ${p.health.latency != null ? p.health.latency + " s" : "—"} en moyenne · ${p.health.success ?? "—"} % de réussite sur les derniers appels${p.health.last_error ? ` · dernière erreur : ${esc(p.health.last_error.slice(0, 120))}` : ""}</p>` : "");
     row.querySelector("input").onchange = () => saveHybrid({ provider: p.id });
     const sel = row.querySelector("select"), inp = row.querySelector(".prov-model input"), note = row.querySelector(".prov-note");
     const showNote = (t) => { note.textContent = t; note.hidden = !t; };

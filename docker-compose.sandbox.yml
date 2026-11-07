@@ -9,7 +9,7 @@
 # Le socket reste une frontière sensible : garde Atom derrière Tailscale avec un mot de passe solide.
 services:
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:latest   # pense à épingler une version
+    image: tecnativa/docker-socket-proxy:v0.5.0   # version épinglée
     restart: unless-stopped
     environment:
       - CONTAINERS=1

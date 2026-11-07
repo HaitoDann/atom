@@ -602,10 +602,10 @@ Atom relève chaque minute l'état de ton serveur et t'alerte en cas de problèm
 
 | Couche | Rôle | Modules |
 |---|---|---|
-| API | routes HTTP, validation des entrées | `main.py` (assemblage), `routes/` (un module par domaine : `canvas`, `git`…) |
+| API | routes HTTP, validation des entrées | `main.py` (assemblage), `routes/` (un module par domaine : conversations, souvenirs, bibliothèque, agent, Git, canevas…) |
 | Core | logique métier, sans HTTP | `memory`, `agent`, `agentcode`, `canvas`, `spaces`, `research`, `analysis`, `reminders` |
 | IA | moteurs et routage | `llm` (Ollama), `providers` (santé mesurée, basculement), `hybrid` (classement simple/complexe/code) |
 | Intégrations | services extérieurs | `telegram`, `tgagent`, `search`, `proxmox`, `notify`, `gitops` |
 | Infrastructure | données, sécurité, exécution | `db` (migrations versionnées), `backup`, `auth`, `security`, `sandbox`, `jobs` |
 
-Les routes migrent progressivement de `main.py` vers `routes/` ; une règle : un module Core n'importe jamais `main` ni FastAPI.
+`main.py` ne garde que l'assemblage, la discussion et l'authentification ; une règle : un module Core n'importe jamais `main` ni FastAPI.
