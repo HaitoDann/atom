@@ -113,7 +113,8 @@ async def run(question: str, conversation_id: int | None) -> AsyncIterator[dict]
             return
         yield dict(type="sources", sources=sources)
         yield dict(type="progress", text=f"Lecture de {len(readable)} page(s) : " + ", ".join(r["domain"] for _, r in readable))
-        block = "\n\n".join(f"[{n}] {r['title']} — {r['domain']}\n{(r.get('content') or r.get('snippet'))[:2200]}" for n, r in readable)
+        from .security import UNTRUSTED_RULE, untrusted
+        block = UNTRUSTED_RULE + "\n\n" + "\n\n".join(f"[{n}] " + untrusted(f"{r['title']} — {r['domain']}\n{(r.get('content') or r.get('snippet'))[:2200]}", f"page web {r['domain']}") for n, r in readable)
         note = _clean(await _ask([{"role": "system", "content": SYS}, {"role": "user", "content":
             f"Question générale : {question}\nRecherche en cours : {q}\n\nSources :\n{block}\n\n"
             "Extrais les faits utiles à la question, sous forme de puces courtes. Chaque puce se termine par le numéro de "

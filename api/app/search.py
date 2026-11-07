@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .security import UNTRUSTED_RULE, untrusted
+
 from .config import SEARCH_PAGES, SEARCH_RESULTS, SEARXNG_URL
 
 log = logging.getLogger("atom.search")
@@ -126,9 +128,9 @@ def prompt_block(query: str, results: list[dict], today: str) -> str:
     lines = [f"Résultats d'une recherche web pour « {query} » (faite le {today}) :", ""]
     for i, r in enumerate(results, 1):
         body = r["content"] or r["snippet"]
-        lines.append(f"[{i}] {r['title']} — {r['domain']}\n{body}\n")
+        lines.append(f"[{i}] " + untrusted(f"{r['title']} — {r['domain']}\n{body}", f"page web {r['domain']}") + "\n")
     lines.append(
         "Réponds à la question en t'appuyant sur ces résultats. Cite tes sources avec leur numéro, "
         "par exemple [1]. Si les résultats ne permettent pas de répondre, dis-le simplement."
     )
-    return "\n".join(lines)
+    return UNTRUSTED_RULE + "\n\n" + "\n".join(lines)

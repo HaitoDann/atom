@@ -438,7 +438,8 @@ async def stream_chain(providers: list[Provider], messages: list[dict], used: di
 
 def _mock_tools(messages: list[dict]) -> dict:
     """Mode test : enchaîne list → read → edit → done avec de vrais appels d'outils."""
-    results = [m["content"] for m in messages if m["role"] == "tool"]
+    strip = lambda t: "\n".join(l for l in t.split("\n") if not l.startswith("<<<"))   # encadrement « contenu externe »
+    results = [strip(m["content"]) for m in messages if m["role"] == "tool"]
     n = len(results)
 
     def call(name: str, args: dict) -> dict:

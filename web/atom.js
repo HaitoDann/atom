@@ -3502,7 +3502,7 @@ $("agRun").onclick = async () => {
   if (task.length < 3) { $("agTask").focus(); return; }
   agReset();
   try {
-    const { id } = await (await send_(`/api/agent/${code.project}`, "POST", { task, engine: $("agEngine").value, parent: agParent || undefined })).json();
+    const { id } = await (await send_(`/api/agent/${code.project}`, "POST", { task, engine: $("agEngine").value, parent: agParent || undefined, readonly: $("agReadonly").checked })).json();
     const wasFollowUp = !!agParent;
     agParent = null; $("agParentNote").hidden = true;
     store.set(agKey(), id); agBusy(true); await agFollow(id);

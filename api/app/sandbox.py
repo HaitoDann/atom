@@ -33,6 +33,8 @@ from . import db, library
 log = logging.getLogger("atom.sandbox")
 
 SOCKET = os.getenv("ATOM_DOCKER_SOCKET", "/var/run/docker.sock")
+# Recommandé : passer par un proxy du socket (docker-compose.sandbox.yml) plutôt que monter le socket lui-même.
+DOCKER_HOST = os.getenv("ATOM_DOCKER_HOST", "").replace("tcp://", "http://").rstrip("/")
 ENABLED = os.getenv("ATOM_SANDBOX", "0").lower() in ("1", "true", "oui", "yes", "on")
 TIMEOUT = int(os.getenv("ATOM_SANDBOX_TIMEOUT", "300"))
 MEMORY = int(os.getenv("ATOM_SANDBOX_MEMORY_MB", "2048"))
@@ -71,19 +73,55 @@ TOOLCHAINS = {
 
 
 def enabled() -> bool:
-    return ENABLED and Path(SOCKET).exists()
+    return ENABLED and (bool(DOCKER_HOST) or Path(SOCKET).exists())
 
 
 def status() -> dict:
     if not ENABLED:
         return {"enabled": False, "reason": "désactivé (ATOM_SANDBOX=1 et docker-compose.sandbox.yml pour l'activer)"}
-    if not Path(SOCKET).exists():
+    if not DOCKER_HOST and not Path(SOCKET).exists():
         return {"enabled": False, "reason": f"socket Docker absent ({SOCKET}) : ajoute docker-compose.sandbox.yml"}
-    return {"enabled": True, "reason": ""}
+    return {"enabled": True, "reason": "", "via": "proxy" if DOCKER_HOST else "socket"}
+
+
+# Liste blanche : seules les opérations dont le bac à sable a besoin. Toute autre requête Docker est refusée,
+# et une création de conteneur privilégié ou montant un dossier de l'hôte est bloquée.
+ALLOWED = [
+    ("GET", re.compile(r"^/images/[^/]+(/[^/]+)?/json$")), ("POST", re.compile(r"^/images/create$")),
+    ("POST", re.compile(r"^/containers/create$")), ("GET", re.compile(r"^/containers/json$")),
+    ("PUT", re.compile(r"^/containers/[0-9a-f]+/archive$")), ("GET", re.compile(r"^/containers/[0-9a-f]+/archive$")),
+    ("POST", re.compile(r"^/containers/[0-9a-f]+/(start|wait|kill)$")), ("GET", re.compile(r"^/containers/[0-9a-f]+/logs$")),
+    ("DELETE", re.compile(r"^/containers/[0-9a-f]+$")),
+]
+
+
+class DockerRefused(RuntimeError):
+    pass
+
+
+def check_request(method: str, path: str, body: bytes | None) -> None:
+    if not any(m == method and rx.match(path) for m, rx in ALLOWED):
+        raise DockerRefused(f"requête Docker non autorisée : {method} {path}")
+    if path == "/containers/create":
+        spec = json.loads(body or b"{}")
+        hc = spec.get("HostConfig") or {}
+        if hc.get("Privileged") or hc.get("Binds") or hc.get("PidMode") == "host" or hc.get("NetworkMode") == "host" \
+                or hc.get("CapAdd") or hc.get("Devices") or any(m.get("Type") != "volume" for m in hc.get("Mounts") or []) \
+                or (spec.get("Labels") or {}).get("atom") != "sandbox":
+            raise DockerRefused("conteneur refusé : privilèges, accès à l'hôte ou étiquette manquante")
+
+
+async def _guard(request: httpx.Request) -> None:
+    body = request.content if request.method == "POST" and request.url.path == "/containers/create" else None
+    check_request(request.method, request.url.path, body)
 
 
 def _client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(uds=SOCKET), base_url="http://docker", timeout=httpx.Timeout(30, read=600))
+    hooks = {"request": [_guard]}
+    if DOCKER_HOST:
+        return httpx.AsyncClient(base_url=DOCKER_HOST, timeout=httpx.Timeout(30, read=600), event_hooks=hooks)
+    return httpx.AsyncClient(transport=httpx.AsyncHTTPTransport(uds=SOCKET), base_url="http://docker",
+                             timeout=httpx.Timeout(30, read=600), event_hooks=hooks)
 
 
 # ---------------------------------------------------------------- projet → archive
@@ -193,6 +231,7 @@ async def _run_container(c: httpx.AsyncClient, image: str, cmd: str, env: list[s
             "NetworkMode": "bridge" if network else "none",
             "Memory": MEMORY * 1024 * 1024, "MemorySwap": MEMORY * 1024 * 1024, "NanoCpus": int(CPUS * 1e9),
             "PidsLimit": 512, "CapDrop": ["ALL"], "SecurityOpt": ["no-new-privileges"],
+            "Privileged": False, "IpcMode": "private", "Ulimits": [{"Name": "nofile", "Soft": 4096, "Hard": 4096}],
             "Mounts": [{"Type": "volume", "Source": CACHE_VOLUME, "Target": "/cache"}],
             "Tmpfs": {"/tmp": "rw,size=512m"},
         },

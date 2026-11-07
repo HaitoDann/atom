@@ -66,6 +66,9 @@ async def lifespan(_app: FastAPI):
         t.cancel()
 
 
+from . import security as _security
+_security.install_log_masking()   # aucune clé ni jeton dans les journaux
+
 db.init()
 library.init()
 agentcode.init()
@@ -996,7 +999,8 @@ def code_revert(cid: int, body: RevertIn):
 class AgentIn(BaseModel):
     task: str = Field(min_length=3, max_length=4000)
     engine: str = Field(default="remote", pattern="^(remote|local)$")
-    parent: str | None = Field(default=None, max_length=32)
+    parent: str | None = Field(default=None, max_length=32, pattern="^[0-9a-f]{16}$")
+    readonly: bool = False
 
 
 @app.post("/api/agent/{cid}")
@@ -1004,7 +1008,7 @@ async def agent_start(cid: int, body: AgentIn):
     """Lance l'agent en arrière-plan : il continue même si la page est rechargée ou fermée."""
     if not library.get_collection(cid):
         raise HTTPException(404, "Projet introuvable")
-    return {"id": agentcode.start(cid, body.task, body.engine, body.parent)}
+    return {"id": agentcode.start(cid, body.task, body.engine, body.parent, body.readonly)}
 
 
 class RulesIn(BaseModel):

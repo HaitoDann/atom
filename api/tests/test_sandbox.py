@@ -78,3 +78,44 @@ def test_disabled(client):
     cid = _project({"package.json": "{}"})
     info = client.get(f"/api/sandbox/{cid}").json()
     assert info["enabled"] is False and "ATOM_SANDBOX" in info["reason"]
+
+
+def test_docker_allowlist_blocks_dangerous_requests():
+    import json as js
+    import pytest as pt
+    ok = {"Image": "x", "Labels": {"atom": "sandbox"}, "HostConfig": {"NetworkMode": "none", "Mounts": [{"Type": "volume", "Source": "c", "Target": "/cache"}]}}
+    sandbox.check_request("POST", "/containers/create", js.dumps(ok).encode())
+    for bad in ({**ok, "HostConfig": {**ok["HostConfig"], "Privileged": True}},
+                {**ok, "HostConfig": {**ok["HostConfig"], "Binds": ["/:/host"]}},
+                {**ok, "HostConfig": {"Mounts": [{"Type": "bind", "Source": "/var/run/docker.sock", "Target": "/s"}]}},
+                {**ok, "HostConfig": {**ok["HostConfig"], "NetworkMode": "host"}},
+                {**ok, "Labels": {}}):
+        with pt.raises(sandbox.DockerRefused):
+            sandbox.check_request("POST", "/containers/create", js.dumps(bad).encode())
+    for m, p in (("POST", "/containers/abc/exec"), ("POST", "/exec/abc/start"), ("GET", "/secrets"), ("POST", "/networks/create"), ("POST", "/containers/atom/stop")):
+        with pt.raises(sandbox.DockerRefused):
+            sandbox.check_request(m, p, b"")
+
+
+def test_container_spec_is_hardened(client, monkeypatch, tmp_path):
+    cid = _project({"go.mod": "module x\n"})
+    specs = []
+
+    def handler(req):
+        if req.url.path == "/containers/create":
+            specs.append(json.loads(req.content)); return httpx.Response(201, json={"Id": "abc"})
+        if req.url.path.endswith("/json") and req.url.path.startswith("/images/"):
+            return httpx.Response(200, json={})
+        if req.url.path.endswith("/wait"):
+            return httpx.Response(200, json={"StatusCode": 0})
+        return httpx.Response(200, content=b"")
+
+    sock = tmp_path / "s"; sock.write_text("")
+    monkeypatch.setattr(sandbox, "ENABLED", True); monkeypatch.setattr(sandbox, "SOCKET", str(sock))
+    monkeypatch.setattr(sandbox, "_client", lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://docker", event_hooks={"request": [sandbox._guard]}))
+    asyncio.run(sandbox.run_text(cid, None, None))
+    test_spec = specs[-1]["HostConfig"]
+    assert test_spec["NetworkMode"] == "none" and test_spec["CapDrop"] == ["ALL"] and "no-new-privileges" in test_spec["SecurityOpt"]
+    assert test_spec["Privileged"] is False and test_spec["PidsLimit"] == 512 and test_spec["Memory"] > 0
+    assert all(m["Type"] == "volume" and "docker.sock" not in m["Source"] for m in test_spec["Mounts"])
+    assert "Binds" not in test_spec

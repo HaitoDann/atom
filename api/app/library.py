@@ -267,9 +267,10 @@ def ref_label(r: dict) -> str:
 
 
 def prompt_block(results: list[dict]) -> str:
-    lines = ["Extraits de la bibliothèque de l'utilisateur (documents et code) pertinents pour sa question :", ""]
+    from .security import UNTRUSTED_RULE, untrusted
+    lines = [UNTRUSTED_RULE, "", "Extraits de la bibliothèque de l'utilisateur (documents et code) pertinents pour sa question :", ""]
     for i, r in enumerate(results, 1):
-        lines.append(f"[D{i}] {ref_label(r)} — collection « {r['collection']} »\n{r['text']}\n")
+        lines.append(f"[D{i}] {ref_label(r)} — collection « {r['collection']} »\n" + untrusted(r["text"], "document de la bibliothèque") + "\n")
     lines.append("Appuie-toi sur ces extraits quand ils sont utiles et cite-les par leur numéro, par exemple [D1]. "
                  "S'ils ne contiennent pas la réponse, dis-le plutôt que d'inventer.")
     return "\n".join(lines)

@@ -96,7 +96,7 @@
           <div class="ag-form" id="agForm">
             <textarea class="field" id="agTask" rows="3" placeholder="Décris la tâche, ex. « Ajoute une validation de l'e-mail dans le formulaire d'inscription et un message d'erreur clair »"></textarea>
             <div class="row"><select class="field" id="agEngine" style="max-width:240px"><option value="remote">API distante (recommandé)</option><option value="local">Modèle local</option></select>
-              <span class="note" id="agEngineNote"></span><span class="spacer"></span><button class="btn primary" id="agRun">Lancer</button></div>
+              <label class="note" title="L'agent peut lire et chercher, mais ni modifier ni lancer de tests"><input type="checkbox" id="agReadonly"> lecture seule</label><span class="note" id="agEngineNote"></span><span class="spacer"></span><button class="btn primary" id="agRun">Lancer</button></div>
             <p class="note" id="agParentNote" hidden>Suite de la tâche affichée : l'agent garde son contexte et les modifications non appliquées. <button class="btn sm" id="agParentCancel">Nouvelle tâche à la place</button></p>
             <p class="note">Rien n'est écrit sans ta validation · l'agent continue même si tu fermes la page · Ctrl+Entrée pour lancer</p>
           </div>
