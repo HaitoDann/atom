@@ -129,12 +129,12 @@ async def scheduler() -> None:
         last = list_all()
         if DB_PATH.exists() and (not last or time.time() - last[0]["created_at"] > 86400):
             await asyncio.to_thread(create, "auto")
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.exception("sauvegarde de rattrapage impossible")
     while True:
         now = datetime.now(TZ)
         await asyncio.sleep(max(30, (_next_run(now) - now).total_seconds()))
         try:
             await asyncio.to_thread(create, "auto")
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("sauvegarde quotidienne impossible")

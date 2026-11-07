@@ -201,27 +201,128 @@ def record(pid: str, ok: bool, latency: float | None = None, err: str = "") -> N
         h["ko"] += 1; h["consec"] += 1; h["err"] = err[:160]
 
 
-def score(p: Provider, task: str | None = None) -> float:
-    """Plus c'est haut, plus on essaie tôt : force estimée, corrigée par les mesures et la nature de la tâche."""
+TASKS = ("simple", "complexe", "code", "long", "agent")
+
+
+def route_prefs() -> dict[str, str]:
+    """Fournisseur préféré par type de demande (réglé dans l'interface) : {"code": "groq", …}."""
+    try:
+        prefs = json.loads(db.kv_get("route:prefs") or "{}")
+    except ValueError:
+        return {}
+    return {t: pid for t, pid in prefs.items() if t in TASKS and get(pid)}
+
+
+def set_route_prefs(prefs: dict[str, str]) -> dict[str, str]:
+    clean = {t: pid for t, pid in prefs.items() if t in TASKS and pid and get(pid)}
+    db.kv_set("route:prefs", json.dumps(clean))
+    return clean
+
+
+def estimate_tokens(messages: list[dict] | None) -> int:
+    """Estimation grossière (≈ 3,5 caractères par token en français) de la question, plus la réponse attendue."""
+    chars = sum(len(str(m.get("content") or "")) for m in messages or [])
+    return int(chars / 3.5) + MAX_TOKENS
+
+
+def assess(p: Provider, task: str | None = None, est_tokens: int = 0) -> tuple[float, list[str]]:
+    """Score (plus c'est haut, plus on essaie tôt) et raisons lisibles du classement.
+    La force estimée du modèle est corrigée par les mesures réelles, la nature de la tâche, la taille et le quota."""
     h = HEALTH.get(p.id, {})
-    sc = float(p.strength)
+    why: list[str] = []
+    strength = float(p.strength)
+    lat = h.get("lat")
+    if task == "simple":
+        # Question courte : la vitesse compte plus que la puissance.
+        sc = 1 + 0.5 * strength
+        if lat:
+            sc += max(-1.0, min(1.0, (3 - lat) / 3))
+            why.append(f"rapide ({lat:.1f} s)" if lat < 2 else f"latence {lat:.1f} s")
+    else:
+        sc = strength
+        if task in ("complexe", "long", "agent"):
+            sc += 0.3 * (strength - 2)
+            if strength >= 3:
+                why.append("modèle fort")
+        if lat:
+            sc -= min(0.8, max(0.0, (lat - 4) / 10))
+    if task in ("code", "agent"):
+        bonus = CODE_FAMILIES.get(family_of(model_of(p), p.family), 0)
+        if bonus:
+            sc += bonus
+            why.append("bon en code")
     rec = h.get("recent") or []
     if len(rec) >= 3:
-        sc -= 1.5 * (1 - sum(rec) / len(rec))          # échecs récents
-    sc -= 0.4 * min(3, h.get("consec", 0))              # échecs consécutifs
-    if h.get("lat"):
-        sc -= min(0.8, max(0.0, (h["lat"] - 4) / 10))   # lenteur (au-delà de 4 s pour un premier mot)
-    if task == "code":
-        sc += CODE_FAMILIES.get(family_of(model_of(p), p.family), 0)
-    return sc
+        rate = sum(rec) / len(rec)
+        sc -= 1.5 * (1 - rate)
+        if rate < 0.8:
+            why.append(f"{round(100 * rate)} % de réussite")
+    if h.get("consec"):
+        sc -= 0.4 * min(3, h["consec"])
+        why.append(f"{h['consec']} échec(s) d'affilée")
+    if est_tokens and est_tokens > budget(p):
+        sc -= 3
+        why.append(f"requête trop longue pour l'offre (~{est_tokens} > {budget(p)} tokens)")
+    if p.limit:
+        left = quota_left(p.id) / p.limit
+        if left < 0.2:
+            sc -= (0.2 - left) * 5          # on épargne un fournisseur presque épuisé
+            why.append(f"quota presque épuisé ({quota_left(p.id)} restants)")
+    if task and route_prefs().get(task) == p.id:
+        sc += 2
+        why.insert(0, f"préféré pour « {task} »")
+    return sc, why
 
 
-def chain(first: str | None = None, sensitive: bool = False, exclude: set[str] | None = None, task: str | None = None) -> list[Provider]:
-    """Ordre d'essai : le fournisseur demandé d'abord (sauf s'il échoue en ce moment), puis par score décroissant."""
+def score(p: Provider, task: str | None = None) -> float:
+    return assess(p, task)[0]
+
+
+def plan(first: str | None = None, sensitive: bool = False, exclude: set[str] | None = None, task: str | None = None,
+         est_tokens: int = 0) -> list[dict]:
+    """Ordre d'essai expliqué : [{provider, score, why}]. Le fournisseur demandé passe en tête s'il va bien."""
     exclude = exclude or set()
-    pool = [p for p in ALL if p.id not in exclude and available(p, sensitive)]
-    pool.sort(key=lambda p: (not (p.id == first and HEALTH.get(p.id, {}).get("consec", 0) < 2), -score(p, task)))
-    return pool
+    prefs = route_prefs()
+    rows = []
+    for p in ALL:
+        if p.id in exclude or not available(p, sensitive):
+            continue
+        sc, why = assess(p, task, est_tokens)
+        healthy = HEALTH.get(p.id, {}).get("consec", 0) < 2 and not (est_tokens and est_tokens > budget(p))
+        # Priorité : la préférence pour ce type de demande, puis le fournisseur principal, puis le score.
+        rank = 0 if healthy and task and prefs.get(task) == p.id else 1 if healthy and p.id == first else 2
+        if rank == 1:
+            why.insert(0, "fournisseur principal")
+        rows.append({"provider": p, "score": round(sc, 2), "why": why, "pinned": rank < 2, "rank": rank})
+    rows.sort(key=lambda r: (r["rank"], -r["score"]))
+    return rows
+
+
+def chain(first: str | None = None, sensitive: bool = False, exclude: set[str] | None = None, task: str | None = None,
+          est_tokens: int = 0) -> list[Provider]:
+    """Ordre d'essai : le fournisseur demandé d'abord (sauf s'il échoue en ce moment), puis par score décroissant."""
+    return [r["provider"] for r in plan(first, sensitive, exclude, task, est_tokens)]
+
+
+def explain(rows: list[dict]) -> str:
+    """Raison courte du premier choix, pour le journal de consommation."""
+    if not rows:
+        return ""
+    why = rows[0]["why"]
+    return ", ".join(why[:3]) if why else "meilleur score"
+
+
+def restore_health() -> None:
+    """Au démarrage : reconstitue la santé de chaque fournisseur à partir de ses derniers appels journalisés."""
+    from . import usage
+    for p in ALL:
+        try:
+            calls = usage.last_calls(p.id)
+        except Exception:
+            log.warning("santé des fournisseurs non restaurée", exc_info=True)
+            return
+        for c in calls:
+            record(p.id, bool(c["ok"]), c["first_s"], c["error"] or "")
 
 
 def describe(p: Provider) -> dict:
@@ -403,7 +504,22 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
 
 
 async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_tokens: int = 4096) -> dict:
-    """Appel non streamé avec outils natifs (function calling, format OpenAI). Renvoie le message de l'assistant."""
+    """Appel non streamé avec outils natifs (function calling, format OpenAI). Renvoie le message de l'assistant.
+    Journalisé dans usage.py (tâche « agent »)."""
+    from . import usage
+    t0 = time.time()
+    meta: dict = {}
+    try:
+        msg = await _chat_tools(p, messages, tools, max_tokens, meta)
+    except Unavailable as e:
+        usage.record(p.id, model=model_of(p), task="agent", ok=False, total_s=time.time() - t0, error=str(e))
+        raise
+    usage.record(p.id, model=model_of(p), task="agent", ok=True, first_s=time.time() - t0, total_s=time.time() - t0,
+                 prompt_tokens=meta.get("prompt_tokens"), completion_tokens=meta.get("completion_tokens"))
+    return msg
+
+
+async def _chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_tokens: int, meta: dict) -> dict:
     if PROVIDER == "mock":
         return _mock_tools(messages)
     model = model_of(p)
@@ -412,6 +528,7 @@ async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_t
     for attempt in range(3):
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(15, read=180)) as client:
+                t_call = time.time()
                 r = await client.post(f"{p.url}/chat/completions", json=payload, headers={"Authorization": f"Bearer {p.key}"})
         except httpx.HTTPError as e:
             _cooldown[p.id] = time.time() + 60
@@ -445,10 +562,11 @@ async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_t
             _cooldown[p.id] = time.time() + 60
         raise Unavailable(f"{p.name} a répondu {r.status_code} : {body[:200]}")
     count(p.id)
-    record(p.id, True, r.elapsed.total_seconds() if r.elapsed else None)
+    record(p.id, True, time.time() - t_call)
     try:
         data = r.json()
         msg = (data.get("choices") or [{}])[0].get("message") or {}
+        meta.update(data.get("usage") or {})
     except (ValueError, AttributeError) as e:
         snippet = re.sub(r"\s+", " ", r.text[:160])
         log.warning("%s : réponse illisible (%s) : %s", p.name, r.headers.get("content-type"), snippet)
@@ -457,27 +575,39 @@ async def chat_tools(p: Provider, messages: list[dict], tools: list[dict], max_t
 
 
 async def stream_chain(providers: list[Provider], messages: list[dict], used: dict, model: str | None = None,
-                       max_tokens: int | None = None) -> AsyncIterator[str]:
+                       max_tokens: int | None = None, task: str | None = None, reason: str = "") -> AsyncIterator[str]:
     """Essaie les fournisseurs dans l'ordre ; passe au suivant tant que rien n'a été écrit.
-    `used` reçoit le fournisseur qui a répondu (+ stats), et `used["skipped"]` les échecs."""
+    `used` reçoit le fournisseur qui a répondu (+ stats), et `used["skipped"]` les échecs.
+    Chaque tentative est journalisée (usage.py), avec la raison du choix et la bascule éventuelle."""
+    from . import usage
     errors = []
+    prev: str | None = None
     for i, p in enumerate(providers):
         got = False
         t0, first_at = time.time(), None
+        why = reason if i == 0 else f"bascule automatique : {errors[-1][:120]}" if errors else "relais"
         try:
             async for t in stream(p, messages, model if i == 0 else None, used.setdefault("stats", {}), max_tokens):
                 got = True
                 first_at = first_at or time.time()
                 yield t
-            record(p.id, True, (first_at or time.time()) - t0)
-            used.update(id=p.id, name=p.name, model=used["stats"].get("model", model_of(p)), skipped=errors)
+            first_s = (first_at or time.time()) - t0
+            record(p.id, True, first_s)
+            st = used["stats"]
+            used.update(id=p.id, name=p.name, model=st.get("model", model_of(p)), skipped=errors)
+            usage.record(p.id, model=st.get("model", model_of(p)), task=task, ok=True, first_s=first_s,
+                         total_s=time.time() - t0, prompt_tokens=st.get("prompt_tokens") or estimate_tokens(messages) - MAX_TOKENS,
+                         completion_tokens=st.get("tokens"), reason=why, fallback_from=prev)
             return
         except Unavailable as e:
             record(p.id, False, err=str(e))
+            usage.record(p.id, model=model_of(p), task=task, ok=False, total_s=time.time() - t0, error=str(e),
+                         reason=why, fallback_from=prev)
             if got:
                 raise
             log.info("relais : %s", e)
             errors.append(str(e))
+            prev = p.id
     used["skipped"] = errors
     raise Unavailable(" ; ".join(errors) or "aucun fournisseur distant disponible")
 

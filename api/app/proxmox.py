@@ -133,11 +133,11 @@ async def _notify(title: str, body: str) -> None:
         return
     try:
         await telegram.broadcast(f"*{title}*\n{body}")
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.warning("proxmox : erreur gérée", exc_info=True)
     try:
         await notify.send(title, body, tags="computer")
-    except Exception:  # noqa: BLE001
+    except Exception:
         log.warning("proxmox : erreur gérée", exc_info=True)
 
 
@@ -196,7 +196,7 @@ async def scheduler() -> None:
         try:
             await poll()
             await evaluate()
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.exception("surveillance Proxmox")
         await asyncio.sleep(INTERVAL)
 

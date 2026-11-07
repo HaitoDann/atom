@@ -104,7 +104,7 @@ async def edit(cid: int, instruction: str, selection: str = "", engine: str = "a
     if engine != "local" and hybrid.configured() and s.get("allow_docs"):
         try:
             out = "".join([t async for t in hybrid.stream(msgs, sensitive=True)])
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("canvas : erreur gérée", exc_info=True)
             out = ""
     if not out:

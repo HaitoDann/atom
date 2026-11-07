@@ -1,10 +1,9 @@
 """Routes : labo des modèles locaux."""
 from __future__ import annotations
 
-import asyncio, base64, io, json, time  # noqa: F401
-from typing import AsyncIterator  # noqa: F401
+import time
 
-import httpx  # noqa: F401
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -64,7 +63,7 @@ async def lab_delete(body: ModelName):
         raise HTTPException(409, "C'est le modèle utilisé par Atom : choisis-en un autre avant de le supprimer.")
     try:
         await models_lab.delete(body.name)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("lab : erreur gérée", exc_info=True)
         raise HTTPException(502, str(e)) from e
     return {"ok": True}
@@ -91,7 +90,7 @@ async def benchmark(model: str | None = None):
     try:
         async for _ in llm.stream_chat(m, [{"role": "user", "content": "Écris une phrase de 40 mots sur la mer. /no_think"}]):
             n += 1
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("lab : erreur gérée", exc_info=True)
         raise HTTPException(502, str(e)) from e
     return {"model": m, "wall_s": round(time.time() - t0, 2), **llm.last_stats}

@@ -1,6 +1,6 @@
 # Bibliothèques embarquées
 
-Servies par Atom lui-même (pas de CDN) : fonctionnent hors ligne et permettent une CSP `script-src 'self'`.
+Servies par Atom lui-même (pas de CDN ni Google Fonts) : fonctionnent hors ligne et permettent une CSP `script-src 'self'`.
 Chargées à la demande, seulement quand une réponse contient une formule ou un schéma.
 
 | Bibliothèque | Version | Source | Fichiers |
@@ -9,3 +9,4 @@ Chargées à la demande, seulement quand une réponse contient une formule ou un
 | Mermaid | 10.9.1 | npm `mermaid@10.9.1` (`dist/`) | `mermaid.min.js` |
 
 Mise à jour : `npm pack katex@X mermaid@Y`, recopier les mêmes fichiers, changer la version ici.
+| Geist, Geist Mono | 5.3.0 | npm `@fontsource-variable/geist`, `@fontsource-variable/geist-mono` | `fonts/` : sous-ensembles latin et latin étendu (variables, `.woff2`), `fonts.css` |

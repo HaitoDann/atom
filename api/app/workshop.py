@@ -312,6 +312,6 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
         meta = {"workshop": {"pattern": pattern, "name": PATTERNS[pattern], "steps": record[:-1]}}
         asst_id = db.add_message(conversation_id, "assistant", final_text, "focus", meta=meta)
         yield dict(type="done", emotion="focus", id=asst_id, final=final_text)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.warning("workshop : erreur gérée", exc_info=True)
         yield dict(type="error", message=f"Atelier interrompu : {e}")

@@ -156,10 +156,14 @@ async def stream(messages: list[dict], model_name: str | None = None, sensitive:
     p = primary()
     if task is None:
         task = classify(next((m["content"] for m in reversed(messages) if m["role"] == "user"), ""))
-    order = providers.chain(p.id if p else None, sensitive, task=task)
+    est = providers.estimate_tokens(messages)
+    if task != "code" and est > 6000:
+        task = "long"
+    rows = providers.plan(p.id if p else None, sensitive, task=task, est_tokens=est)
+    order = [r["provider"] for r in rows]
     used: dict = {}
     try:
-        async for t in providers.stream_chain(order, messages, used, model_name):
+        async for t in providers.stream_chain(order, messages, used, model_name, task=task, reason=providers.explain(rows)):
             yield t
     finally:
         last_used.clear()

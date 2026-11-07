@@ -268,7 +268,7 @@ async def _run_text(ws: "Workspace", system: str, task: str, state: dict) -> Asy
                 reply = _mock(messages)
             else:
                 reply = "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("agentcode : erreur gérée", exc_info=True)
             yield dict(type="error", message=f"Le modèle n'a pas répondu : {e}")
             return
@@ -437,7 +437,7 @@ def start(cid: int, task: str, engine: str, parent_id: str | None = None, readon
                 if time.time() - last_save > 3:
                     _save(rid, events=json.dumps(live["events"], ensure_ascii=False))
                     last_save = time.time()
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("agentcode : erreur gérée", exc_info=True)
             status = "error"
             live["events"].append(dict(type="error", message=f"Agent interrompu : {e}"))

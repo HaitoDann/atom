@@ -37,7 +37,7 @@ def test_fallback(three, monkeypatch):
     async def fake(p, messages, model=None, stats=None, max_tokens=None):
         if p.id == "groq":
             raise providers.Unavailable("limite de l'offre Groq atteinte")
-            yield  # noqa
+            yield
         async for t in real(p, messages, model, stats):
             yield t
 

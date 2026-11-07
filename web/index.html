@@ -6,9 +6,7 @@
 <meta name="theme-color" content="#1b1b1b">
 <title>Atom</title>
 <script src="/theme.js?v=__V__"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/vendor/fonts/fonts.css?v=__V__">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
@@ -367,6 +365,33 @@
           <p class="note">« Sans données privées » : ce fournisseur ne reçoit jamais tes souvenirs, documents ni fichiers, même si tu les autorises plus haut (offres gratuites qui peuvent réutiliser les données). Réglable avec <code>ATOM_&lt;ID&gt;_PRIVATE</code>.</p>
         </div>
       </section>
+      <section class="pane" data-pane="usage">
+        <div class="block">
+          <div class="us-head">
+            <h4>Vue d'ensemble <span class="us-live" id="usLive" title="Mise à jour en direct">en direct</span></h4>
+            <div class="seg" id="usPeriod"><button data-d="1" class="on">Aujourd'hui</button><button data-d="7">7 jours</button><button data-d="30">30 jours</button></div>
+          </div>
+          <p class="desc">Chaque appel à un modèle, local ou distant, apparaît ici dès qu'il se termine : tokens, temps de réponse, bascules automatiques et coût estimé.</p>
+          <div class="us-tiles" id="usTiles"></div>
+          <div class="us-chart" id="usChart" aria-label="Tokens par heure sur 24 heures"></div>
+        </div>
+        <div class="block">
+          <h4>Fournisseurs</h4>
+          <p class="desc">Quota du jour, réussite et délai avant le premier mot, mesurés sur les vrais appels.</p>
+          <div class="tbl us-tbl"><table><thead><tr><th>Fournisseur</th><th>Appels</th><th>Réussite</th><th title="entrée / sortie">Tokens</th><th title="délai avant le premier mot">1er mot</th><th>Quota du jour</th><th>Coût</th></tr></thead><tbody id="usProv"></tbody></table></div>
+        </div>
+        <div class="block">
+          <h4>Routage intelligent</h4>
+          <p class="desc">Atom choisit le modèle selon la demande : le plus rapide pour une question simple, le plus fort pour une demande complexe ou longue, un modèle réputé en code pour le code. Il tient compte de la taille de la requête, des quotas restants et des pannes récentes, et bascule seul sur le suivant si un fournisseur échoue. Tu peux imposer un fournisseur par type de demande.</p>
+          <div class="us-prefs" id="usPrefs"></div>
+          <div class="row" style="margin-top:12px"><input class="field" id="usTry" placeholder="Tester : écris une demande pour voir quel modèle répondrait, et pourquoi"><button class="btn" id="usTryGo">Tester</button></div>
+          <div id="usTryOut" class="us-try"></div>
+        </div>
+        <div class="block">
+          <h4>Derniers appels</h4>
+          <ul class="list us-feed" id="usFeed"></ul>
+        </div>
+      </section>
 
       <section class="pane" data-pane="workshop">
         <div class="block">
@@ -546,9 +571,13 @@
 <script src="/js/08-connexion-fichiers-apparence.js?v=__V__"></script>
 <script src="/js/09-labo-modeles.js?v=__V__"></script>
 <script src="/js/10-bibliotheque-hybride.js?v=__V__"></script>
-<script src="/js/11-mode-code.js?v=__V__"></script>
+<script src="/js/11a-code-explorateur.js?v=__V__"></script>
+<script src="/js/11b-code-modifications-git.js?v=__V__"></script>
+<script src="/js/11c-code-agent.js?v=__V__"></script>
+<script src="/js/11d-code-tests-barres-regles.js?v=__V__"></script>
 <script src="/js/12-atelier-espaces-recherche-canevas.js?v=__V__"></script>
 <script src="/js/13-interface-commandes-mobile.js?v=__V__"></script>
-<script src="/js/14-demarrage.js?v=__V__"></script>
+<script src="/js/14-consommation.js?v=__V__"></script>
+<script src="/js/15-demarrage.js?v=__V__"></script>
 </body>
 </html>

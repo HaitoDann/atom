@@ -130,8 +130,8 @@ def to_html(src: str) -> str:
     lines = src.replace("\r", "").split("\n")
     out: list[str] = []
     i = 0
-    is_row = lambda l: re.match(r"^\s*\|.*\|\s*$", l) is not None  # noqa: E731
-    is_sep = lambda l: re.match(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$", l) is not None  # noqa: E731
+    is_row = lambda l: re.match(r"^\s*\|.*\|\s*$", l) is not None
+    is_sep = lambda l: re.match(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$", l) is not None
     while i < len(lines):
         line = lines[i]
         if re.match(r"^\s*```", line):
@@ -325,11 +325,11 @@ async def handle_message(client, msg: dict) -> None:
             elif t == "error":
                 stop_typing.set()
                 await send_text(client, chat_id, f"⚠ {ev['message']}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         log.exception("erreur Telegram")
         try:
             await send_text(client, chat_id, f"⚠ Erreur : {e}")
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("telegram : erreur gérée", exc_info=True)
     finally:
         stop_typing.set()

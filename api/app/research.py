@@ -30,7 +30,7 @@ async def _ask(messages: list[dict], used: dict) -> str:
             out = "".join([t async for t in hybrid.stream(messages)])
             used["engine"] = hybrid.last_used.get("name") or "distant"
             return out
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("research : erreur gérée", exc_info=True)
     used["engine"] = "local"
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
@@ -45,7 +45,7 @@ async def _stream(messages: list[dict], used: dict) -> AsyncIterator[str]:
                 yield t
             used["engine"] = hybrid.last_used.get("name") or "distant"
             return
-        except Exception:  # noqa: BLE001
+        except Exception:
             log.warning("research : erreur gérée", exc_info=True)
             if got:
                 raise
@@ -101,7 +101,7 @@ async def run(question: str, conversation_id: int | None) -> AsyncIterator[dict]
         yield dict(type="progress", text=f"Recherche : {q}")
         try:
             results = await search.search(q)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             log.warning("research : erreur gérée", exc_info=True)
             yield dict(type="progress", text=f"Recherche impossible ({e})")
             return
