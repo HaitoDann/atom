@@ -118,7 +118,7 @@ async def search(query: str) -> list[dict]:
     async with httpx.AsyncClient(timeout=httpx.Timeout(8, read=12), follow_redirects=True,
                                  event_hooks={"request": [_check_request]}) as client:
         pages = await asyncio.gather(*[_fetch(client, x["url"]) for x in results[:SEARCH_PAGES]])
-        for x, content in zip(results, pages):
+        for x, content in zip(results, pages, strict=False):
             x["content"] = content
     log.info("recherche « %s » : %d résultats", query, len(results))
     return results

@@ -403,7 +403,7 @@ async def _run_native(ws: "Workspace", system: str, task: str, state: dict) -> A
             return
         yield dict(type="thinking", step=step)
         msg, errors, waits = None, [], []
-        for attempt in range(4):
+        for _attempt in range(4):
             msg, errors, waits = None, [], []
             for p in list(order):
                 try:

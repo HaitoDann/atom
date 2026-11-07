@@ -14,16 +14,23 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 
 | Chemin | Rôle |
 |---|---|
-| `web/index.html` | L'interface (un seul fichier, sans build) |
-| `api/app/main.py` | Routes HTTP et boucle de chat en streaming |
-| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
-| `api/app/llm.py` | Accès à Ollama : chat, JSON contraint, embeddings |
-| `api/app/reminders.py` | Rappels : commandes du modèle, planificateur |
+| `web/index.html`, `web/atom.js`, `web/atom.css` | L'interface (sans build), `web/sw.js` pour le mode hors ligne (PWA) |
+| `api/app/main.py` | Application FastAPI : authentification, santé, montage des routes |
+| `api/app/routes/` | Routes HTTP réparties par domaine (conversations, mémoire, code, Git, canevas, espaces…) |
 | `api/app/agent.py` | Cœur de l'agent : prompt, streaming, commandes (partagé web / Telegram) |
-| `api/app/telegram.py` | Bot Telegram bidirectionnel |
-| `api/app/notify.py` | Canaux sortants (ntfy, Telegram) |
-| `api/app/db.py` | Stockage SQLite et migrations |
-| `docker-compose.yml` | Ollama + téléchargement du modèle + backend |
+| `api/app/agentcode.py`, `codeedit.py`, `gitops.py`, `sandbox.py` | Mode Code : agent, modifications validées, Git, tests en bac à sable |
+| `api/app/llm.py`, `providers.py`, `hybrid.py` | Modèle local (Ollama), fournisseurs distants avec relais, mode hybride |
+| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
+| `api/app/library.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, OCR, espaces |
+| `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
+| `api/app/canvas.py`, `workshop.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, analyse de données, labo des modèles |
+| `api/app/reminders.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, notifications (ntfy, Telegram), bot et agent Telegram |
+| `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
+| `api/app/db.py`, `backup.py`, `jobs.py` | Stockage SQLite et migrations, sauvegardes, tâches de fond |
+| `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
+| `api/tests/` | Tests (`cd api && pip install -r requirements.txt -r requirements-dev.txt && ruff check app tests && python -m pytest -q`) |
+| `docker-compose.yml` | Ollama + téléchargement du modèle + SearXNG + ntfy + backend (images épinglées) |
+| `docker-compose.sandbox.yml` | Option : bac à sable Docker via un proxy restreint |
 
 ## Premier essai sur Proxmox (réseau local)
 
@@ -50,6 +57,12 @@ git clone -b claude/new-session-q4ozge https://github.com/HaitoDann/atom.git
 
 ```bash
 cd atom && cp .env.example .env
+```
+
+Dans `.env`, remplace au minimum `SEARXNG_SECRET` par une longue phrase aléatoire (Atom refuse de démarrer si elle est absente), par exemple :
+
+```bash
+sed -i "s/^SEARXNG_SECRET=.*/SEARXNG_SECRET=$(openssl rand -hex 32)/" .env
 ```
 
 ```bash

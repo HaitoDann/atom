@@ -7,10 +7,15 @@ COPY api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY api/app ./app
 COPY web /srv/web
+COPY api/entrypoint.sh /usr/local/bin/atom-entrypoint
+# Utilisateur non privilégié : Atom ne tourne pas en root dans le conteneur.
+RUN useradd --create-home --uid 1000 atom && mkdir -p /data /backups && chown atom:atom /data /backups \
+    && chmod +x /usr/local/bin/atom-entrypoint
 ARG ATOM_VERSION=dev
 ENV ATOM_VERSION=${ATOM_VERSION} \
     ATOM_WEB=/srv/web \
     ATOM_DB=/data/atom.db \
     PYTHONUNBUFFERED=1
 EXPOSE 8000
+ENTRYPOINT ["atom-entrypoint"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

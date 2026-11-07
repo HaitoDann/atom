@@ -13,7 +13,7 @@ def test_canvas(client):
 
 
 def test_research(client, monkeypatch):
-    from app import research, search
+    from app import search
 
     async def fake_search(q):
         return [{"title": "Page A", "url": "https://a.example/x", "domain": "a.example", "snippet": "La RTX 3060 a 12 Go.", "content": "La RTX 3060 a 12 Go de mémoire."}]
@@ -39,7 +39,7 @@ def test_analyze_needs_sandbox(client):
 
 
 def test_analyze_flow(client, monkeypatch):
-    from app import analysis, sandbox
+    from app import sandbox
     calls = []
 
     async def fake_py(files, code, timeout=180):

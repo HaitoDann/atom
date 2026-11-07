@@ -283,7 +283,7 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
             switched: list = []
             yield dict(type="step", status="start", index=i, role=role, engine=engine_label(engine), final=final)
             text, sent = "", 0
-            async for tok in _gen(engine, _prompts(pattern, i, request, outputs), lambda e, why: switched.append((e, why))):
+            async for tok in _gen(engine, _prompts(pattern, i, request, outputs), lambda e, why: switched.append((e, why))):  # noqa: B023 (consommé dans la même itération)
                 text += tok
                 # On retient le début le temps d'écarter un éventuel tag d'émotion ou bloc de réflexion.
                 if len(text) < 30 and "]" not in text[:25]:

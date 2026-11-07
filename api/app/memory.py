@@ -175,7 +175,7 @@ async def _backfill(facts: list[dict]) -> None:
     vecs = await llm.embed([f["content"] for f in missing])
     if vecs is None:
         return
-    for f, v in zip(missing, vecs):
+    for f, v in zip(missing, vecs, strict=False):
         db.set_memory_embedding(f["id"], v)
         f["embedding"] = v
 

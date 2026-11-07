@@ -1,0 +1,11 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = ["E4", "E7", "E9", "F", "B"]
+# Style assumé du projet : noms courts (l), plusieurs instructions par ligne, imports groupés.
+ignore = ["E741", "E702", "E401", "E731"]
+
+[lint.per-file-ignores]
+# Imports volontairement placés après l'initialisation (masquage des secrets dans les journaux).
+"app/main.py" = ["E402"]

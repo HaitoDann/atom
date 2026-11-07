@@ -11,6 +11,18 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r api/requirements.txt -r api/requirements-dev.txt
+      - name: Lint (ruff)
+        run: cd api && ruff check app tests
       - run: cd api && python -m pytest -q
       - name: Syntaxe de l'interface
         run: node --check web/atom.js && node --check web/sw.js
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fichiers compose valides
+        run: |
+          SEARXNG_SECRET=ci docker compose config -q
+          SEARXNG_SECRET=ci docker compose -f docker-compose.yml -f docker-compose.sandbox.yml config -q
+      - name: Construction de l'image
+        run: docker build -f api/Dockerfile -t atom-ci .

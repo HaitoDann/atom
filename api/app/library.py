@@ -381,7 +381,7 @@ async def _store_chunks(did: int, cid: int, chunks: list[dict]) -> None:
             "INSERT INTO chunks (document_id, collection_id, ord, page, line_start, line_end, text, embedding) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [(did, cid, i, ch.get("page"), ch.get("line_start"), ch.get("line_end"), ch["text"], db.to_blob(v))
-             for i, (ch, v) in enumerate(zip(chunks, vecs))])
+             for i, (ch, v) in enumerate(zip(chunks, vecs, strict=False))])
     _bump()
 
 
