@@ -42,7 +42,7 @@ services:
 
   # Serveur de notifications push (appli ntfy sur le téléphone)
   ntfy:
-    image: binwiederhier/ntfy:v2.11.0
+    image: binwiederhier/ntfy:v2.37.2
     command: serve
     restart: unless-stopped
     ports:
