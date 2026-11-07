@@ -19,7 +19,8 @@ FACT_MIN_SCORE = float(os.getenv("ATOM_FACT_MIN_SCORE", "0.45"))
 RECALL_MIN_SCORE = float(os.getenv("ATOM_RECALL_MIN_SCORE", "0.55"))
 DUPLICATE_SCORE = float(os.getenv("ATOM_DUPLICATE_SCORE", "0.9"))
 
-EMOTIONS = ["idle", "thinking", "talking", "joy", "angry", "sad", "surprise", "fear", "sleep", "curious", "focus"]
+EMOTIONS = ["idle", "thinking", "talking", "joy", "curious", "concerned", "sleep",
+            "angry", "sad", "surprise", "fear", "focus"]   # les dernières : anciennes, ramenées au jeu réduit par l'interface
 
 DEFAULT_PERSONA = (
     "Tu es Atom, une entité numérique bienveillante, curieuse et concise. "
