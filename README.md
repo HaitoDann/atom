@@ -21,17 +21,19 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/agent.py` | Cœur de l'agent : prompt, streaming, commandes (partagé web / Telegram) |
 | `api/app/agentcode.py`, `agenttools.py`, `codeedit.py`, `gitops.py`, `sandbox.py` | Mode Code : boucle de l'agent, outils et espace de travail, modifications validées, Git, tests en bac à sable |
 | `api/app/llm.py`, `providers.py`, `hybrid.py` | Modèle local (Ollama), fournisseurs distants avec relais, mode hybride |
-| `api/app/usage.py`, `observability.py` | Journal des appels aux modèles (tokens, latence, bascules, coût) et flux en direct ; identifiant de requête, journaux JSON, métriques Prometheus |
+| `api/app/usage.py`, `observability.py`, `alerts.py`, `grafana.py` | Journal des appels aux modèles (tokens, latence, bascules, coût) et flux en direct ; identifiant de requête, journaux JSON, métriques Prometheus |
 | `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
 | `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
 | `api/app/canvas.py`, `workshop.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, analyse de données, labo des modèles |
 | `api/app/reminders.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, notifications (ntfy, Telegram), bot et agent Telegram |
 | `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
-| `api/app/db.py`, `migrations/`, `backup.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
+| `api/app/db.py`, `migrations/`, `backup.py`, `offsite.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
 | `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
 | `api/tests/` | Tests (`cd api && pip install -r requirements.txt -r requirements-dev.txt && ruff check app tests && python -m pytest -q`) |
 | `docker-compose.yml` | Ollama + téléchargement du modèle + SearXNG + ntfy + backend (images épinglées) |
+| `monitoring/`, `docker-compose.monitoring.yml` | Prometheus et Grafana (tableau de bord intégré à l'interface) |
+| `docker-compose.nas.yml` | Copie chiffrée des sauvegardes sur un NAS (SMB / NFS) |
 | `web/vendor/` | KaTeX, Mermaid et polices Geist embarqués (aucune ressource externe) |
 | `docker-compose.sandbox.yml` | Option : bac à sable Docker via un proxy restreint |
 
@@ -297,6 +299,29 @@ Réglages → Connexions → **Consommation** : tout se met à jour **en direct*
 Dans tous les cas, Atom écarte un fournisseur dont l'offre n'accepte pas une requête aussi longue, épargne celui dont le quota du jour est presque épuisé (la charge se répartit), et pénalise les pannes récentes. Tu peux **imposer un fournisseur par type de demande**, et le champ **Tester** montre, sans rien envoyer, quel modèle répondrait à une demande et pourquoi.
 
 Coût estimé (facultatif, en dollars par million de tokens) : `ATOM_<ID>_PRICE_IN=0.15` et `ATOM_<ID>_PRICE_OUT=0.60` dans `.env`. Sans tarif, le coût affiché est « — » (offres gratuites). Le journal des appels est gardé 90 jours (`ATOM_USAGE_RETENTION_DAYS`).
+
+### Alertes de consommation
+
+Atom vérifie chaque minute et te prévient (ntfy / Telegram) quand :
+- un fournisseur a utilisé **80 % de son quota du jour** (`ATOM_ALERT_QUOTA=0.8`) — une fois par jour et par fournisseur ;
+- **tous les fournisseurs distants échouent** depuis 15 minutes (Atom répond alors en local) — au plus toutes les 2 h ;
+- le **budget mensuel** est atteint à 80 % puis à 100 % (`ATOM_COST_BUDGET=5` en dollars, avec les tarifs `ATOM_<ID>_PRICE_*`).
+
+Historique des alertes et bouton « Envoyer une notification d'essai » : Réglages → Connexions → Consommation.
+
+### Tableau de bord Grafana (dans l'interface)
+
+Vue **Tableau de bord** de la barre latérale : un tableau Grafana complet (consommation par fournisseur, tokens par minute, réussite, quotas, délais, bascules, temps de réponse HTTP p50/p95/p99, routes les plus lentes, base de données), sur 1 h, 24 h, 7 ou 30 jours, qui suit le thème clair / sombre d'Atom.
+
+1. Dans `.env` :
+
+   ```bash
+   COMPOSE_FILE=docker-compose.yml:docker-compose.monitoring.yml    # + :docker-compose.nas.yml si tu utilises le NAS
+   ATOM_METRICS_TOKEN=…    # openssl rand -hex 32
+   ```
+2. `./update.sh` : Prometheus (90 jours d'historique, `PROM_RETENTION`) et Grafana démarrent à côté d'Atom.
+
+Aucun port n'est ouvert : Grafana n'est joignable qu'**à travers Atom** (`/grafana/`), donc derrière ton mot de passe, et ton cookie de session Atom n'est jamais transmis à Grafana. Le tableau est versionné dans `monitoring/grafana/dashboards/atom.json` (généré par `monitoring/build_dashboard.py`). Pour modifier les tableaux dans Grafana lui-même, connecte-toi en `admin` avec `GRAFANA_ADMIN_PASSWORD` (par défaut : la valeur de `ATOM_METRICS_TOKEN`) via « Ouvrir dans Grafana ».
 
 ## Observabilité
 

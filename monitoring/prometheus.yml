@@ -1,0 +1,11 @@
+# Modèle de configuration : le jeton est injecté au démarrage du conteneur (voir docker-compose.monitoring.yml).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+scrape_configs:
+  - job_name: atom
+    metrics_path: /api/metrics
+    authorization:
+      credentials: "__ATOM_METRICS_TOKEN__"
+    static_configs:
+      - targets: ["atom:8000"]

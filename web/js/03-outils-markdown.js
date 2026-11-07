@@ -197,7 +197,7 @@ function mdRaw(src) {
       i += 2;
       let body = "";
       while (i < lines.length && isRow(lines[i])) { body += "<tr>" + cells(lines[i]).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>"; i++; }
-      out += `<div class="tbl"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
+      out += `<div class="tbl" tabindex="0" role="region" aria-label="Tableau"><table><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${body}</tbody></table></div>`;
       continue;
     }
     if ((m = l.match(/^\s*(#{1,4})\s+(.*)$/))) { flush(); out += `<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`; i++; continue; }

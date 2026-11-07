@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, analysis, auth, backup, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
+from . import agent, agentcode, alerts, analysis, auth, backup, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +43,7 @@ async def run_chat(*args) -> AsyncIterator[bytes]:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
-             asyncio.create_task(backup.scheduler())]
+             asyncio.create_task(backup.scheduler()), asyncio.create_task(alerts.scheduler())]
     asyncio.create_task(sandbox.cleanup())
 
     async def maintenance():   # tous les jours : rétention des échanges indexés
@@ -80,6 +80,8 @@ providers.restore_health()   # santé des fournisseurs reconstituée depuis le j
 app = FastAPI(title="Atom", lifespan=lifespan)
 
 from .routes import canvas as _r_canvas, git as _r_git
+from . import grafana as _grafana
+app.include_router(_grafana.router)   # /grafana/… : tableau de bord servi à travers Atom (session requise)
 app.include_router(_r_canvas.router)
 app.include_router(_r_git.router)
 import importlib
@@ -95,6 +97,8 @@ for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'mem
 async def guard(request: Request, call_next):
     path = request.url.path
     metrics_token = path == "/api/metrics" and observability.token_ok(request.headers.get("authorization"))
+    if path.startswith("/grafana/") and (not auth.is_set() or not auth.session_for(request.cookies.get(auth.COOKIE))):
+        return JSONResponse({"detail": "Connexion requise", "auth": True}, status_code=401)
     if path.startswith("/api/") and not path.startswith("/api/auth/") and not metrics_token:
         if not auth.is_set() or not auth.session_for(request.cookies.get(auth.COOKIE)):
             return JSONResponse({"detail": "Connexion requise", "auth": True}, status_code=401)
@@ -104,9 +108,12 @@ async def guard(request: Request, call_next):
     resp = await call_next(request)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
     resp.headers.setdefault("Referrer-Policy", "same-origin")
-    resp.headers.setdefault("X-Frame-Options", "DENY")
+    grafana = path.startswith("/grafana/")
+    # Grafana s'affiche dans un cadre de l'interface (même origine) et garde sa propre politique de contenu.
+    resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN" if grafana else "DENY")
     resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    resp.headers.setdefault("Content-Security-Policy", CSP)
+    if not grafana:
+        resp.headers.setdefault("Content-Security-Policy", CSP)
     if _secure(request):
         resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
     return resp

@@ -7,6 +7,7 @@ const fs = require("fs");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "atom-e2e-"));
 const PORT = process.env.ATOM_E2E_PORT || "8799";
+const GRAFANA_PORT = process.env.ATOM_E2E_GRAFANA_PORT || "8798";
 
 module.exports = defineConfig({
   testDir: "./tests",
@@ -18,7 +19,13 @@ module.exports = defineConfig({
     baseURL: `http://127.0.0.1:${PORT}`,
     ...(process.env.ATOM_CHROMIUM ? { launchOptions: { executablePath: process.env.ATOM_CHROMIUM } } : {}),
   },
-  webServer: {
+  webServer: [{
+    // Faux Grafana (vue « Tableau de bord ») : Atom le sert à travers son relais /grafana/.
+    command: `python fake_grafana.py ${GRAFANA_PORT}`,
+    url: `http://127.0.0.1:${GRAFANA_PORT}/grafana/api/health`,
+    reuseExistingServer: false,
+    timeout: 20_000,
+  }, {
     command: `python -m uvicorn app.main:app --host 127.0.0.1 --port ${PORT}`,
     cwd: path.join(__dirname, "..", "api"),
     url: `http://127.0.0.1:${PORT}/api/auth/status`,
@@ -38,7 +45,8 @@ module.exports = defineConfig({
       ATOM_OFFSITE_DIR: (fs.mkdirSync(path.join(tmp, "nas"), { recursive: true }), path.join(tmp, "nas")),
       ATOM_OFFSITE_KEY: "phrase-e2e-pour-le-nas",
       ATOM_OFFSITE_NAME: "NAS-VinX",
+      ATOM_GRAFANA_URL: `http://127.0.0.1:${GRAFANA_PORT}`,
       PATH: process.env.PATH,
     },
-  },
+  }],
 });

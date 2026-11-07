@@ -163,3 +163,57 @@ PANE_LOAD.usage = usageOpen;
 document.querySelector('.pane[data-pane="usage"] .pane-title').textContent = "Consommation";
 const _closeSettingsUsage = closeSettings;
 closeSettings = function () { usageClose(); _closeSettingsUsage(); };   // le flux s'arrête avec les réglages
+
+/* ============================================================
+   TABLEAU DE BORD — Grafana intégré (servi par Atom sous /grafana/)
+   ============================================================ */
+let dashRange = "now-24h", dashOn = null;
+const dashUrl = (kiosk = true) => `/grafana/d/atom/atom?orgId=1&from=${dashRange}&to=now&refresh=30s` +
+  `&theme=${document.documentElement.dataset.theme === "light" ? "light" : "dark"}${kiosk ? "&kiosk" : ""}`;
+async function loadDashboard() {
+  if (dashOn === null) {
+    try { dashOn = (await getJSON("/api/monitoring")).grafana; } catch { dashOn = false; }
+  }
+  $("dashFrame").hidden = !dashOn; $("dashOff").hidden = dashOn; $("dashOpen").hidden = !dashOn; $("dashRange").hidden = !dashOn;
+  if (!dashOn) {
+    $("dashSrc").textContent = "";
+    $("dashOff").innerHTML = `<div class="dash-off-card">${icon("pulse")}<h3>Tableau de bord Grafana</h3>
+      <p>Graphiques de la consommation des modèles, des fournisseurs, du serveur et de la base, sur des heures ou des semaines.</p>
+      <p>Pour l'activer, dans le fichier <code>.env</code> du serveur :</p>
+      <pre>COMPOSE_FILE=docker-compose.yml:docker-compose.monitoring.yml
+ATOM_METRICS_TOKEN=…   # openssl rand -hex 32</pre>
+      <p>puis <code>./update.sh</code>. Grafana reste derrière ton mot de passe Atom : aucun port n'est ouvert.</p>
+      <p class="note">En attendant, la consommation en direct est dans Réglages → Connexions → Consommation.</p>
+      <button class="btn" data-goto-usage>Voir la consommation en direct</button></div>`;
+    $("dashOff").querySelector("[data-goto-usage]").onclick = () => openSettings("usage");
+    return;
+  }
+  $("dashSrc").textContent = "Grafana · Prometheus · actualisé toutes les 30 s";
+  const want = dashUrl();
+  if ($("dashFrame").dataset.src !== want) { $("dashFrame").src = want; $("dashFrame").dataset.src = want; }
+}
+$("dashRange").querySelectorAll("button").forEach((b) => b.onclick = () => {
+  dashRange = b.dataset.r;
+  $("dashRange").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  loadDashboard();
+});
+$("dashOpen").onclick = () => window.open(dashUrl(false), "_blank", "noopener");
+// Le thème d'Atom change : Grafana suit.
+new MutationObserver(() => { if (currentView === "dash" && dashOn) loadDashboard(); })
+  .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+/* ---- alertes (rubrique Consommation) */
+function renderAlerts() {
+  const a = usState?.alerts; if (!a) return;
+  const budget = a.budget ? `${fmtCost(a.month_cost)} dépensés ce mois sur ${fmtCost(a.budget)}` : "aucun budget fixé (ATOM_COST_BUDGET)";
+  $("alInfo").innerHTML = `Atom te prévient sur ton téléphone quand un quota atteint <b>${Math.round(a.quota_threshold * 100)} %</b>, quand tous les fournisseurs distants sont en panne, et quand le budget du mois est atteint (${esc(budget)}).`;
+  $("alList").innerHTML = a.history.length ? a.history.map((h) =>
+    `<li><small>${esc(new Date(h.at * 1000).toLocaleString("fr-FR"))}</small><b>${esc(h.title)}</b> — ${esc(h.body)}</li>`).join("")
+    : '<li class="none">Aucune alerte envoyée pour l\'instant.</li>';
+}
+$("alTest").onclick = async () => {
+  const r = await (await send_("/api/alerts/test", "POST")).json();
+  toast(r.sent ? "Notification d'essai envoyée." : "Aucun canal configuré (ntfy ou Telegram) : voir le README.");
+};
+const _renderUsageAlerts = renderUsage;
+renderUsage = function (freshId) { _renderUsageAlerts(freshId); renderAlerts(); };

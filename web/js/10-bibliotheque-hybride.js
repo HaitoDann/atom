@@ -11,21 +11,25 @@ function showView(v) {
   currentView = v; store.set("view", v); app.dataset.view = v; applyLayout();
   $("libView").hidden = v !== "library";
   $("codeView").hidden = v !== "code";
+  $("dashView").hidden = v !== "dash";
   $("scroller").hidden = v !== "chat";
   document.querySelector(".composer").hidden = v !== "chat";
   $("navLib").classList.toggle("on", v === "library");
   $("navCode").classList.toggle("on", v === "code");
+  $("navDash").classList.toggle("on", v === "dash");
   ["pinBtn", "exportBtn"].forEach((id) => { if (v !== "chat") $(id).style.display = "none"; });
   app.classList.remove("side-open");
   if (v !== "chat") exitHero();
   else if (!history.length) requestAnimationFrame(() => enterHero());
   if (v === "library") { $("title").textContent = "Bibliothèque"; loadLibrary(); }
   else if (v === "code") { $("title").textContent = "Code"; loadCodeProjects(); }
+  else if (v === "dash") { $("title").textContent = "Tableau de bord"; loadDashboard(); }
   else { updateTitle(); if (!library.collections.some((c) => c.status === "indexing")) clearTimeout(libTimer); }
   if (typeof syncTabbar === "function") syncTabbar();
 }
 $("navLib").onclick = () => showView(currentView === "library" ? "chat" : "library");
 $("navCode").onclick = () => showView(currentView === "code" ? "chat" : "code");
+$("navDash").onclick = () => showView(currentView === "dash" ? "chat" : "dash");
 
 async function loadLibrary() {
   try { library = await getJSON("/api/library"); } catch { return; }
@@ -331,7 +335,7 @@ async function loadHybrid() {
     const pct = Math.min(100, (100 * p.used_today) / Math.max(1, p.limit));
     row.innerHTML = `<div class="prov-top"><label class="prov-main"><input type="radio" name="hyPrimary" ${p.id === h.provider ? "checked" : ""}> <b>${esc(p.name)}</b></label>
         <span class="prov-tags"><span>${esc(p.family)}</span><span title="Force estimée (1 à 3)">${"●".repeat(p.strength)}${"○".repeat(3 - p.strength)}</span>${p.private ? "" : "<span>sans données privées</span>"}${p.paused ? "<span>en pause</span>" : ""}</span></div>
-      <div class="row prov-model"><select class="field"><option value="${esc(p.model)}">${esc(p.model)}</option><option value="__other">Autre… (saisir un nom)</option></select><input class="field" hidden value="${esc(p.model)}" spellcheck="false" autocomplete="off" placeholder="nom exact du modèle"><button class="btn sm">Enregistrer</button></div>
+      <div class="row prov-model"><select class="field" aria-label="Modèle de ${esc(p.name)}"><option value="${esc(p.model)}">${esc(p.model)}</option><option value="__other">Autre… (saisir un nom)</option></select><input class="field" aria-label="Nom du modèle de ${esc(p.name)}" hidden value="${esc(p.model)}" spellcheck="false" autocomplete="off" placeholder="nom exact du modèle"><button class="btn sm">Enregistrer</button></div>
       <p class="note prov-note" hidden></p>
       <div class="metric"><div class="l"><span>${p.used_today} / ${p.limit} aujourd'hui</span><span></span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`
       + (p.health && p.health.calls ? `<p class="note">Mesuré : ${p.health.latency != null ? p.health.latency + " s" : "—"} en moyenne · ${p.health.success ?? "—"} % de réussite sur les derniers appels${p.health.last_error ? ` · dernière erreur : ${esc(p.health.last_error.slice(0, 120))}` : ""}</p>` : "");

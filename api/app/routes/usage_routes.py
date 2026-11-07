@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from .. import hybrid, providers, usage
+from .. import alerts, hybrid, providers, usage
 from ..streaming import event
 
 router = APIRouter()
@@ -29,6 +29,11 @@ def _providers_view() -> list[dict]:
     return out
 
 
+def grafana_enabled() -> bool:
+    from ..grafana import enabled
+    return enabled()
+
+
 def snapshot(days: float = 1) -> dict:
     return {
         "at": time.time(),
@@ -39,6 +44,8 @@ def snapshot(days: float = 1) -> dict:
         "prefs": providers.route_prefs(),
         "tasks": list(providers.TASKS),
         "mode": hybrid.settings()["mode"],
+        "alerts": alerts.status(),
+        "grafana": grafana_enabled(),
     }
 
 
@@ -96,3 +103,22 @@ def preview_route(body: RouteIn):
     return {"task": task, "est_tokens": est, "engine": engine, "reason": reason,
             "order": [{"id": r["provider"].id, "name": r["provider"].name, "model": providers.model_of(r["provider"]),
                        "score": r["score"], "why": r["why"]} for r in rows]}
+
+
+@router.post("/api/alerts/test")
+async def test_alert():
+    """Envoie une notification d'essai sur les canaux configurés (ntfy, Telegram)."""
+    from .. import notify
+    ok = await notify.send("Test d'alerte Atom", "Les alertes de consommation arriveront ici.", tags="bell")
+    return {"sent": ok, "channels": notify.enabled()}
+
+
+@router.post("/api/alerts/check")
+async def run_alert_check():
+    return {"sent": await alerts.check(), "status": alerts.status()}
+
+
+@router.get("/api/monitoring")
+def monitoring():
+    """Grafana est-il servi à travers Atom ? (vue « Tableau de bord »)"""
+    return {"grafana": grafana_enabled(), "path": "/grafana/d/atom/atom"}

@@ -42,7 +42,8 @@ const ICONS = {
 };
 const icon = (n) => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n] || ""}</svg>`;
 document.querySelectorAll("[data-i]").forEach((el) => { el.insertAdjacentHTML("afterbegin", icon(el.dataset.i)); });
-document.querySelectorAll(".topbar .iconbtn[title], .composer .iconbtn[title], .side-bottom .iconbtn[title]").forEach((el) => { el.dataset.tip = el.title; el.removeAttribute("title"); });
+// Infobulle maison à la place de title= ; le nom du bouton est gardé (aria-label) pour les lecteurs d’écran.
+document.querySelectorAll(".topbar .iconbtn[title], .composer .iconbtn[title], .side-bottom .iconbtn[title]").forEach((el) => { el.dataset.tip = el.title; if (!el.getAttribute("aria-label")) el.setAttribute("aria-label", el.title); el.removeAttribute("title"); });
 
 /* ============================================================
    ÉTATS ÉMOTIONNELS — seule source de couleur de l'interface
