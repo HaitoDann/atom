@@ -7,6 +7,7 @@ Le cookie de session d'Atom n'est jamais transmis à Grafana.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 
@@ -71,3 +72,49 @@ async def proxy(path: str, request: Request):
     resp = StreamingResponse(r.aiter_raw(), status_code=r.status_code, background=BackgroundTask(r.aclose))
     resp.raw_headers = [(k.encode("latin-1"), v.encode("latin-1")) for k, v in out]
     return resp
+
+
+async def check() -> dict:
+    """Exécute chaque requête du tableau « Atom » à travers Grafana et rapporte les erreurs exactes, panneau par panneau.
+    Sert au bouton « Vérifier le tableau » : plus besoin de survoler les triangles rouges un par un."""
+    if not enabled():
+        return {"ok": False, "enabled": False, "errors": [], "checked": 0}
+    base = f"{url()}/grafana"
+    try:
+        r = await _http().get(f"{base}/api/dashboards/uid/atom")
+        if r.status_code != 200:
+            return {"ok": False, "enabled": True, "checked": 0,
+                    "errors": [{"panel": "Tableau « Atom »", "error": f"Grafana a répondu {r.status_code} : {r.text[:200]}"}]}
+        panels = [p for p in r.json()["dashboard"]["panels"] if p.get("targets")]
+    except (httpx.HTTPError, ValueError, KeyError) as e:
+        return {"ok": False, "enabled": True, "checked": 0, "errors": [{"panel": "Grafana", "error": f"injoignable : {e}"}]}
+    errors, empty = [], []
+    gate = asyncio.Semaphore(6)   # quelques requêtes à la fois : on ménage Grafana et Prometheus
+
+    async def one(p: dict) -> None:
+        async with gate:
+            await _one(p)
+
+    async def _one(p: dict) -> None:
+        queries = [{"refId": t.get("refId", "A"), "datasource": t["datasource"], "expr": t["expr"], "instant": t.get("instant", False),
+                    "range": t.get("range", True), "intervalMs": 60000, "maxDataPoints": 200} for t in p["targets"]]
+        try:
+            q = await _http().post(f"{base}/api/ds/query", json={"queries": queries, "from": "now-1h", "to": "now"})
+        except httpx.HTTPError as e:
+            errors.append({"panel": p["title"], "error": f"requête impossible : {e or e.__class__.__name__}"})
+            return
+        try:
+            res = q.json().get("results", {})
+        except ValueError:
+            res = {}
+        if q.status_code >= 400 and not res:
+            errors.append({"panel": p["title"], "error": f"{q.status_code} : {q.text[:200]}"})
+            return
+        for ref, v in res.items():
+            if v.get("error"):
+                errors.append({"panel": p["title"], "error": str(v["error"])[:300], "query": ref})
+            elif not any(f.get("data", {}).get("values") for f in v.get("frames", [])):
+                empty.append(p["title"])
+
+    await asyncio.gather(*(one(p) for p in panels))
+    return {"ok": not errors, "enabled": True, "checked": len(panels), "errors": errors, "empty": sorted(set(empty))}

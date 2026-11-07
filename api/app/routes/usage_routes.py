@@ -122,3 +122,10 @@ async def run_alert_check():
 def monitoring():
     """Grafana est-il servi à travers Atom ? (vue « Tableau de bord »)"""
     return {"grafana": grafana_enabled(), "path": "/grafana/d/atom/atom"}
+
+
+@router.get("/api/monitoring/check")
+async def monitoring_check():
+    """Vérifie chaque panneau du tableau Grafana (erreurs exactes, panneaux encore vides)."""
+    from .. import grafana
+    return await grafana.check()

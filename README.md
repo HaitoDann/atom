@@ -311,7 +311,20 @@ Historique des alertes et bouton « Envoyer une notification d'essai » : Régla
 
 ### Tableau de bord Grafana (dans l'interface)
 
-Vue **Tableau de bord** de la barre latérale : un tableau Grafana complet (consommation par fournisseur, tokens par minute, réussite, quotas, délais, bascules, temps de réponse HTTP p50/p95/p99, routes les plus lentes, base de données), sur 1 h, 24 h, 7 ou 30 jours, qui suit le thème clair / sombre d'Atom.
+Vue **Tableau de bord** de la barre latérale : un tableau Grafana complet, sur 1 h, 24 h, 7 ou 30 jours, qui suit le thème clair / sombre d'Atom. Chaque fournisseur garde la même couleur dans tous les panneaux ; les alertes et les redémarrages sont marqués sur les graphiques.
+
+| Rangée | Ce qu'on y voit |
+|---|---|
+| Santé | fournisseurs en forme / en pause, taux d'échec, délai avant le premier mot, âge de la dernière sauvegarde et de la copie NAS |
+| Consommation et coût | appels, tokens, coût, jauge du budget du mois, bascules, alertes ; tokens et appels par minute |
+| Routage | répartition par fournisseur et par type de demande, « type de demande → fournisseur », erreurs par type (quota, clé, panne…), quotas restants, bascules et pauses |
+| Rapidité | délai avant le premier mot (médiane et cas lents) et vitesse de génération par fournisseur, réussite, temps passé à générer |
+| Modèle local et serveur | processeur, mémoire, disque, modèles chargés par Ollama |
+| Qualité des réponses | part de 👍, avis par jour, erreurs serveur, réponses sauvées par un relais |
+| Mémoire et données | souvenirs par type, messages par jour, conversations, documents, taille de la base |
+| Serveur web | requêtes par statut, durée (médiane, p95, p99), routes les plus lentes |
+
+Le bouton **Vérifier le tableau** exécute chaque requête à travers Grafana et liste les erreurs exactes (et les panneaux encore vides).
 
 1. Dans `.env` :
 

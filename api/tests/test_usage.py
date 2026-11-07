@@ -106,7 +106,11 @@ def test_metrics(client, monkeypatch):
     r = client.get("/api/metrics")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/plain")
     body = r.text
-    assert 'atom_model_calls_total{provider="local",result="ok"}' in body
+    assert 'atom_model_calls_total{provider="local",task="simple",result="ok"}' in body or \
+        'atom_model_calls_total{provider="local",task="autre",result="ok"}' in body
+    for name in ("atom_model_first_token_seconds_bucket", "atom_feedback_total", "atom_system_memory_bytes",
+                 "atom_backup_count", "atom_ollama_loaded_models", "atom_offsite_configured"):
+        assert name in body, name
     assert "atom_http_request_duration_seconds_bucket" in body and "atom_provider_quota_remaining" in body
     assert r.headers.get("x-request-id")
     # sans session : refusé, sauf jeton Prometheus

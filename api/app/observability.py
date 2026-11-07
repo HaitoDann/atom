@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import time
 from collections import defaultdict
 
@@ -125,7 +126,7 @@ def _labels(**kw) -> str:
     return "{" + ",".join(f'{k}="{_esc(v)}"' for k, v in kw.items()) + "}" if kw else ""
 
 
-def render() -> str:
+def render(loaded: list[dict] | None = None) -> str:
     from . import db, providers, usage
     from .config import DB_PATH
 
@@ -154,9 +155,21 @@ def render() -> str:
         lines.append(f"atom_http_request_duration_seconds_count{_labels(method=m, route=r)} {d[1]}")
 
     tot = usage.totals()
-    metric("atom_model_calls_total", "counter", "Appels aux modèles (local et API).",
-           [({"provider": p, "result": "ok"}, t["calls"] - (t["errors"] or 0)) for p, t in tot.items()]
-           + [({"provider": p, "result": "error"}, t["errors"] or 0) for p, t in tot.items()])
+    metric("atom_model_calls_total", "counter", "Appels aux modèles (local et API), par type de demande.",
+           [({"provider": r["provider"], "task": r["task"], "result": "ok" if r["ok"] else "error"}, r["n"])
+            for r in usage.calls_by_task()])
+    metric("atom_model_errors_total", "counter", "Appels en échec, par type d'erreur.",
+           [({"provider": p, "kind": k}, n) for (p, k), n in sorted(usage.errors_by_kind().items())])
+    lines.append("# HELP atom_model_first_token_seconds Délai avant le premier mot (appels réussis).")
+    lines.append("# TYPE atom_model_first_token_seconds histogram")
+    for p, h in sorted(usage.first_token_histogram().items()):
+        for b, n in h["buckets"]:
+            lines.append(f"atom_model_first_token_seconds_bucket{_labels(provider=p, le=b)} {n}")
+        lines.append(f"atom_model_first_token_seconds_bucket{_labels(provider=p, le='+Inf')} {h['count']}")
+        lines.append(f"atom_model_first_token_seconds_sum{_labels(provider=p)} {round(h['sum'], 3)}")
+        lines.append(f"atom_model_first_token_seconds_count{_labels(provider=p)} {h['count']}")
+    metric("atom_model_generation_tokens_per_second", "gauge", "Vitesse de génération sur la dernière heure.",
+           [({"provider": p}, v) for p, v in sorted(usage.generation_speed().items())])
     metric("atom_model_tokens_total", "counter", "Tokens consommés.",
            [({"provider": p, "kind": "prompt"}, t["prompt_tokens"] or 0) for p, t in tot.items()]
            + [({"provider": p, "kind": "completion"}, t["completion_tokens"] or 0) for p, t in tot.items()])
@@ -185,5 +198,51 @@ def render() -> str:
     metric("atom_db_size_bytes", "gauge", "Taille de la base SQLite.", [({}, size)])
     with db.conn() as c:
         counts = {t: c.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0] for t in ("conversations", "messages", "memories")}
+        fb = dict(c.execute("SELECT feedback, COUNT(*) FROM messages WHERE feedback IS NOT NULL GROUP BY feedback").fetchall())
+        roles = dict(c.execute("SELECT role, COUNT(*) FROM messages GROUP BY role").fetchall())
+        mem_cols = {r[1] for r in c.execute("PRAGMA table_info(memories)")}
+        kinds = (dict(c.execute("SELECT COALESCE(kind, 'semantique'), COUNT(*) FROM memories WHERE archived_at IS NULL "
+                                "GROUP BY 1").fetchall()) if {"kind", "archived_at"} <= mem_cols else {})
+        tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        docs = dict(c.execute("SELECT status, COUNT(*) FROM documents GROUP BY status").fetchall()) if "documents" in tables else {}
     metric("atom_rows", "gauge", "Lignes par table.", [({"table": t}, n) for t, n in counts.items()])
+    metric("atom_messages_total", "counter", "Messages enregistrés, par auteur.", [({"role": r}, n) for r, n in sorted(roles.items())])
+    metric("atom_feedback_total", "counter", "Avis sur les réponses (👍 / 👎).",
+           [({"value": "up"}, sum(n for v, n in fb.items() if v and v > 0)), ({"value": "down"}, sum(n for v, n in fb.items() if v and v < 0))])
+    metric("atom_memories", "gauge", "Souvenirs actifs, par type.", [({"kind": k}, n) for k, n in sorted(kinds.items())])
+    metric("atom_library_documents", "gauge", "Documents de la bibliothèque, par état.", [({"status": k}, n) for k, n in sorted(docs.items())])
+
+    from . import alerts, backup, offsite, system
+    bk = backup.list_all()
+    metric("atom_backup_last_timestamp_seconds", "gauge", "Date de la dernière sauvegarde locale.",
+           [({}, round(bk[0]["created_at"]))] if bk else [])
+    metric("atom_backup_count", "gauge", "Sauvegardes locales gardées.", [({}, len(bk))])
+    off = offsite.status()
+    metric("atom_offsite_configured", "gauge", "1 si la copie sur le NAS est configurée.", [({}, int(off["configured"]))])
+    # Toujours déclarées (sans valeur si le NAS n'est pas configuré) : le tableau affiche alors « non configurée ».
+    metric("atom_offsite_reachable", "gauge", "1 si le NAS est monté et accessible en écriture.",
+           [({}, int(off["reachable"]))] if off["configured"] else [])
+    metric("atom_offsite_last_push_timestamp_seconds", "gauge", "Date de la dernière copie sur le NAS.",
+           [({}, round(off["last_push"]))] if off["configured"] and off.get("last_push") else [])
+    metric("atom_offsite_last_verify_ok", "gauge", "1 si le dernier test de restauration a réussi.",
+           [({}, int(bool(off.get("last_verify_ok"))))] if off["configured"] and off.get("last_verify") else [])
+    metric("atom_cost_month_dollars", "gauge", "Coût estimé depuis le 1er du mois.", [({}, round(alerts.month_cost(), 4))])
+    metric("atom_cost_budget_dollars", "gauge", "Budget mensuel (ATOM_COST_BUDGET).", [({}, alerts.budget())] if alerts.budget() else [])
+    metric("atom_alert_quota_ratio", "gauge", "Seuil d'alerte de quota.", [({}, alerts.quota_threshold())])
+    metric("atom_alerts_sent_total", "counter", "Alertes envoyées, par type.",
+           [({"kind": k}, n) for k, n in sorted(alerts.counts_by_kind().items())])
+
+    cpu, mem = system.cpu_percent(), system.memory()
+    metric("atom_system_cpu_ratio", "gauge", "Processeur utilisé (serveur).", [({}, round(cpu / 100, 4))] if cpu is not None else [])
+    metric("atom_system_memory_bytes", "gauge", "Mémoire du serveur.",
+           [({"type": "used"}, mem["used"]), ({"type": "total"}, mem["total"])] if mem else [])
+    try:
+        du = shutil.disk_usage(DB_PATH.parent)
+        metric("atom_disk_bytes", "gauge", "Disque des données.", [({"type": "free"}, du.free), ({"type": "total"}, du.total)])
+    except OSError:
+        pass
+    if loaded is not None:
+        metric("atom_ollama_loaded_models", "gauge", "Modèles chargés en mémoire par Ollama.", [({}, len(loaded))])
+        metric("atom_ollama_loaded_bytes", "gauge", "Mémoire occupée par les modèles chargés.",
+               [({"model": m["name"]}, m.get("size", 0)) for m in loaded])
     return "\n".join(lines) + "\n"

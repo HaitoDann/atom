@@ -175,6 +175,7 @@ async function loadDashboard() {
     try { dashOn = (await getJSON("/api/monitoring")).grafana; } catch { dashOn = false; }
   }
   $("dashFrame").hidden = !dashOn; $("dashOff").hidden = dashOn; $("dashOpen").hidden = !dashOn; $("dashRange").hidden = !dashOn;
+  $("dashCheck").hidden = !dashOn; if (!dashOn) $("dashReport").hidden = true;
   if (!dashOn) {
     $("dashSrc").textContent = "";
     $("dashOff").innerHTML = `<div class="dash-off-card">${icon("pulse")}<h3>Tableau de bord Grafana</h3>
@@ -217,3 +218,23 @@ $("alTest").onclick = async () => {
 };
 const _renderUsageAlerts = renderUsage;
 renderUsage = function (freshId) { _renderUsageAlerts(freshId); renderAlerts(); };
+
+/* Vérifier le tableau : chaque requête est exécutée à travers Grafana, les erreurs exactes sont listées. */
+$("dashCheck").onclick = async (e) => {
+  const b = e.currentTarget, box = $("dashReport");
+  b.disabled = true; b.innerHTML = '<span class="spin"></span> Vérification…';
+  try {
+    const r = await getJSON("/api/monitoring/check");
+    const empty = r.empty?.length ? `<p class="note">Encore vides (normal tant qu'Atom n'a pas servi ces cas) : ${r.empty.map(esc).join(", ")}.</p>` : "";
+    box.innerHTML = r.ok
+      ? `<p><span class="st-dot ok"></span> Les ${r.checked} panneaux répondent sans erreur.</p>${empty}`
+      : `<p><span class="st-dot error"></span> ${r.errors.length} erreur(s) sur ${r.checked} panneaux :</p><ul>${r.errors.map((x) =>
+          `<li><b>${esc(x.panel)}</b> — <code>${esc(x.error)}</code></li>`).join("")}</ul>${empty}
+         <button class="btn sm" data-copy-report>Copier le rapport</button>`;
+    box.hidden = false;
+    box.querySelector("[data-copy-report]")?.addEventListener("click", () => {
+      copyText(r.errors.map((x) => `${x.panel} : ${x.error}`).join("\n")); toast("Rapport copié.");
+    });
+  } catch (err) { box.innerHTML = `<p class="us-ko">${esc(err.message)}</p>`; box.hidden = false; }
+  finally { b.disabled = false; b.textContent = "Vérifier le tableau"; }
+};

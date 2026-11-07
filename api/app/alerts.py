@@ -57,6 +57,17 @@ def _remember(key: str, kind: str, title: str, body: str) -> None:
     sent[key] = time.time()
     db.kv_set("alerts:sent", json.dumps({k: v for k, v in sent.items() if time.time() - v < 40 * 86400}))
     db.kv_set("alerts:log", json.dumps(([{"at": time.time(), "kind": kind, "title": title, "body": body}] + history())[:50]))
+    counts = counts_by_kind()
+    counts[kind] = counts.get(kind, 0) + 1
+    db.kv_set("alerts:counts", json.dumps(counts))
+
+
+def counts_by_kind() -> dict[str, int]:
+    """Alertes envoyées depuis le début, par type (compteur exposé dans /api/metrics)."""
+    try:
+        return json.loads(db.kv_get("alerts:counts") or "{}")
+    except ValueError:
+        return {}
 
 
 def month_cost() -> float:
