@@ -597,3 +597,15 @@ Atom relève chaque minute l'état de ton serveur et t'alerte en cas de problèm
 - `api/app/` : le serveur FastAPI, un module par fonction (`agent` pour la discussion, `agentcode` pour l'agent du mode Code, `library`, `providers`, `sandbox`, `gitops`, `research`, `analysis`, `canvas`, `spaces`, `proxmox`, `telegram`…).
 - `web/index.html` : la structure de la page. `web/atom.css` : les styles. `web/atom.js` : la logique de l'interface. Les fichiers sont servis avec un numéro de version, donc le navigateur recharge dès qu'ils changent.
 - `api/tests/` : les tests (`cd api && python -m pytest -q`), lancés aussi par GitHub Actions avec une vérification de la syntaxe du JavaScript.
+
+### Couches du serveur
+
+| Couche | Rôle | Modules |
+|---|---|---|
+| API | routes HTTP, validation des entrées | `main.py` (assemblage), `routes/` (un module par domaine : `canvas`, `git`…) |
+| Core | logique métier, sans HTTP | `memory`, `agent`, `agentcode`, `canvas`, `spaces`, `research`, `analysis`, `reminders` |
+| IA | moteurs et routage | `llm` (Ollama), `providers` (santé mesurée, basculement), `hybrid` (classement simple/complexe/code) |
+| Intégrations | services extérieurs | `telegram`, `tgagent`, `search`, `proxmox`, `notify`, `gitops` |
+| Infrastructure | données, sécurité, exécution | `db` (migrations versionnées), `backup`, `auth`, `security`, `sandbox`, `jobs` |
+
+Les routes migrent progressivement de `main.py` vers `routes/` ; une règle : un module Core n'importe jamais `main` ni FastAPI.

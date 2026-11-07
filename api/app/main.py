@@ -77,6 +77,10 @@ canvas.init()
 auth.init()
 app = FastAPI(title="Atom", lifespan=lifespan)
 
+from .routes import canvas as _r_canvas, git as _r_git  # noqa: E402
+app.include_router(_r_canvas.router)
+app.include_router(_r_git.router)
+
 
 # ---- protection : tout /api/ demande une session, sauf /api/auth/*
 @app.middleware("http")
@@ -190,13 +194,9 @@ def security_password(body: PasswordChangeIn, request: Request):
 @app.get("/api/status")
 async def status_report():
     return await healthcheck.report()
-_jobs: set[asyncio.Task] = set()
 
 
-def background(coro) -> None:
-    t = asyncio.create_task(coro)
-    _jobs.add(t)
-    t.add_done_callback(_jobs.discard)
+from .jobs import background, _jobs  # noqa: E402
 
 
 class Attachment(BaseModel):
@@ -409,71 +409,6 @@ def analysis_image(fid: str):
 @app.get("/api/sandbox")
 def sandbox_global():
     return sandbox.status()
-
-
-class CanvasIn(BaseModel):
-    title: str | None = Field(default=None, max_length=120)
-    content: str | None = Field(default=None, max_length=400_000)
-    conversation_id: int | None = None
-    kind: str | None = Field(default=None, pattern="^(doc|code)$")
-
-
-class CanvasEditIn(BaseModel):
-    instruction: str = Field(min_length=2, max_length=2000)
-    selection: str = Field(default="", max_length=100_000)
-    engine: str = Field(default="auto", pattern="^(auto|local)$")
-
-
-@app.get("/api/canvas")
-def canvas_list(conversation_id: int | None = None):
-    return {"canvases": canvas.list_for(conversation_id)}
-
-
-@app.post("/api/canvas")
-def canvas_create(body: CanvasIn):
-    cid = canvas.create(body.title or "Sans titre", body.content or "", body.conversation_id, body.kind or "doc")
-    return canvas.get(cid)
-
-
-@app.get("/api/canvas/{cid}")
-def canvas_get(cid: int):
-    c = canvas.get(cid)
-    if not c:
-        raise HTTPException(404, "Canevas introuvable")
-    return c
-
-
-@app.put("/api/canvas/{cid}")
-def canvas_put(cid: int, body: CanvasIn):
-    try:
-        cur = canvas.get(cid) or {}
-        return canvas.save(cid, body.content if body.content is not None else cur.get("content", ""), "toi", "", body.title)
-    except KeyError as e:
-        raise HTTPException(404, "Canevas introuvable") from e
-
-
-@app.post("/api/canvas/{cid}/edit")
-async def canvas_edit(cid: int, body: CanvasEditIn):
-    try:
-        return await canvas.edit(cid, body.instruction, body.selection, body.engine)
-    except KeyError as e:
-        raise HTTPException(404, "Canevas introuvable") from e
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(502, f"Modification impossible : {e}") from e
-
-
-@app.get("/api/canvas/{cid}/versions/{i}")
-def canvas_version(cid: int, i: int):
-    try:
-        return {"content": canvas.version(cid, i)}
-    except KeyError as e:
-        raise HTTPException(404, "Version introuvable") from e
-
-
-@app.delete("/api/canvas/{cid}")
-def canvas_delete(cid: int):
-    canvas.delete(cid)
-    return {"ok": True}
 
 
 # ---- fichiers joints
@@ -1110,77 +1045,6 @@ async def sandbox_run(cid: int, body: SandboxRun):
 
 
 # ---- Git (projets clonés par Atom) : chaque action vient d'un bouton
-
-
-def _git_call(fn, *a):
-    try:
-        return fn(*a)
-    except FileNotFoundError as e:
-        raise HTTPException(404, "Projet introuvable") from e
-    except PermissionError as e:
-        raise HTTPException(403, str(e)) from e
-    except (ValueError, gitops.GitError) as e:
-        raise HTTPException(409, str(e)) from e
-
-
-class GitName(BaseModel):
-    name: str = Field(max_length=100)
-
-
-class GitCommit(BaseModel):
-    message: str = Field(max_length=5000)
-    paths: list[str] = Field(max_length=500)
-
-
-class GitPaths(BaseModel):
-    paths: list[str] = Field(default_factory=list, max_length=500)
-
-
-@app.get("/api/git/{cid}/status")
-def git_status(cid: int):
-    return _git_call(gitops.status, cid)
-
-
-@app.get("/api/git/{cid}/diff")
-def git_diff(cid: int):
-    return {"diff": _git_call(gitops.diff, cid, None)}
-
-
-@app.post("/api/git/{cid}/branch")
-def git_branch(cid: int, body: GitName):
-    return _git_call(gitops.new_branch, cid, body.name)
-
-
-@app.post("/api/git/{cid}/switch")
-async def git_switch(cid: int, body: GitName):
-    out = _git_call(gitops.switch, cid, body.name)
-    background(library.index_project(cid))   # les fichiers ont changé : réindexation (seuls les fichiers modifiés)
-    return out
-
-
-@app.post("/api/git/{cid}/commit")
-def git_commit(cid: int, body: GitCommit):
-    return _git_call(gitops.commit, cid, body.message, body.paths)
-
-
-@app.post("/api/git/{cid}/push")
-def git_push(cid: int):
-    return _git_call(gitops.push, cid)
-
-
-@app.post("/api/git/{cid}/discard")
-async def git_discard(cid: int):
-    out = _git_call(gitops.discard_all, cid)
-    background(library.index_project(cid))
-    return out
-
-
-@app.post("/api/git/{cid}/message")
-async def git_message(cid: int, body: GitPaths):
-    try:
-        return {"message": await gitops.suggest_message(cid, body.paths)}
-    except (FileNotFoundError, PermissionError, ValueError, gitops.GitError) as e:
-        raise HTTPException(409, str(e)) from e
 
 
 # ---- sauvegardes
