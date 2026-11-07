@@ -1,6 +1,6 @@
 services:
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.15   # version épinglée
     restart: unless-stopped
     volumes:
       - ollama:/root/.ollama
@@ -21,7 +21,7 @@ services:
 
   # Télécharge le modèle au premier démarrage, puis s'arrête.
   ollama-pull:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.15
     depends_on:
       ollama:
         condition: service_healthy
@@ -32,11 +32,11 @@ services:
 
   # Moteur de recherche auto-hébergé (interne : pas de port exposé)
   searxng:
-    image: searxng/searxng:latest
+    image: searxng/searxng:2026.11.2-cccbc9e15   # version épinglée
     restart: unless-stopped
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080/
-      - SEARXNG_SECRET=${SEARXNG_SECRET:-change-moi-atom-searxng}
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?définis SEARXNG_SECRET dans .env (longue phrase aléatoire)}
     volumes:
       - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
 
@@ -70,9 +70,18 @@ services:
       - path: .env
         required: false
     depends_on:
-      - ollama
-      - ntfy
-      - searxng
+      ollama:
+        condition: service_healthy
+      ntfy:
+        condition: service_started
+      searxng:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/auth/status', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
     ports:
       # ATOM_BIND=127.0.0.1 : Atom n'est plus joignable depuis le réseau local, seulement via Tailscale.
       - "${ATOM_BIND:-0.0.0.0}:${ATOM_PORT:-8000}:8000"
@@ -111,7 +120,7 @@ services:
   # Accès distant en HTTPS via Tailscale, sans VM ni /dev/net/tun (mode espace utilisateur).
   # Activé seulement avec le profil « tailscale » (COMPOSE_PROFILES=tailscale dans .env).
   tailscale:
-    image: tailscale/tailscale:stable
+    image: tailscale/tailscale:v1.104.4   # version épinglée
     profiles: ["tailscale"]
     # Pas de « hostname: atom » ici : le conteneur se résoudrait lui-même au lieu du service atom.
     # Le nom sur le réseau Tailscale vient de TS_HOSTNAME.
@@ -126,8 +135,10 @@ services:
       - tailscale-state:/var/lib/tailscale
       - ./tailscale/serve.json:/config/serve.json:ro
     depends_on:
-      - atom
-      - ntfy
+      atom:
+        condition: service_healthy
+      ntfy:
+        condition: service_started
 
 volumes:
   tailscale-state:

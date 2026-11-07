@@ -5,13 +5,13 @@ import asyncio, base64, io, json, time  # noqa: F401
 from typing import AsyncIterator  # noqa: F401
 
 import httpx  # noqa: F401
-from fastapi import APIRouter, HTTPException, Request  # noqa: F401
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse  # noqa: F401
-from pydantic import BaseModel, Field  # noqa: F401
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
-from .. import agent, agentcode, analysis, auth, backup, canvas, codeedit, proxmox, research, sandbox, spaces, db, gitops, models_lab, ocr, providers, hybrid, library, llm, memory, notify, reminders, search, system, telegram, workshop  # noqa: F401
-from ..config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR  # noqa: F401
-from ..jobs import background  # noqa: F401
+from .. import codeedit
+import logging
+
+log = logging.getLogger("atom.code")
 
 router = APIRouter()
 
@@ -36,6 +36,7 @@ async def code_propose(cid: int, body: ProposeIn):
     except ValueError as e:
         raise HTTPException(422, str(e)) from e
     except Exception as e:  # noqa: BLE001
+        log.warning("code : erreur gérée", exc_info=True)
         raise HTTPException(502, f"Le modèle n'a pas répondu : {e}") from e
 
 

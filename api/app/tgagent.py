@@ -18,6 +18,9 @@ import re
 import time
 
 from . import agentcode, db, gitops, library
+import logging
+
+log = logging.getLogger("atom.tgagent")
 
 STEP_LABEL = {"list": "liste", "read": "lit", "search": "cherche", "edit": "modifie", "write": "écrit", "test": "teste"}
 
@@ -160,6 +163,7 @@ async def on_button(tg, client, cq: dict) -> None:
                 link = f"\n\n[Ouvrir une pull request]({st['compare']})" if st.get("compare") else ""
                 await tg.send_text(client, chat_id, f"⬆ Branche `{st['pushed']}` poussée sur GitHub.{link}")
         except Exception as e:  # noqa: BLE001
+            log.warning("tgagent : erreur gérée", exc_info=True)
             await tg.send_text(client, chat_id, f"Git : {e}")
         return
     rid = ref
@@ -184,6 +188,7 @@ async def on_button(tg, client, cq: dict) -> None:
         try:
             r = agentcode.apply(rid, list((run.get("files") or {}).keys()))
         except Exception as e:  # noqa: BLE001
+            log.warning("tgagent : erreur gérée", exc_info=True)
             await tg.send_text(client, chat_id, f"Application impossible : {e}")
             return
         from . import library as lib

@@ -14,16 +14,24 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 
 | Chemin | Rôle |
 |---|---|
-| `web/index.html` | L'interface (un seul fichier, sans build) |
-| `api/app/main.py` | Routes HTTP et boucle de chat en streaming |
-| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
-| `api/app/llm.py` | Accès à Ollama : chat, JSON contraint, embeddings |
-| `api/app/reminders.py` | Rappels : commandes du modèle, planificateur |
+| `web/index.html`, `web/atom.css`, `web/js/` | L'interface (sans build) : un script par domaine, chargés dans l'ordre ; `web/sw.js` pour le mode hors ligne (PWA) |
+| `e2e/` | Tests de bout en bout de l'interface (Playwright, modèle simulé) : `cd e2e && npm ci && npm test` |
+| `api/app/main.py` | Application FastAPI : authentification, santé, montage des routes |
+| `api/app/routes/` | Routes HTTP réparties par domaine (conversations, mémoire, code, Git, canevas, espaces…) |
 | `api/app/agent.py` | Cœur de l'agent : prompt, streaming, commandes (partagé web / Telegram) |
-| `api/app/telegram.py` | Bot Telegram bidirectionnel |
-| `api/app/notify.py` | Canaux sortants (ntfy, Telegram) |
-| `api/app/db.py` | Stockage SQLite et migrations |
-| `docker-compose.yml` | Ollama + téléchargement du modèle + backend |
+| `api/app/agentcode.py`, `agenttools.py`, `codeedit.py`, `gitops.py`, `sandbox.py` | Mode Code : boucle de l'agent, outils et espace de travail, modifications validées, Git, tests en bac à sable |
+| `api/app/llm.py`, `providers.py`, `hybrid.py` | Modèle local (Ollama), fournisseurs distants avec relais, mode hybride |
+| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
+| `api/app/library.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
+| `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
+| `api/app/canvas.py`, `workshop.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, analyse de données, labo des modèles |
+| `api/app/reminders.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, notifications (ntfy, Telegram), bot et agent Telegram |
+| `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
+| `api/app/db.py`, `migrations/`, `backup.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
+| `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
+| `api/tests/` | Tests (`cd api && pip install -r requirements.txt -r requirements-dev.txt && ruff check app tests && python -m pytest -q`) |
+| `docker-compose.yml` | Ollama + téléchargement du modèle + SearXNG + ntfy + backend (images épinglées) |
+| `docker-compose.sandbox.yml` | Option : bac à sable Docker via un proxy restreint |
 
 ## Premier essai sur Proxmox (réseau local)
 
@@ -45,11 +53,17 @@ curl -fsSL https://get.docker.com | sudo sh
 ### 3. Récupérer et lancer Atom
 
 ```bash
-git clone -b claude/new-session-q4ozge https://github.com/HaitoDann/atom.git
+git clone https://github.com/HaitoDann/atom.git
 ```
 
 ```bash
 cd atom && cp .env.example .env
+```
+
+Dans `.env`, remplace au minimum `SEARXNG_SECRET` par une longue phrase aléatoire (Atom refuse de démarrer si elle est absente), par exemple :
+
+```bash
+sed -i "s/^SEARXNG_SECRET=.*/SEARXNG_SECRET=$(openssl rand -hex 32)/" .env
 ```
 
 ```bash
@@ -595,7 +609,7 @@ Atom relève chaque minute l'état de ton serveur et t'alerte en cas de problèm
 ## Structure du code
 
 - `api/app/` : le serveur FastAPI, un module par fonction (`agent` pour la discussion, `agentcode` pour l'agent du mode Code, `library`, `providers`, `sandbox`, `gitops`, `research`, `analysis`, `canvas`, `spaces`, `proxmox`, `telegram`…).
-- `web/index.html` : la structure de la page. `web/atom.css` : les styles. `web/atom.js` : la logique de l'interface. Les fichiers sont servis avec un numéro de version, donc le navigateur recharge dès qu'ils changent.
+- `web/index.html` : la structure de la page. `web/atom.css` : les styles. `web/js/` : la logique de l'interface, un fichier par domaine (`01-icones-emotions.js` … `14-demarrage.js`), chargés dans l'ordre et partageant la même portée : une fonction définie dans un fichier est utilisable dans les autres une fois la page chargée, mais le code exécuté au chargement ne doit appeler que ce qui est défini dans un fichier précédent. Les fichiers sont servis avec un numéro de version, donc le navigateur recharge dès qu'ils changent.
 - `api/tests/` : les tests (`cd api && python -m pytest -q`), lancés aussi par GitHub Actions avec une vérification de la syntaxe du JavaScript.
 
 ### Couches du serveur

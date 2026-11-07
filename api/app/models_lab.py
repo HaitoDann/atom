@@ -18,6 +18,9 @@ import httpx
 
 from . import llm, providers
 from .config import OLLAMA_URL, PROVIDER
+import logging
+
+log = logging.getLogger("atom.models_lab")
 
 SUGGESTED = [
     {"name": "qwen3:30b-a3b-instruct-2507-q4_K_M", "size_gb": 18.6,
@@ -71,6 +74,7 @@ async def install(name: str) -> None:
                         st["total"], st["completed"] = ev["total"], ev.get("completed", 0)
         st.update(status="terminé", done=True)
     except Exception as e:  # noqa: BLE001
+        log.warning("models_lab : erreur gérée", exc_info=True)
         msg = str(e)
         if "file does not exist" in msg or "not found" in msg.lower():
             msg = "modèle introuvable dans la bibliothèque Ollama (vérifie le nom sur ollama.com/library)"
@@ -124,6 +128,7 @@ async def compare(models: list[str], prompts: list[dict], keep: str | None = Non
                            first_s=round((first or time.time()) - t0, 2), wall_s=round(time.time() - t0, 2),
                            tok_s=s.get("tok_s"), prompt_tok_s=s.get("prompt_tok_s"), load_s=s.get("load_s"), tokens=s.get("tokens"))
             except Exception as e:  # noqa: BLE001
+                log.warning("models_lab : erreur gérée", exc_info=True)
                 yield dict(type="error", model=m, prompt=p["id"], message=str(e)[:300])
                 break   # modèle en échec (absent, mémoire insuffisante) : on passe au suivant
         if keep and m != keep and not m.startswith("p:"):

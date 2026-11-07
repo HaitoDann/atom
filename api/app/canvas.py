@@ -10,6 +10,9 @@ import time
 
 from . import db, hybrid, llm
 from .config import DEFAULT_MODEL
+import logging
+
+log = logging.getLogger("atom.canvas")
 
 MAX_VERSIONS = 30
 
@@ -102,6 +105,7 @@ async def edit(cid: int, instruction: str, selection: str = "", engine: str = "a
         try:
             out = "".join([t async for t in hybrid.stream(msgs, sensitive=True)])
         except Exception:  # noqa: BLE001
+            log.warning("canvas : erreur gérée", exc_info=True)
             out = ""
     if not out:
         out = "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, msgs)])

@@ -18,6 +18,9 @@ from typing import AsyncIterator
 
 from . import db, hybrid, llm, sandbox
 from .config import DATA_DIR, DEFAULT_MODEL
+import logging
+
+log = logging.getLogger("atom.analysis")
 
 OUT_DIR = DATA_DIR / "analysis"
 DATA_EXT = {"csv", "tsv", "xlsx", "xls", "json", "parquet"}
@@ -55,7 +58,7 @@ async def _ask(messages: list[dict]) -> str:
         try:
             return "".join([t async for t in hybrid.stream(messages, sensitive=True)])
         except Exception:  # noqa: BLE001
-            pass
+            log.warning("analysis : erreur gérée", exc_info=True)
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
 
 
@@ -142,6 +145,7 @@ async def run(name: str, raw: bytes, question: str, conversation_id: int | None)
                 text += t
                 yield dict(type="token", text=t)
         except Exception:  # noqa: BLE001
+            log.warning("analysis : erreur gérée", exc_info=True)
             text = ""
     if not text:
         async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, final_msgs):

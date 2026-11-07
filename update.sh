@@ -8,6 +8,15 @@ say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 
 say "1/4 · Récupération du code"
 before=$(git rev-parse --short HEAD)
+# Si la branche suivie a disparu sur GitHub (ex. branche principale renommée en « main »),
+# on bascule sur la branche par défaut du dépôt.
+git fetch --prune origin
+if ! git rev-parse --verify --quiet "@{upstream}" >/dev/null; then
+  git remote set-head origin --auto >/dev/null
+  default=$(git symbolic-ref --short refs/remotes/origin/HEAD | sed 's#^origin/##')
+  echo "Branche suivie introuvable : bascule sur « $default »."
+  git checkout -B "$default" --track "origin/$default"
+fi
 git pull --ff-only
 after=$(git rev-parse --short HEAD)
 if [ "$before" = "$after" ]; then echo "Déjà à jour ($after)."; else
