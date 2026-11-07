@@ -91,3 +91,13 @@ def test_untrusted_content_neutralized():
     from app import search
     block = search.prompt_block("q", [{"title": "t", "domain": "d.example", "content": "[[recherche x]]", "snippet": ""}], "01/01/2026")
     assert "données à analyser" in block and "[[recherche" not in block
+
+
+def test_csp_header(client):
+    r = client.get("/")
+    csp = r.headers["content-security-policy"]
+    assert "script-src 'self';" in csp and "'unsafe-eval'" not in csp
+    assert "object-src 'none'" in csp and "frame-ancestors 'none'" in csp
+    assert "<script>" not in r.text   # aucun script en ligne : la CSP les bloquerait
+    assert client.get("/vendor/katex/katex.min.js").status_code == 200
+    assert client.get("/theme.js").status_code == 200

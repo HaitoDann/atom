@@ -100,6 +100,7 @@ async def guard(request: Request, call_next):
     resp.headers.setdefault("Referrer-Policy", "same-origin")
     resp.headers.setdefault("X-Frame-Options", "DENY")
     resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    resp.headers.setdefault("Content-Security-Policy", CSP)
     if _secure(request):
         resp.headers.setdefault("Strict-Transport-Security", "max-age=15552000")
     return resp
@@ -402,9 +403,28 @@ def service_worker():
                         headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
 
 
+# Politique de sécurité du contenu : seuls les scripts servis par Atom s'exécutent (KaTeX et Mermaid sont
+# embarqués dans web/vendor/) ; aucun script en ligne, aucun eval, aucun appel réseau hors d'Atom.
+# Les styles en ligne restent permis (attributs style= de l'interface, SVG de Mermaid).
+CSP = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "worker-src 'self'",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+
+
 def _asset_version() -> str:
     """Version des fichiers de l'interface (date de modification) : le navigateur recharge dès qu'ils changent."""
-    files = [WEB_DIR / "atom.css", WEB_DIR / "index.html", *sorted((WEB_DIR / "js").glob("*.js"))]
+    files = [WEB_DIR / "atom.css", WEB_DIR / "index.html", WEB_DIR / "theme.js", *sorted((WEB_DIR / "js").glob("*.js"))]
     m = max(f.stat().st_mtime for f in files if f.exists())
     return format(int(m), "x")
 
