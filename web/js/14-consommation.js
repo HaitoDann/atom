@@ -4,7 +4,8 @@
    CONSOMMATION — appels aux modèles en direct, quotas, routage
    ============================================================ */
 // Ouvert seulement quand la rubrique est affichée : un flux NDJSON (/api/usage/live) pousse chaque appel terminé.
-const TASK_LABELS = { simple: "Question simple", complexe: "Demande complexe", code: "Code", long: "Texte long", agent: "Agent de code" };
+const TASK_LABELS = { simple: "Question simple", complexe: "Demande complexe", code: "Code", long: "Texte long", agent: "Agent de code",
+  memoire: "Mémorisation", embedding: "Embeddings" };   // les deux derniers : travail en coulisse du modèle local
 let usDays = 1, usState = null, usCtrl = null, usTimer = 0;
 
 const fmtN = (n) => (n || 0).toLocaleString("fr-FR");
