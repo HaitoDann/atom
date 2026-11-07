@@ -2023,16 +2023,24 @@ $("autoMem").onchange = () => { settings.autoMemory = $("autoMem").checked; save
 $("reconnect").onclick = () => connect(true);
 
 let memories = [];
+let memArchived = false, memArchCount = 0;
+const MEM_KIND = { semantique: "fait", procedurale: "habitude", episodique: "événement" };
 async function loadMemories() {
-  try { memories = (await getJSON("/api/memories")).memories; } catch (e) { console.warn(e); }
+  try { const d = await getJSON(`/api/memories${memArchived ? "?archived=1" : ""}`); memories = d.memories; memArchCount = d.archived || 0; } catch (e) { console.warn(e); }
   const box = $("memList");
   box.innerHTML = "";
+  memories.sort((a, b) => (b.to_review - a.to_review) || ((b.importance || 2) - (a.importance || 2)) || (b.updated_at - a.updated_at));
   for (const m of memories) {
     const row = document.createElement("div");
-    row.className = "mem";
-    const tag = document.createElement("span");
-    tag.className = "tag"; tag.textContent = m.source === "auto" ? "auto" : "manuel";
-    tag.title = m.source === "auto" ? "Retenu automatiquement" : "Ajouté par toi";
+    row.className = "mem" + (m.to_review ? " review" : "") + (m.archived_at ? " archived" : "");
+    const tag = document.createElement("button");
+    tag.type = "button"; tag.className = "tag";
+    tag.textContent = (MEM_KIND[m.kind] || "fait") + ((m.importance || 2) >= 3 ? " ★" : "");
+    tag.title = `${m.source === "auto" ? "Retenu automatiquement" : "Ajouté par toi"} · confiance ${Math.round((m.confidence || 0.8) * 100)} % · utilisé ${m.hits || 0} fois\nClic : changer le type · Maj+clic : essentiel oui/non`;
+    tag.onclick = async (e) => {
+      const body = e.shiftKey ? { importance: (m.importance || 2) >= 3 ? 2 : 3 } : { kind: { semantique: "procedurale", procedurale: "episodique", episodique: "semantique" }[m.kind || "semantique"] };
+      try { await send_(`/api/memories/${m.id}/meta`, "POST", body); } catch {} loadMemories();
+    };
     const inp = document.createElement("input");
     inp.value = m.content;
     const del = document.createElement("button");
@@ -2044,17 +2052,38 @@ async function loadMemories() {
       try { await send_(`/api/memories/${m.id}`, "PATCH", { content: v }); m.content = v; refreshPanel(); }
       catch (e) { toast(esc(e.message)); inp.value = m.content; }
     };
-    row.append(tag, inp, del);
+    row.append(tag, inp);
+    if (m.to_review) {   // fait temporaire arrivé à échéance
+      const keep = document.createElement("button"); keep.className = "btn sm"; keep.textContent = "Toujours vrai";
+      keep.onclick = async () => { await send_(`/api/memories/${m.id}/meta`, "POST", { confirm: true }); loadMemories(); };
+      row.append(keep);
+    }
+    if (m.archived_at) {
+      const back = document.createElement("button"); back.className = "btn sm"; back.textContent = "Restaurer";
+      back.title = "Ce souvenir a été remplacé par une information plus récente (ou une contradiction).";
+      back.onclick = async () => { await send_(`/api/memories/${m.id}/meta`, "POST", { restore: true }); loadMemories(); };
+      row.append(back);
+    }
+    row.append(del);
     box.appendChild(row);
   }
-  $("memInfo").textContent = memories.length
+  const rev = memories.filter((m) => m.to_review).length;
+  $("memArchToggle").textContent = memArchived ? "← Souvenirs actifs" : memArchCount ? `Historique (${memArchCount} remplacé${memArchCount > 1 ? "s" : ""})` : "";
+  $("memArchToggle").hidden = !memArchived && !memArchCount;
+  if (rev && !memArchived) $("memInfo").textContent = `${rev} souvenir${rev > 1 ? "s" : ""} temporaire${rev > 1 ? "s" : ""} à revoir : confirme-les ou oublie-les. Atom ne s'en sert plus en attendant.`;
+  else $("memInfo").textContent = memArchived ? "Souvenirs remplacés par une information plus récente (contradiction ou mise à jour)." : memories.length
     ? `${memories.length} souvenir(s). Atom retient seul les informations durables ; modifie ou supprime ce qui ne te convient pas.`
     : "Atom n'a encore rien retenu. Il apprendra au fil des conversations.";
 }
+$("memArchToggle").onclick = () => { memArchived = !memArchived; loadMemories(); };
 $("memAdd").onclick = async () => {
   const v = $("memNew").value.trim();
   if (!v) return;
-  try { await send_("/api/memories", "POST", { content: v }); $("memNew").value = ""; } catch (e) { toast(esc(e.message)); }
+  try {
+    const r = await (await send_("/api/memories", "POST", { content: v })).json(); $("memNew").value = "";
+    if (r.action === "replaced") toast(`Souvenir mis à jour · remplace « ${esc(r.replaced)} » (gardé dans l'historique)`);
+    else if (r.action === "merged") toast(`Fusionné avec un souvenir existant : « ${esc(r.content)} »`);
+  } catch (e) { toast(esc(e.message)); }
   loadMemories(); refreshPanel();
 };
 $("memNew").onkeydown = (e) => { if (e.key === "Enter") $("memAdd").onclick(); };

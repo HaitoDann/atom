@@ -1120,3 +1120,8 @@ body.presence-ui #presence { opacity: 1; }
 .px-g .v.t { color: var(--faint); min-width: 80px; }
 .px-th { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 8px; font-size: 13px; color: var(--text-2); }
 .px-th input { width: 64px; display: inline-block; padding: 4px 6px; font-size: 13px; }
+
+.mem .tag { cursor: pointer; border: 0; font: inherit; }
+.mem.review { box-shadow: inset 2px 0 0 #e8c76a; }
+.mem.archived { opacity: .6; }
+.mem .btn.sm { flex: none; }

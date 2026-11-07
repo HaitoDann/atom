@@ -326,7 +326,9 @@
           <h4>Ce qu'Atom sait de toi</h4>
           <p class="desc" id="memInfo">Atom retient seul les informations durables. Modifie ou supprime ce qui ne te convient pas.</p>
           <label class="switch"><span>Mémoire automatique</span><input type="checkbox" id="autoMem"></label>
+          <p class="note">Chaque souvenir a un type : <b>fait</b> (ce que tu es, ce que tu as), <b>habitude</b> (ta façon de travailler, appliquée par Atom), <b>événement</b> (daté). ★ = essentiel. Quand une nouvelle information contredit un souvenir, l'ancien est remplacé et gardé dans l'historique.</p>
           <div id="memList"></div>
+          <button class="btn sm" id="memArchToggle" hidden style="margin-top:8px"></button>
           <div class="row" style="margin-top:12px">
             <input id="memNew" class="field" placeholder="Ajouter un souvenir…">
             <button class="btn" id="memAdd">Ajouter</button>

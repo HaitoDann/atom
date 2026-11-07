@@ -48,6 +48,18 @@ async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
              asyncio.create_task(backup.scheduler())]
     asyncio.create_task(sandbox.cleanup())
+
+    async def maintenance():   # tous les jours : rétention des échanges indexés
+        from .config import RECALL_MAX_DAYS, RECALL_MAX_ROWS
+        while True:
+            try:
+                n = await asyncio.to_thread(db.prune_recall, RECALL_MAX_DAYS, RECALL_MAX_ROWS)
+                if n:
+                    logging.getLogger("atom").info("rétention : %d échanges indexés supprimés", n)
+            except Exception:  # noqa: BLE001
+                logging.getLogger("atom").exception("maintenance")
+            await asyncio.sleep(86400)
+    tasks.append(asyncio.create_task(maintenance()))
     tasks.append(asyncio.create_task(proxmox.scheduler()))
     yield
     for t in tasks:
@@ -597,12 +609,39 @@ def remove_conversation(cid: int):
 
 
 def _public(m: dict) -> dict:
-    return {k: m[k] for k in ("id", "content", "source", "created_at", "updated_at")}
+    out = {k: m.get(k) for k in ("id", "content", "source", "created_at", "updated_at", "kind", "importance",
+                                 "confidence", "review_at", "archived_at", "superseded_by", "hits", "last_used")}
+    out["to_review"] = bool(m.get("review_at") and m["review_at"] < time.time())
+    return out
 
 
 @app.get("/api/memories")
-def get_memories():
-    return {"memories": [_public(m) for m in db.list_memories()]}
+def get_memories(archived: bool = False):
+    return {"memories": [_public(m) for m in db.list_memories(active_only=not archived) if archived or not m.get("archived_at")],
+            "archived": sum(1 for m in db.list_memories(active_only=False) if m.get("archived_at"))}
+
+
+class MemoryMetaIn(BaseModel):
+    kind: str | None = Field(default=None, pattern="^(semantique|procedurale|episodique)$")
+    importance: int | None = Field(default=None, ge=1, le=3)
+    confirm: bool | None = None     # « toujours vrai » : retire la date de révision
+    restore: bool | None = None     # désarchiver
+
+
+@app.post("/api/memories/{mid}/meta")
+def memory_meta(mid: int, body: MemoryMetaIn):
+    f = {}
+    if body.kind:
+        f["kind"] = body.kind
+    if body.importance:
+        f["importance"] = body.importance
+    if body.confirm:
+        f.update(review_at=None, confidence=1.0)
+    if body.restore:
+        f.update(archived_at=None, superseded_by=None)
+    if f:
+        db.set_memory_fields(mid, **f)
+    return {"ok": True}
 
 
 @app.post("/api/memories")
@@ -610,7 +649,7 @@ async def post_memory(body: MemoryIn):
     m = await memory.remember(body.content, source="manuel")
     if m is None:
         raise HTTPException(409, "Ce souvenir existe déjà.")
-    return m
+    return m   # action : added | merged (complète un souvenir) | replaced (contredit et remplace un ancien)
 
 
 @app.patch("/api/memories/{mid}")
