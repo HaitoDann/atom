@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1b1b">
+<title>Atom</title>
+<script>
+  // Thème appliqué avant l'affichage, pour éviter un flash.
+  try { const t = (JSON.parse(localStorage.getItem("atom.settings") || "{}").theme) || "dark";
+    document.documentElement.dataset.theme = t === "auto" ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : t; } catch {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Atom">
+<link rel="stylesheet" href="/atom.css?v=__V__">
+</head>
+<body>
+<div id="app">
+  <!-- ============================================================ barre latérale -->
+  <aside id="side">
+    <div class="side-top">
+      <span class="wordmark"><img class="mark" src="/icons/mark-light.svg" alt="">atom</span>
+      <button class="iconbtn" id="sideClose" title="Masquer la barre latérale" data-i="sidebar"></button>
+    </div>
+    <button class="side-new" id="newConv" title="Nouvelle conversation (Ctrl+Maj+O)"><span data-i="plus"></span>Nouvelle conversation</button>
+    <label class="search"><span data-i="search"></span><input id="search" placeholder="Rechercher" autocomplete="off"><kbd id="palKbd" title="Palette de commandes">Ctrl K</kbd></label>
+    <div class="side-nav">
+      <button id="navLib"><span data-i="library"></span>Bibliothèque</button>
+      <button id="navCode"><span data-i="code"></span>Code</button>
+      <button data-goto="memory"><span data-i="memory"></span>Souvenirs<span class="count" id="navMem"></span></button>
+      <button data-goto="reminders"><span data-i="clock"></span>Rappels<span class="count" id="navRem"></span></button>
+    </div>
+    <div class="side-sep"></div>
+    <div class="spaces" id="spaces">
+      <div class="sp-h"><span>Espaces</span><button class="iconbtn" id="spNew" title="Nouvel espace" data-i="plus"></button></div>
+      <div id="spList"></div>
+    </div>
+    <div class="sp-active" id="spActive" hidden><button id="spBack" title="Toutes les conversations">‹</button><b id="spName"></b><button class="iconbtn" id="spEdit" title="Modifier l'espace" data-i="settings"></button></div>
+    <nav id="convList"></nav>
+    <div class="side-bottom">
+      <div class="status"><span class="dot" id="dot"></span><span id="statusText">Connexion…</span></div>
+      <button class="iconbtn" id="openSettings" title="Réglages" data-i="settings"></button>
+    </div>
+  </aside>
+
+  <!-- ============================================================ conversation -->
+  <main id="main">
+    <div class="topbar" id="topbar">
+      <button class="iconbtn" id="sideOpen" title="Conversations" data-i="sidebar"></button>
+      <button class="title" id="title" title="Renommer">Nouvelle conversation</button>
+      <span class="spacer"></span>
+      <select id="model" title="Modèle"></select>
+      <button class="iconbtn" id="pinBtn" title="Épingler" data-i="pin"></button>
+      <button class="iconbtn" id="exportBtn" title="Exporter en Markdown" data-i="download"></button>
+      <button class="iconbtn" id="presenceBtn" title="Mode présence" data-i="orb"></button>
+      <button class="iconbtn" id="panelBtn" title="Panneau de l'entité" data-i="panel"></button>
+    </div>
+    <div id="scroller"><div id="chat"></div></div>
+    <section id="codeView" hidden>
+      <nav class="cv-rail" id="cvRail">
+        <button data-pane="files" class="on" title="Fichiers (Ctrl+P pour ouvrir vite)" data-i="folder"></button>
+        <button data-pane="search" title="Chercher dans le code (Ctrl+Maj+F)" data-i="search"></button>
+        <button data-pane="git" title="Git" data-i="list"><i class="dot" id="railGitDot" hidden></i></button>
+        <button data-pane="tests" title="Tests" data-i="check"><i class="dot" id="railTestDot" hidden></i></button>
+      </nav>
+      <aside class="cv-side">
+        <div class="row" style="gap:6px"><select class="field" id="cvProject" style="flex:1;min-width:0"></select><button class="iconbtn" id="cvSync" title="Mettre à jour le projet" data-i="refresh"></button><button class="iconbtn" id="cvAdd" title="Ajouter un projet" data-i="plus"></button></div>
+        <p class="note" id="cvInfo" style="margin:6px 2px 8px"></p>
+        <div class="cv-pane-title" id="cvPaneTitle">Fichiers</div>
+        <div class="cv-changes" id="cvChanges" data-cvpane="git" hidden></div>
+        <p class="note" id="cvGitNote" data-cvpane="git" hidden>Ce projet vient d'un dossier du serveur, en lecture seule : Git n'est disponible que pour les dépôts clonés par Atom.</p>
+        <div class="cv-changes sb-box" id="cvTests" data-cvpane="tests" hidden>
+          <div class="h"><span>Tests</span><button id="sbEdit" title="Changer la commande">modifier</button></div>
+          <code class="sb-cmd" id="sbCmd"></code>
+          <input class="field sb-cmd-in" id="sbCmdIn" hidden spellcheck="false">
+          <div class="git-acts"><button class="btn sm" id="sbRun">▶ Lancer les tests</button></div>
+          <div class="sb-out" id="sbOut"></div>
+        </div>
+        <div class="row" data-cvpane="files search" style="gap:6px;margin-bottom:6px"><input class="field" id="cvFilter" placeholder="Filtrer les fichiers…" autocomplete="off"><button class="iconbtn" id="cvGrep" hidden title="Chercher dans le contenu des fichiers" data-i="search"></button></div>
+        <div class="cv-tree" id="cvTree" data-cvpane="files search"></div>
+      </aside>
+      <div class="cv-main">
+        <div class="cv-tabs" id="cvTabs"></div>
+        <div id="cvEmpty" class="cv-placeholder" hidden>Aucun projet de code pour l'instant.<small>Ajoute un dépôt GitHub ou un dossier du serveur pour le parcourir ici.</small><button class="btn primary" id="cvAdd2" style="margin-top:14px">Ajouter un projet</button></div>
+        <div id="cvAgentView" class="ag" hidden>
+          <div class="ag-head"><b>Agent</b><span class="note" id="agInfo"></span><span class="spacer"></span><select class="field" id="agHistory" hidden style="max-width:300px;font-size:12px"></select><button class="iconbtn" id="agNew" title="Nouvelle tâche" data-i="plus"></button><button class="iconbtn" id="agClose" title="Fermer" data-i="x"></button></div>
+          <div class="ag-form" id="agForm">
+            <textarea class="field" id="agTask" rows="3" placeholder="Décris la tâche, ex. « Ajoute une validation de l'e-mail dans le formulaire d'inscription et un message d'erreur clair »"></textarea>
+            <div class="row"><select class="field" id="agEngine" style="max-width:240px"><option value="remote">API distante (recommandé)</option><option value="local">Modèle local</option></select>
+              <span class="note" id="agEngineNote"></span><span class="spacer"></span><button class="btn primary" id="agRun">Lancer</button></div>
+            <p class="note" id="agParentNote" hidden>Suite de la tâche affichée : l'agent garde son contexte et les modifications non appliquées. <button class="btn sm" id="agParentCancel">Nouvelle tâche à la place</button></p>
+            <p class="note">Rien n'est écrit sans ta validation · l'agent continue même si tu fermes la page · Ctrl+Entrée pour lancer</p>
+          </div>
+          <div class="ag-home" id="agHome">
+            <h6>Idées</h6>
+            <div class="ag-chips" id="agChips"></div>
+            <h6>Règles du projet <span class="note" style="text-transform:none;letter-spacing:0">· l'agent les respecte à chaque tâche</span></h6>
+            <div class="ag-rules" id="agRules"></div>
+            <div class="row" style="gap:6px;margin-top:4px"><input class="field" id="agRuleIn" placeholder="Ex. « Utiliser des tabulations » ou « Toujours écrire les tests avec testify »" style="font-size:12.5px"><button class="btn sm" id="agRuleAdd">Ajouter</button></div>
+            <h6 id="agRecentTitle" hidden>Tâches récentes</h6>
+            <div class="ag-recent" id="agRecent"></div>
+          </div>
+          <div class="ag-log" id="agLog"></div>
+          <div class="ag-res" id="agRes" hidden></div>
+        </div>
+        <div id="cvMainWrap" class="cv-wrap">
+          <div class="cv-bar" id="cvBar" hidden>
+            <span class="cv-path" id="cvPath"></span><span class="cv-meta" id="cvMeta"></span><span class="spacer"></span>
+            <button class="btn sm" id="cvMd" hidden>Aperçu</button>
+            <button class="iconbtn" id="cvCopyPath" title="Copier le chemin" data-i="link"></button>
+            <button class="iconbtn" id="cvCopy" title="Copier le fichier" data-i="copy"></button>
+            <button class="btn sm" id="cvAsk"><span data-i="spark"></span>Expliquer le fichier</button>
+            <button class="btn sm" id="cvEdit"><span data-i="edit"></span>Modifier…</button>
+          </div>
+          <div class="cv-selbar" id="cvSelBar" hidden><span id="cvSelInfo"></span><span class="spacer"></span>
+            <button class="btn sm" id="cvExplain">Expliquer</button><button class="btn sm" id="cvReview">Relire</button><button class="btn sm" id="cvAskSel">Demander…</button><button class="btn sm" id="cvEditSel">Modifier…</button></div>
+          <div class="cv-editbox" id="cvEditBox" hidden>
+            <textarea class="field" id="cvInstr" rows="2" placeholder="Que faut-il changer ? Ex. « gère le cas où la liste est vide »"></textarea>
+            <div class="row"><span class="note" id="cvEditScope"></span><span class="spacer"></span>
+              <label class="note" id="cvRemoteWrap" hidden><input type="checkbox" id="cvRemote"> <span id="cvRemoteName"></span></label>
+              <button class="btn sm" id="cvEditCancel">Annuler</button><button class="btn sm primary" id="cvEditGo">Proposer</button></div>
+          </div>
+          <div class="cv-diffbar" id="cvDiffBar" hidden><span id="cvDiffInfo"></span><span class="spacer"></span>
+            <button class="btn sm" id="cvDiffDrop">Abandonner</button><button class="btn sm" id="cvDiffPatch"><span data-i="download"></span>Patch</button><button class="btn sm primary" id="cvDiffApply"><span data-i="check"></span>Appliquer</button></div>
+          <div class="cv-editor" id="cvEditor"></div>
+        </div>
+        <footer class="cv-status" id="cvStatus"><span id="stBranch"></span><span id="stChanges"></span><span id="stTests"></span><span class="spacer"></span><span id="stFile"></span><button id="stQuick" title="Ouvrir un fichier (Ctrl+P)">Ctrl+P</button></footer>
+      </div>
+    </section>
+    <div id="quickOpen" class="qo" hidden><div class="qo-box"><input class="field" id="qoIn" placeholder="Ouvrir un fichier… (tape une partie du nom)" spellcheck="false" autocomplete="off"><div id="qoList" class="qo-list"></div></div></div>
+    <section id="libView" hidden>
+      <aside class="lib-side">
+        <div class="lib-cols" id="libCols"></div>
+        <button class="btn" id="libNewDocs">＋ Nouvelle collection</button>
+        <button class="btn" id="libNewCode">＋ Ajouter un projet de code</button>
+        <p class="note">Atom lit tes documents et ton code, et cite ses sources. Rien ne quitte ton serveur.</p>
+      </aside>
+      <div class="lib-main" id="libMain"></div>
+    </section>
+    <div class="composer">
+      <div class="composer-in">
+        <button id="toBottom" title="Aller en bas" data-i="down"></button>
+        <form id="form" autocomplete="off">
+          <div class="tray" id="tray"></div>
+          <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
+          <div class="cbar">
+            <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF)" data-i="clip"></button>
+            <button class="iconbtn" id="webBtn" type="button" title="Rechercher sur Internet pour ce message" data-i="globe"></button>
+            <button class="iconbtn" id="deepBtn" type="button" title="Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé" data-i="library"></button>
+            <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA pour ce message" data-i="users" style="display:none"></button>
+            <span class="cbar-sep"></span>
+            <div class="scope-wrap" id="engineWrap" style="display:none"><button type="button" class="sel" id="engineBtn" title="Quel modèle répond"></button><div class="scope-menu" id="engineMenu"></div></div>
+            <div class="scope-wrap"><button type="button" class="sel" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div>
+            <span class="spacer"></span>
+            <button id="send" type="submit" disabled title="Envoyer" data-i="up"></button>
+          </div>
+          <input type="file" id="fileIn" multiple hidden>
+        </form>
+        <div class="quick" id="quick"></div>
+        
+      </div>
+    </div>
+  </main>
+
+  <!-- ============================================================ panneau entité -->
+  <aside id="panel">
+    <div class="panel-in">
+      <div class="stage" id="stage">
+        <canvas id="entity"></canvas>
+        <div class="stage-top"><span>Atom</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
+        <div class="stage-meta"><span id="emoName">Veille</span><span id="emoState">en attente</span></div>
+      </div>
+      <details class="sec" id="sysSec">
+        <summary><h3>Système</h3></summary>
+        <div class="metric"><div class="l"><span>Processeur</span><span id="cpuV">—</span></div><div class="bar"><i id="cpuB"></i></div></div>
+        <div class="metric"><div class="l"><span>Mémoire</span><span id="ramV">—</span></div><div class="bar"><i id="ramB"></i></div></div>
+        <div class="kv"><span>Modèle chargé</span><span id="loadedV">—</span></div>
+        <div class="kv"><span>Vitesse</span><span id="speedV">—</span></div>
+        <div class="kv"><span>Serveur actif depuis</span><span id="upV">—</span></div>
+      </details>
+      <details class="sec">
+        <summary><h3>Prochains rappels</h3></summary>
+        <ul class="list" id="pRem"></ul>
+      </details>
+      <details class="sec">
+        <summary><h3>Derniers souvenirs</h3></summary>
+        <ul class="list" id="pMem"></ul>
+      </details>
+    </div>
+  </aside>
+  <div id="scrim"></div>
+</div>
+
+<!-- ============================================================ réglages -->
+<div id="settings" role="dialog" aria-modal="true" aria-label="Réglages">
+  <div class="dialog">
+    <nav class="tabs">
+      <h2>Réglages</h2>
+      <input class="field set-search" id="setSearch" placeholder="Chercher un réglage…" autocomplete="off">
+      <button class="tab on" data-tab="atom"><span data-i="orb"></span>Atom</button>
+      <button class="tab" data-tab="discussion"><span data-i="list"></span>Discussion</button>
+      <button class="tab" data-tab="data"><span data-i="memory"></span>Données</button>
+      <button class="tab" data-tab="connections"><span data-i="spark"></span>Connexions</button>
+      <button class="tab" data-tab="system"><span data-i="pulse"></span>Système</button>
+    </nav>
+    <div class="pane-wrap">
+      <p class="note" id="setEmpty" hidden>Aucun réglage ne correspond.</p>
+      <button class="iconbtn" id="closeSettings" style="position:absolute;top:10px;right:10px" title="Fermer" data-i="x"></button>
+
+      <section class="pane on" data-pane="general">
+        <div class="block">
+          <h4>Personnalité</h4>
+          <p class="desc">Comment Atom se présente et se comporte. Utilisée aussi par Telegram.</p>
+          <textarea id="persona" class="field"></textarea>
+        </div>
+        <div class="block">
+          <h4>Recherche sur Internet</h4>
+          <p class="desc">Atom peut décider seul de chercher quand il ne sait pas (actualité, prix, météo…). Le bouton globe sous la saisie force une recherche pour un message.</p>
+          <label class="switch"><span>Atom cherche de lui-même</span><input type="checkbox" id="webAuto"></label>
+          <p class="note" id="webInfo"></p>
+        </div>
+        <div class="block">
+          <h4>Serveur</h4>
+          <p class="desc" id="srvInfo">…</p>
+          <div class="row"><button class="btn" id="reconnect">Tester la connexion</button><button class="btn" id="benchBtn">Mesurer la vitesse</button></div>
+          <p class="note" id="benchInfo"></p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="status">
+        <div class="block">
+          <div class="row" style="justify-content:space-between;padding-right:34px"><h4>État d'Atom</h4><button class="btn sm" id="stRefresh">Vérifier</button></div>
+          <p class="desc" id="stInfo">Chaque service d'Atom est vérifié ici.</p>
+          <ul class="list st-list" id="stList"></ul>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="lab">
+        <div class="block">
+          <h4>Modèles installés</h4>
+          <p class="desc" id="labMem">—</p>
+          <div id="labInstalled" class="lab-list"></div>
+        </div>
+        <div class="block">
+          <h4>Essayer un autre modèle</h4>
+          <p class="desc">Le téléchargement se fait en arrière-plan sur le serveur ; tu peux continuer à utiliser Atom.</p>
+          <div id="labSuggested" class="lab-list"></div>
+          <div class="row" style="margin-top:8px;gap:6px"><input class="field" id="labName" placeholder="autre modèle Ollama, ex. mistral-nemo:12b" spellcheck="false" style="font-family:var(--mono);font-size:12.5px"><button class="btn" id="labInstall">Installer</button></div>
+        </div>
+        <div class="block">
+          <h4>Comparatif</h4>
+          <p class="desc">Les mêmes questions sont posées à chaque modèle, l'un après l'autre. Atom mesure le chargement, le délai avant le premier mot et la vitesse d'écriture. Le premier passage d'un modèle inclut son chargement en mémoire.</p>
+          <div id="labPick" class="lab-pick"></div>
+          <p class="note" id="labRemoteNote" hidden>Les API distantes ne reçoivent que les questions du comparatif (jamais tes souvenirs ni tes documents) et chaque question compte dans leur quota du jour. Leur vitesse dépend surtout du réseau et de leur charge.</p>
+          <div id="labPrompts" class="lab-pick"></div>
+          <textarea class="field" id="labCustom" rows="2" placeholder="Ta propre question (facultatif) — le meilleur test, c'est ton usage réel"></textarea>
+          <div class="row" style="margin-top:8px"><button class="btn primary" id="labRun">Lancer le comparatif</button><span class="note" id="labRunInfo" style="margin-left:8px"></span></div>
+          <div id="labResults"></div>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="proxmox">
+        <div class="block" id="pxSetup" hidden>
+          <h4>Surveillance Proxmox (lecture seule)</h4>
+          <p class="desc">Atom relève chaque minute l'état de ton serveur (nœuds, VM, conteneurs, stockages), t'alerte sur Telegram et ntfy, et répond à « comment va le serveur ? ».</p>
+          <ol class="desc" style="padding-left:18px;margin:6px 0">
+            <li>Dans Proxmox : <b>Datacenter → Permissions → API Tokens → Add</b> : utilisateur <code>root@pam</code>, identifiant <code>atom</code>, laisse « Privilege Separation » cochée. Copie le secret affiché (il ne sera plus montré).</li>
+            <li>Puis <b>Datacenter → Permissions → Add → API Token Permission</b> : chemin <code>/</code>, jeton <code>root@pam!atom</code>, rôle <code>PVEAuditor</code>, « Propagate » coché.</li>
+            <li>Dans <code>.env</code> : <code>ATOM_PROXMOX_URL=https://IP-DE-PROXMOX:8006</code>, <code>ATOM_PROXMOX_TOKEN_ID=root@pam!atom</code>, <code>ATOM_PROXMOX_TOKEN_SECRET=…</code></li>
+            <li><code>docker compose up -d atom</code>.</li>
+          </ol>
+          <p class="note">PVEAuditor = lecture seule : Atom ne peut rien démarrer, arrêter ni modifier.</p>
+        </div>
+        <div id="pxBody" hidden>
+          <div class="block"><div class="row" style="justify-content:space-between"><h4 style="margin:0">Serveur</h4><span><span class="note" id="pxUpd"></span> <button class="btn sm" id="pxRefresh">Actualiser</button></span></div>
+            <div id="pxAlerts"></div><div id="pxNodes" class="px-nodes"></div></div>
+          <div class="block"><h4>Machines virtuelles et conteneurs</h4><div id="pxGuests" class="px-guests"></div></div>
+          <div class="block"><h4>Stockages</h4><div id="pxStorages"></div></div>
+          <div class="block"><h4>Alertes</h4>
+            <p class="desc">Envoyées sur Telegram et ntfy, une fois par problème (rappel au plus toutes les heures), avec un message quand c'est rétabli.</p>
+            <label class="switch"><span>Envoyer les alertes</span><input type="checkbox" id="pxNotify"></label>
+            <label class="switch"><span>Prévenir si une VM ou un conteneur s'arrête</span><input type="checkbox" id="pxGuestDown"></label>
+            <div class="px-th">
+              <label>Processeur ≥ <input class="field" type="number" id="pxCpu" min="50" max="100"> %</label>
+              <label>Mémoire ≥ <input class="field" type="number" id="pxMem" min="50" max="100"> %</label>
+              <label>pendant <input class="field" type="number" id="pxMin" min="1" max="120"> min</label>
+              <label>Stockage ≥ <input class="field" type="number" id="pxSto" min="50" max="100"> %</label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="security">
+        <div class="block">
+          <h4>Appareils connectés</h4>
+          <p class="desc">Chaque navigateur reste connecté 90 jours après sa dernière visite. Déconnecte ceux que tu ne reconnais pas.</p>
+          <ul class="list" id="secList"></ul>
+          <div class="row" style="margin-top:10px"><button class="btn" id="secLogout">Me déconnecter</button><button class="btn danger" id="secOthers">Déconnecter les autres appareils</button></div>
+        </div>
+        <div class="block">
+          <h4>Changer le mot de passe</h4>
+          <input class="field" type="password" id="secCur" placeholder="Mot de passe actuel" autocomplete="current-password" style="margin-bottom:8px">
+          <input class="field" type="password" id="secNew" placeholder="Nouveau mot de passe (8 caractères min.)" autocomplete="new-password" style="margin-bottom:8px">
+          <button class="btn primary" id="secChange">Changer</button>
+          <p class="note">Les autres appareils seront déconnectés. Mot de passe oublié : sur le serveur, <code>docker compose exec atom python -m app.auth reset</code>.</p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="memory">
+        <div class="block">
+          <h4>Ce qu'Atom sait de toi</h4>
+          <p class="desc" id="memInfo">Atom retient seul les informations durables. Modifie ou supprime ce qui ne te convient pas.</p>
+          <label class="switch"><span>Mémoire automatique</span><input type="checkbox" id="autoMem"></label>
+          <div id="memList"></div>
+          <div class="row" style="margin-top:12px">
+            <input id="memNew" class="field" placeholder="Ajouter un souvenir…">
+            <button class="btn" id="memAdd">Ajouter</button>
+          </div>
+        </div>
+        <button class="btn danger" id="clearMem">Tout oublier</button>
+      </section>
+
+      <section class="pane" data-pane="reminders">
+        <div class="block">
+          <h4>Rappels programmés</h4>
+          <p class="desc">Demande simplement à Atom : « Rappelle-moi demain à 9 h d'appeler le garage ».</p>
+          <ul class="list" id="remList"></ul>
+          <p class="note" id="remInfo"></p>
+        </div>
+        <button class="btn" id="notifTest">Envoyer une notification de test</button>
+      </section>
+
+      <section class="pane" data-pane="hybrid">
+        <div class="block">
+          <h4>Mode hybride</h4>
+          <p class="desc" id="hyInfo">Atom répond en local par défaut, et peut s'appuyer sur des modèles plus puissants (Groq, Cerebras, Gemini…) quand ça vaut le coup.</p>
+          <div id="hySetup" class="note" style="display:none;margin-bottom:12px"></div>
+          <h4 style="font-size:13px;margin-top:6px">Moteur par défaut</h4>
+          <div class="row" id="hyMode" style="margin:8px 0 6px;flex-wrap:wrap"></div>
+          <p class="note">Auto : distant pour les demandes longues ou complexes (analyse, comparaison, rédaction…), local pour le reste. Si aucun fournisseur ne répond, Atom repasse en local. Le choix sous la saisie peut changer le moteur pour une conversation.</p>
+        </div>
+        <div class="block">
+          <h4>Ce qui peut être envoyé aux fournisseurs distants</h4>
+          <p class="desc">Ton message et le fil de la conversation sont toujours envoyés quand un modèle distant répond. Le reste ne sort que si tu l'autorises. La mémorisation, la recherche dans tes documents et l'indexation restent toujours en local.</p>
+          <label class="switch"><span>Mes souvenirs (ce qu'Atom sait de moi)</span><input type="checkbox" id="hyMem"></label>
+          <label class="switch"><span>Ma bibliothèque et mes fichiers joints</span><input type="checkbox" id="hyDocs"></label>
+          <label class="switch"><span>Les résultats de recherche web</span><input type="checkbox" id="hyWeb"></label>
+          <p class="note">Si une demande a besoin de ta bibliothèque ou d'un fichier et que l'envoi n'est pas autorisé, Atom répond en local.</p>
+        </div>
+        <div class="block">
+          <h4>Fournisseurs</h4>
+          <p class="desc">Le fournisseur <b>principal</b> répond quand Atom passe en distant. S'il est indisponible (limite, panne, quota du jour), Atom passe automatiquement au suivant, du plus fort au plus faible, puis au local. Ajoute-en d'autres dans <code>.env</code> : une ligne <code>ATOM_GEMINI_API_KEY=…</code> (ou CEREBRAS, OPENROUTER, GITHUB, MISTRAL) suffit.</p>
+          <div id="hyProviders" class="prov-list"></div>
+          <p class="note">« Sans données privées » : ce fournisseur ne reçoit jamais tes souvenirs, documents ni fichiers, même si tu les autorises plus haut (offres gratuites qui peuvent réutiliser les données). Réglable avec <code>ATOM_&lt;ID&gt;_PRIVATE</code>.</p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="workshop">
+        <div class="block">
+          <h4>Atelier multi-IA</h4>
+          <p class="desc">Pour une demande importante, plusieurs IA travaillent ensemble : l'une rédige, une autre critique, une troisième corrige ou arbitre. Active-le ici, puis utilise le bouton <b>Atelier</b> sous la saisie pour un message.</p>
+          <label class="switch"><span>Activer l'atelier</span><input type="checkbox" id="wsEnabled"></label>
+        </div>
+        <div class="block">
+          <h4>Schéma de travail</h4>
+          <div class="row" id="wsPattern" style="flex-wrap:wrap;margin:8px 0"></div>
+          <p class="note">Rédaction puis relecture : un rédacteur, un relecteur exigeant, une version corrigée. · Comité et arbitre : deux propositions indépendantes, un arbitre fait la synthèse. · Débat : deux positions opposées, un arbitre tranche — utile pour une décision.</p>
+        </div>
+        <div class="block">
+          <h4>Participants</h4>
+          <p class="desc">« Automatique » : le modèle le plus fort rédige, un modèle d'une <b>autre famille</b> relit (ils ne font pas les mêmes erreurs), et l'arbitre n'est jamais le plus faible. Le relecteur suit une grille (exactitude, consignes, cohérence, utilité) et signale ce qu'il ne peut pas vérifier.</p>
+          <div id="wsParts"></div>
+          <div class="row" id="wsRoundsRow" style="margin-top:10px"><span style="width:130px;font-size:13px;color:var(--text-2)">Tours de relecture</span><select class="field" id="wsRounds" style="max-width:120px"><option>1</option><option>2</option><option>3</option></select></div>
+          <p class="note" id="wsWarn" hidden></p>
+          <p class="note" id="wsCost"></p>
+          <p class="note">Confidentialité : l'atelier ne reçoit que ta demande et les derniers échanges — ni souvenirs, ni bibliothèque, ni fichiers. Si un participant est indisponible (limite, panne, quota), un autre fournisseur prend le relais, puis le local.</p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="backup">
+        <div class="block">
+          <h4>Sauvegardes automatiques</h4>
+          <p class="desc" id="bkInfo">Atom copie toute sa mémoire chaque nuit.</p>
+          <div class="row" style="flex-wrap:wrap">
+            <button class="btn primary" id="bkNow">Sauvegarder maintenant</button>
+            <button class="btn" id="bkExport">Télécharger une copie</button>
+            <button class="btn" id="bkImport">Restaurer depuis un fichier…</button>
+            <input type="file" id="bkFile" accept=".db" hidden>
+          </div>
+          <ul class="list" id="bkList" style="margin-top:14px"></ul>
+          <p class="note">Avant toute restauration, l'état actuel est sauvegardé automatiquement : rien n'est perdu par erreur. Garde de temps en temps une copie téléchargée hors du serveur.</p>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="look">
+        <div class="block">
+          <h4>Thème</h4>
+          <p class="desc">Sombre, clair, ou automatique selon ton système.</p>
+          <div class="row" id="themeRow"></div>
+        </div>
+        <div class="block">
+          <h4>Accueil</h4>
+          <label class="switch"><span>L'entité accueille au centre des nouvelles conversations</span><input type="checkbox" id="heroToggle"></label>
+        </div>
+        <div class="block">
+          <h4>Densité du texte</h4>
+          <p class="desc">Taille du texte et espacement des messages.</p>
+          <div class="row" id="densityRow"></div>
+        </div>
+        <div class="block">
+          <h4>Largeur de la conversation</h4>
+          <p class="desc">Colonne étroite pour lire, large pour les tableaux et le code.</p>
+          <div class="row" id="widthRow"></div>
+        </div>
+        <div class="block">
+          <h4>Installer Atom</h4>
+          <p class="desc" id="installInfo">Ajoute Atom à ton écran d'accueil pour l'ouvrir comme une application.</p>
+          <button class="btn" id="installBtn" style="display:none">Installer l'application</button>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="entity">
+        <div class="block">
+          <h4>Apparence de l'entité</h4>
+          <p class="desc">Maillage : un réseau de nœuds reliés, parcouru de signaux lumineux. Fragments : la sphère de poussière d'origine. Planète : une planète vivante dessinée au trait — continents, relief, nuages, lune, météo selon l'humeur, satellites pendant les grosses tâches.</p>
+          <div class="row" id="styleRow"></div>
+        </div>
+        <div class="block">
+          <h4>Tester une émotion</h4>
+          <p class="desc">Prévisualise les états de l'entité.</p>
+          <div class="emos" id="emos"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="palette"><div class="pal">
+  <div class="pal-in"><span data-i="search"></span><input id="palIn" placeholder="Chercher une conversation, une action, un réglage…" autocomplete="off"><kbd>Échap</kbd></div>
+  <div class="pal-list" id="palList"></div>
+  <div class="pal-foot"><span>↑↓ naviguer</span><span>Entrée ouvrir</span><span>Ctrl K ouvrir / fermer</span></div>
+</div></div>
+<nav id="tabbar">
+  <button data-tab="chats"><span data-i="list"></span>Discussions</button>
+  <button data-tab="library"><span data-i="library"></span>Bibliothèque</button>
+  <button data-tab="code"><span data-i="code"></span>Code</button>
+  <button data-tab="atom"><span data-i="orb"></span>Atom</button>
+  <button data-tab="settings"><span data-i="settings"></span>Réglages</button>
+</nav>
+<div id="login" hidden>
+  <form class="login-card" id="loginForm" autocomplete="on">
+    <img class="login-mark" src="/icons/mark-full.svg" alt="">
+    <div class="wordmark" style="font-size:20px;text-align:center">atom</div>
+    <p id="loginText">Entre ton mot de passe.</p>
+    <input type="text" name="username" value="atom" autocomplete="username" hidden>
+    <input class="field" type="password" id="loginPw" autocomplete="current-password" placeholder="Mot de passe" required>
+    <input class="field" type="password" id="loginPw2" autocomplete="new-password" placeholder="Confirme le mot de passe" hidden>
+    <p class="login-err" id="loginErr"></p>
+    <button class="btn primary" id="loginBtn" type="submit">Se connecter</button>
+    <p class="note" id="loginNote" style="text-align:center"></p>
+  </form>
+</div>
+<aside id="canvasPane" class="cvs" hidden>
+  <div class="cvs-head">
+    <input class="cvs-title" id="cvsTitle" placeholder="Titre" maxlength="120">
+    <select class="field" id="cvsVersions" title="Versions"></select>
+    <button class="iconbtn" id="cvsPreview" title="Aperçu / édition" data-i="panel"></button>
+    <button class="iconbtn" id="cvsCopy" title="Copier" data-i="copy"></button>
+    <button class="iconbtn" id="cvsDownload" title="Télécharger" data-i="download"></button>
+    <button class="iconbtn" id="cvsClose" title="Fermer" data-i="x"></button>
+  </div>
+  <div class="cvs-body"><textarea id="cvsText" spellcheck="true"></textarea><div class="cvs-view md" id="cvsView" hidden></div></div>
+  <div class="cvs-foot">
+    <div class="ag-chips" id="cvsQuick"></div>
+    <div class="cvs-ask"><span class="note" id="cvsSel"></span><input class="field" id="cvsInstr" placeholder="Demande à Atom de modifier… (sélectionne un passage pour ne changer que lui)"><button class="btn primary" id="cvsGo">Modifier</button></div>
+  </div>
+</aside>
+<div class="modal" id="spaceDlg">
+  <div class="modal-in">
+    <h4 id="spDlgTitle">Nouvel espace</h4>
+    <p class="desc">Un espace regroupe des conversations sur un sujet, avec ses propres consignes et ses documents. Dans un espace, Atom suit ces consignes et cherche d'abord dans ces collections.</p>
+    <label class="lbl">Nom</label>
+    <input class="field" id="spDlgName" placeholder="Ex. Leyo Shell, Administratif, Santé…" maxlength="80">
+    <label class="lbl">Consignes pour Atom (facultatif)</label>
+    <textarea class="field" id="spDlgInstr" rows="4" placeholder="Ex. « Je développe un shell en Go pour Windows. Réponds de façon technique, avec du code Go idiomatique. »"></textarea>
+    <label class="lbl">Collections de la bibliothèque (facultatif)</label>
+    <div class="lab-pick" id="spDlgCols"></div>
+    <div class="row" style="justify-content:space-between;margin-top:16px"><button class="btn" id="spDlgDel">Supprimer l'espace</button><span><button class="btn" id="spDlgCancel">Annuler</button> <button class="btn primary" id="spDlgOk">Enregistrer</button></span></div>
+  </div>
+</div>
+<div class="modal" id="codeDlg">
+  <div class="modal-in">
+    <h4>Ajouter un projet de code</h4>
+    <p class="desc">Atom lit le code (lecture seule) pour répondre à tes questions sur le projet.</p>
+    <label class="lbl">Dépôt GitHub</label>
+    <input class="field" id="codeUrl" placeholder="https://github.com/utilisateur/projet">
+    <p class="note">Dépôt privé : ajoute un jeton en lecture seule dans <code>ATOM_GITHUB_TOKEN</code> (voir README).</p>
+    <label class="lbl">ou un dossier du serveur</label>
+    <select class="field" id="codeServer"></select>
+    <p class="note">Les dossiers placés dans <code>~/atom/projects</code> sur le serveur apparaissent ici.</p>
+    <label class="lbl">Nom (facultatif)</label>
+    <input class="field" id="codeName" placeholder="Mon projet">
+    <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn" id="codeCancel">Annuler</button><button class="btn primary" id="codeOk">Ajouter</button></div>
+  </div>
+</div>
+<div class="modal" id="preview">
+  <div class="modal-in wide">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px"><h4 id="pvTitle" style="margin:0">Aperçu</h4><button class="iconbtn" id="pvClose" data-i="x"></button></div>
+    <div id="pvBody" class="pv-body"></div>
+  </div>
+</div>
+<div id="drop"><div><span data-i="download"></span><span id="dropTitle">Dépose tes fichiers ici</span><small id="dropSub">Texte, code, Markdown, CSV, JSON, PDF</small></div></div>
+<div id="presenceBg"></div>
+<div id="presence" aria-hidden="true">
+  <div><div class="clock" id="pClock">--:--</div><div class="date" id="pDate"></div></div>
+  <div>
+    <div class="bottom">
+      <div class="say" id="pSay"></div>
+      <div class="emo" id="pEmoBig">veille</div>
+    </div>
+    <div class="hint">Touche la sphère pour revenir</div>
+  </div>
+</div>
+
+<script src="/atom.js?v=__V__"></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-24h}   # garde le modèle chargé en RAM
+      # Une seule conversation à la fois : sinon Ollama réserve 4 contextes et peut faire swapper.
+      - OLLAMA_NUM_PARALLEL=1
+      # Le modèle de discussion et celui de la mémoire restent chargés ensemble.
+      - OLLAMA_MAX_LOADED_MODELS=2
+      # Contexte compressé : deux fois moins de RAM pour la même longueur.
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KV_CACHE_TYPE=q8_0
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Télécharge le modèle au premier démarrage, puis s'arrête.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["sh", "-c", "ollama pull ${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M} && ollama pull ${ATOM_EMBED_MODEL:-nomic-embed-text}"]
+    restart: "no"
+
+  # Moteur de recherche auto-hébergé (interne : pas de port exposé)
+  searxng:
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      - SEARXNG_BASE_URL=http://searxng:8080/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-change-moi-atom-searxng}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+
+  # Serveur de notifications push (appli ntfy sur le téléphone)
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    command: serve
+    restart: unless-stopped
+    ports:
+      - "${NTFY_PORT:-8080}:80"
+    environment:
+      - TZ=${TZ:-Europe/Paris}
+      - NTFY_BASE_URL=${NTFY_BASE_URL:-http://localhost:8080}
+      - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
+      - NTFY_CACHE_DURATION=72h
+      # Nécessaire pour les notifications instantanées sur iPhone (voir README)
+      - NTFY_UPSTREAM_BASE_URL=${NTFY_UPSTREAM_BASE_URL:-}
+    volumes:
+      - ntfy-cache:/var/cache/ntfy
+
+  atom:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      args:
+        ATOM_VERSION: ${ATOM_VERSION:-dev}
+    restart: unless-stopped
+    # Toutes les variables du .env (dont les fournisseurs ATOM_PROVIDERS / ATOM_<ID>_*) ;
+    # la liste « environment » ci-dessous garde la priorité.
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - ollama
+      - ntfy
+      - searxng
+    ports:
+      # ATOM_BIND=127.0.0.1 : Atom n'est plus joignable depuis le réseau local, seulement via Tailscale.
+      - "${ATOM_BIND:-0.0.0.0}:${ATOM_PORT:-8000}:8000"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - ATOM_MODEL=${ATOM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+      - ATOM_EMBED_MODEL=${ATOM_EMBED_MODEL:-nomic-embed-text}
+      - ATOM_PROVIDER=${ATOM_PROVIDER:-ollama}
+      - ATOM_PASSWORD=${ATOM_PASSWORD:-}
+      - ATOM_NUM_THREADS=${ATOM_NUM_THREADS:-0}
+      - ATOM_GITHUB_TOKEN=${ATOM_GITHUB_TOKEN:-}
+      - ATOM_GIT_NAME=${ATOM_GIT_NAME:-Atom}
+      - ATOM_GIT_EMAIL=${ATOM_GIT_EMAIL:-atom@localhost}
+      - ATOM_REMOTE_API_KEY=${ATOM_REMOTE_API_KEY:-}
+      - ATOM_REMOTE_MODEL=${ATOM_REMOTE_MODEL:-mistral-small-latest}
+      - ATOM_REMOTE_URL=${ATOM_REMOTE_URL:-https://api.mistral.ai/v1}
+      - ATOM_REMOTE_NAME=${ATOM_REMOTE_NAME:-Mistral}
+      - ATOM_REMOTE_DAILY_LIMIT=${ATOM_REMOTE_DAILY_LIMIT:-200}
+      - ATOM_BACKUP_DIR=/backups
+      - ATOM_BACKUP_KEEP=${ATOM_BACKUP_KEEP:-7}
+      - ATOM_BACKUP_TIME=${ATOM_BACKUP_TIME:-03:30}
+      - TZ=${TZ:-Europe/Paris}
+      - ATOM_NTFY_URL=http://ntfy:80
+      - ATOM_NTFY_TOPIC=${ATOM_NTFY_TOPIC:-atom}
+      - ATOM_PUBLIC_URL=${ATOM_PUBLIC_URL:-}
+      - ATOM_SEARXNG_URL=${ATOM_SEARXNG_URL-http://searxng:8080}
+      - ATOM_TELEGRAM_TOKEN=${ATOM_TELEGRAM_TOKEN:-}
+      - ATOM_TELEGRAM_ALLOWED=${ATOM_TELEGRAM_ALLOWED:-}
+    volumes:
+      - atom-data:/data
+      # Sauvegardes visibles sur l'hôte (dossier ./backups) : faciles à copier ailleurs.
+      - ./backups:/backups
+      # Tes projets de code sur le serveur, en lecture seule (voir README « Bibliothèque »)
+      - ${ATOM_PROJECTS_HOST_DIR:-./projects}:/projects:ro
+
+  # Accès distant en HTTPS via Tailscale, sans VM ni /dev/net/tun (mode espace utilisateur).
+  # Activé seulement avec le profil « tailscale » (COMPOSE_PROFILES=tailscale dans .env).
+  tailscale:
+    image: tailscale/tailscale:stable
+    profiles: ["tailscale"]
+    # Pas de « hostname: atom » ici : le conteneur se résoudrait lui-même au lieu du service atom.
+    # Le nom sur le réseau Tailscale vient de TS_HOSTNAME.
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY:-}
+      - TS_HOSTNAME=${TS_HOSTNAME:-atom}
+      - TS_USERSPACE=true
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale/serve.json:/config/serve.json:ro
+    depends_on:
+      - atom
+      - ntfy
+
+volumes:
+  tailscale-state:
+  ntfy-cache:
+  ollama:
+  atom-data:
