@@ -17,6 +17,9 @@ router = APIRouter()
 
 
 from ..streaming import event  # noqa: E402
+import logging  # noqa: E402
+
+log = logging.getLogger("atom.lab")
 
 
 
@@ -62,6 +65,7 @@ async def lab_delete(body: ModelName):
     try:
         await models_lab.delete(body.name)
     except Exception as e:  # noqa: BLE001
+        log.warning("lab : erreur gérée", exc_info=True)
         raise HTTPException(502, str(e)) from e
     return {"ok": True}
 
@@ -88,5 +92,6 @@ async def benchmark(model: str | None = None):
         async for _ in llm.stream_chat(m, [{"role": "user", "content": "Écris une phrase de 40 mots sur la mer. /no_think"}]):
             n += 1
     except Exception as e:  # noqa: BLE001
+        log.warning("lab : erreur gérée", exc_info=True)
         raise HTTPException(502, str(e)) from e
     return {"model": m, "wall_s": round(time.time() - t0, 2), **llm.last_stats}

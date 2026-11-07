@@ -5,6 +5,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from .. import canvas
+import logging
+
+log = logging.getLogger("atom.canvas")
 
 router = APIRouter()
 
@@ -57,6 +60,7 @@ async def canvas_edit(cid: int, body: CanvasEditIn):
     except KeyError as e:
         raise HTTPException(404, "Canevas introuvable") from e
     except Exception as e:  # noqa: BLE001
+        log.warning("canvas : erreur gérée", exc_info=True)
         raise HTTPException(502, f"Modification impossible : {e}") from e
 
 

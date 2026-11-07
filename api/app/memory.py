@@ -236,6 +236,7 @@ async def _judge(old: dict, new: str, model: str | None) -> dict:
         out = await llm.json_chat(model or db.kv_get("model") or DEFAULT_MODEL,
                                   [{"role": "user", "content": JUDGE_PROMPT.format(old=old["content"], new=new, date=date)}], JUDGE_SCHEMA)
     except Exception:  # noqa: BLE001
+        log.warning("memory : erreur gérée", exc_info=True)
         out = {}
     if out.get("relation") not in ("identique", "complement", "contradiction", "different"):
         return {"relation": "different", "fusion": ""}

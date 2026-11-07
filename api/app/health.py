@@ -12,6 +12,9 @@ import httpx
 from . import backup, db, hybrid, library, ocr, providers, proxmox, sandbox, search, telegram
 from .config import (DATA_DIR, DB_PATH, DEFAULT_MODEL, EMBED_MODEL, NTFY_URL, OLLAMA_URL, PROVIDER, SEARXNG_URL,
                      TELEGRAM_ALLOWED, TELEGRAM_TOKEN)
+import logging
+
+log = logging.getLogger("atom.health")
 
 VERSION = os.getenv("ATOM_VERSION", "dev")
 
@@ -59,6 +62,7 @@ async def _telegram() -> dict:
             me = await telegram.call(client, "getMe")
         return _c("Telegram", "ok", f"@{me.get('username')} · {len(TELEGRAM_ALLOWED)} utilisateur(s) autorisé(s)")
     except Exception as e:  # noqa: BLE001
+        log.warning("health : erreur gérée", exc_info=True)
         return _c("Telegram", "error", str(e)[:120], "vérifie le jeton dans .env")
 
 
@@ -75,6 +79,7 @@ async def _remote() -> list[dict]:
         try:
             models = await providers.list_models(p)
         except Exception:  # noqa: BLE001
+            log.warning("health : erreur gérée", exc_info=True)
             models = None   # pas de liste (ex. GitHub Models) : on vérifie par un appel minimal
         if models is None or not models:
             err = await providers.ping(p)

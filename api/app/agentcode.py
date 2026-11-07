@@ -24,6 +24,9 @@ from typing import AsyncIterator
 
 from . import db, hybrid, library, llm, providers, sandbox
 from .config import DEFAULT_MODEL, PROVIDER
+import logging
+
+log = logging.getLogger("atom.agentcode")
 
 MAX_STEPS = 25
 READ_LINES = 250
@@ -498,6 +501,7 @@ async def _run_text(ws: "Workspace", system: str, task: str, state: dict) -> Asy
             else:
                 reply = "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
         except Exception as e:  # noqa: BLE001
+            log.warning("agentcode : erreur gérée", exc_info=True)
             yield dict(type="error", message=f"Le modèle n'a pas répondu : {e}")
             return
         thought, action = _parse(reply)
@@ -666,6 +670,7 @@ def start(cid: int, task: str, engine: str, parent_id: str | None = None, readon
                     _save(rid, events=json.dumps(live["events"], ensure_ascii=False))
                     last_save = time.time()
         except Exception as e:  # noqa: BLE001
+            log.warning("agentcode : erreur gérée", exc_info=True)
             status = "error"
             live["events"].append(dict(type="error", message=f"Agent interrompu : {e}"))
             live["events"].append(dict(type="done", id=rid, summary="", files=[]))

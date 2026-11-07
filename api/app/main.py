@@ -78,6 +78,8 @@ from .routes import canvas as _r_canvas, git as _r_git  # noqa: E402
 app.include_router(_r_canvas.router)
 app.include_router(_r_git.router)
 import importlib  # noqa: E402
+
+log = logging.getLogger("atom.main")
 for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab'):
     _m = importlib.import_module(f".routes.{_n}", __package__)
     app.include_router(_m.router)
@@ -361,6 +363,7 @@ def extract(body: ExtractIn):
                 ocr_used = bool(got)
             text = "\n\n".join(f"--- page {i + 1} ---\n{t.strip()}" for i, t in enumerate(pages) if t.strip())
         except Exception as e:  # noqa: BLE001
+            log.warning("main : erreur gérée", exc_info=True)
             raise HTTPException(400, f"PDF illisible : {e}") from e
         if not text.strip():
             raise HTTPException(400, "Ce PDF ne contient pas de texte lisible." if ocr.pdf_available()

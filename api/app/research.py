@@ -16,6 +16,9 @@ from typing import AsyncIterator
 
 from . import db, hybrid, llm, search
 from .config import DEFAULT_MODEL
+import logging
+
+log = logging.getLogger("atom.research")
 
 MAX_QUERIES = 6
 
@@ -28,6 +31,7 @@ async def _ask(messages: list[dict], used: dict) -> str:
             used["engine"] = hybrid.last_used.get("name") or "distant"
             return out
         except Exception:  # noqa: BLE001
+            log.warning("research : erreur gérée", exc_info=True)
             pass
     used["engine"] = "local"
     return "".join([t async for t in llm.stream_chat(db.kv_get("model") or DEFAULT_MODEL, messages)])
@@ -43,6 +47,7 @@ async def _stream(messages: list[dict], used: dict) -> AsyncIterator[str]:
             used["engine"] = hybrid.last_used.get("name") or "distant"
             return
         except Exception:  # noqa: BLE001
+            log.warning("research : erreur gérée", exc_info=True)
             if got:
                 raise
     used["engine"] = "local"
@@ -98,6 +103,7 @@ async def run(question: str, conversation_id: int | None) -> AsyncIterator[dict]
         try:
             results = await search.search(q)
         except Exception as e:  # noqa: BLE001
+            log.warning("research : erreur gérée", exc_info=True)
             yield dict(type="progress", text=f"Recherche impossible ({e})")
             return
         fresh = []
