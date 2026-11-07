@@ -1350,8 +1350,9 @@ function renderCards() {
 
 function renderEmpty() {
   const g = greeting().replace(/\.$/, "");
-  chat.innerHTML = `<div id="empty"><div id="heroSlot"></div><h1><span class="orbtxt">${g}</span>.</h1><p>Que puis-je faire pour toi ?</p><div class="cards"></div></div>`;
+  chat.innerHTML = `<div id="empty"><div id="heroSlot"></div><h1><span class="orbtxt">${g}</span>.</h1><p>Que puis-je faire pour toi ?</p><div class="today" id="today"></div><div class="cards"></div></div>`;
   renderCards();
+  renderToday();
   requestAnimationFrame(() => enterHero());
 }
 
@@ -1904,8 +1905,46 @@ async function refreshSystem() {
   } catch {}
 }
 
+// Ligne « aujourd'hui » de l'accueil : rappels du jour, état du serveur, mémoire
+async function renderToday() {
+  const box = $("today"); if (!box) return;
+  const parts = [];
+  try {
+    const r = (await getJSON("/api/reminders")).reminders;
+    const end = new Date(); end.setHours(23, 59, 59, 999);
+    const today = r.filter((x) => x.due_at * 1000 <= end.getTime());
+    parts.push(`<button data-go="reminders"><span class="dot${today.length ? " warn" : ""}"></span>${today.length ? `${today.length} rappel${today.length > 1 ? "s" : ""} aujourd'hui` : "aucun rappel aujourd'hui"}</button>`);
+  } catch {}
+  try {
+    const p = await getJSON("/api/proxmox");
+    if (p.configured) {
+      const n = p.alerts?.length || 0, run = p.guests.filter((g) => g.status === "running").length;
+      parts.push(`<button data-go="proxmox"><span class="dot ${!p.ok ? "err" : n ? "warn" : "ok"}"></span>${!p.ok ? "serveur injoignable" : n ? `${n} alerte${n > 1 ? "s" : ""} serveur` : `serveur OK · ${run} en marche`}</button>`);
+    }
+  } catch {}
+  try {
+    const m = (await getJSON("/api/memories")).memories.length;
+    if (m) parts.push(`<button data-go="memory"><span class="dot"></span>${m} souvenir${m > 1 ? "s" : ""}</button>`);
+  } catch {}
+  if (!$("today")) return;
+  box.innerHTML = parts.join("");
+  box.querySelectorAll("[data-go]").forEach((b) => { b.onclick = () => openSettings(b.dataset.go); });
+}
 async function refreshPanel() {
   if (!panelVisible()) return;
+  try {   // serveur Proxmox (si configuré)
+    const p = await getJSON("/api/proxmox");
+    $("pxSec").hidden = !p.configured;
+    if (p.configured) {
+      const n = p.nodes[0], run = p.guests.filter((g) => g.status === "running").length;
+      $("pxMini").innerHTML = !p.ok ? `<p class="alert">Injoignable : ${esc(p.error)}</p>` : `<div class="px-mini">
+        ${(p.alerts || []).map((a) => `<p class="alert">⚠ ${esc(a.title)}</p>`).join("")}
+        ${n ? `<div class="metric"><div class="l"><span>${esc(n.name)} · processeur</span><span>${n.cpu.toFixed(0)} %</span></div><div class="bar"><i style="width:${n.cpu}%"></i></div></div>
+        <div class="metric"><div class="l"><span>Mémoire</span><span>${n.mem.toFixed(0)} %</span></div><div class="bar"><i style="width:${n.mem}%"></i></div></div>` : ""}
+        <div class="kv"><span>Invités en marche</span><span>${run} / ${p.guests.length}</span></div></div>`;
+      $("pxMini").onclick = () => openSettings("proxmox");
+    }
+  } catch { $("pxSec").hidden = true; }
   try {
     const r = (await getJSON("/api/reminders")).reminders.slice(0, 3);
     $("pRem").innerHTML = r.length
@@ -2295,12 +2334,14 @@ function enterHero() {
   entity.target = "hero";
   stageOut("hero-ph");
   document.body.classList.add("hero");
+  requestAnimationFrame(() => { if (placeholder) placeholder.style.height = "0px"; });   // le panneau remonte ses rubriques
   flyTo(1, 1000, () => { heroBusy = false; });
 }
 function exitHero(cb) {
   if (!heroOn) { cb && cb(); return; }
   heroBusy = true;
   document.body.classList.remove("hero");
+  if (placeholder) placeholder.style.height = "360px";   // la place revient pendant le retour de l'entité
   flyTo(0, 750, () => { stageBack(); heroOn = false; heroBusy = false; entity.target = "full"; cb && cb(); });
 }
 
@@ -3882,7 +3923,7 @@ function renderDeepBtn() {
   b.classList.toggle("on", deepNext);
   b.title = deepNext ? "Recherche approfondie activée pour le prochain message (clic pour annuler)" : "Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé";
 }
-$("deepBtn").onclick = () => { deepNext = !deepNext; if (deepNext) { webForce = false; renderWebBtn(); } renderDeepBtn(); input.focus(); if (deepNext) toast("Recherche approfondie : compte 1 à 3 minutes. Atom lit plusieurs sources et rédige un rapport."); };
+$("deepBtn").onclick = () => { deepNext = !deepNext; if (deepNext) { webForce = false; renderWebBtn(); } renderDeepBtn(); input.focus(); };
 setInterval(renderDeepBtn, 3000); renderDeepBtn();
 function analysisEl(a) {
   const d = document.createElement("div");
@@ -4043,6 +4084,45 @@ $("pxRefresh").onclick = loadProxmox;
 $("pxNotify").onchange = () => pxSave({ notify: $("pxNotify").checked });
 $("pxGuestDown").onchange = () => pxSave({ guest_down: $("pxGuestDown").checked });
 [["pxCpu", "cpu"], ["pxMem", "mem"], ["pxMin", "minutes"], ["pxSto", "storage"]].forEach(([id, k]) => { $(id).onchange = () => pxSave({ [k]: +$(id).value }); });
+
+/* ============================================================
+   ZONE DE SAISIE — outils derrière « + », modes actifs en pastilles
+   (divulgation progressive : l'essentiel visible, le reste à un clic)
+   ============================================================ */
+function toolsItems() {
+  const items = [];
+  if (searchAvailable) {
+    items.push({ id: "web", ic: "globe", t: "Rechercher sur Internet", d: "Pour ce message · quelques secondes", on: webForce, run: () => $("webBtn").click() });
+    items.push({ id: "deep", ic: "library", t: "Recherche approfondie", d: "Plan, lecture de nombreuses pages, rapport sourcé · 1 à 3 min", on: deepNext, run: () => $("deepBtn").click() });
+  }
+  if (workshopCfg?.enabled) items.push({ id: "ws", ic: "users", t: "Atelier multi-IA", d: "Plusieurs IA rédigent et se relisent · 3 appels ou plus", on: workshopNext, run: () => $("wsBtn").click() });
+  items.push("hr");
+  items.push({ id: "file", ic: "clip", t: "Joindre un fichier", d: "Texte, code, PDF, tableur (analysé en Python), image", run: () => $("attach").click() });
+  items.push({ id: "pal", ic: "search", t: "Toutes les actions", d: "Ctrl+K", run: () => openPalette() });
+  return items;
+}
+function renderTools() {
+  $("toolsMenu").innerHTML = toolsItems().map((x, i) => x === "hr" ? "<hr>" :
+    `<button type="button" data-k="${i}" class="${x.on ? "on" : ""}">${icon(x.ic)}<b>${esc(x.t)}</b><small>${esc(x.d)}</small></button>`).join("");
+  const items = toolsItems();
+  $("toolsMenu").querySelectorAll("[data-k]").forEach((b) => { b.onclick = () => { $("toolsMenu").classList.remove("open"); items[+b.dataset.k].run(); renderModes(); }; });
+}
+$("toolsBtn").onclick = (e) => { e.stopPropagation(); renderTools(); $("toolsMenu").classList.toggle("open"); };
+document.addEventListener("click", (e) => { if (!e.target.closest(".tools-wrap")) $("toolsMenu").classList.remove("open"); });
+function renderModes() {
+  const m = [];
+  if (webForce) m.push(["globe", "Recherche web", () => $("webBtn").click()]);
+  if (deepNext) m.push(["library", "Recherche approfondie · 1 à 3 min", () => $("deepBtn").click()]);
+  if (workshopNext) m.push(["users", "Atelier multi-IA", () => $("wsBtn").click()]);
+  const box = $("modes");
+  const key = m.map((x) => x[1]).join("|");
+  if (box.dataset.k === key) return;
+  box.dataset.k = key;
+  box.innerHTML = m.map(([ic, t], i) => `<span class="mode-chip">${icon(ic)}${esc(t)}<button type="button" data-x="${i}" title="Désactiver">${icon("x")}</button></span>`).join("");
+  box.querySelectorAll("[data-x]").forEach((b) => { b.onclick = () => { m[+b.dataset.x][2](); renderModes(); input.focus(); }; });
+  $("toolsBtn").classList.toggle("on", m.length > 0);
+}
+setInterval(renderModes, 400);
 
 /* ============================================================
    THÈME

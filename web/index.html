@@ -150,10 +150,12 @@
       <div class="composer-in">
         <button id="toBottom" title="Aller en bas" data-i="down"></button>
         <form id="form" autocomplete="off">
+          <div class="modes" id="modes"></div>
           <div class="tray" id="tray"></div>
           <textarea id="input" rows="1" placeholder="Écrire à Atom…"></textarea>
           <div class="cbar">
-            <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF)" data-i="clip"></button>
+            <div class="tools-wrap"><button class="iconbtn" id="toolsBtn" type="button" title="Outils : recherche, recherche approfondie, atelier…" data-i="plus"></button><div class="tools-menu" id="toolsMenu"></div></div>
+            <button class="iconbtn" id="attach" type="button" title="Joindre un fichier (texte, code, PDF, tableur, image)" data-i="clip"></button>
             <button class="iconbtn" id="webBtn" type="button" title="Rechercher sur Internet pour ce message" data-i="globe"></button>
             <button class="iconbtn" id="deepBtn" type="button" title="Recherche approfondie : plusieurs recherches, lecture de nombreuses pages, rapport sourcé" data-i="library"></button>
             <button class="iconbtn" id="wsBtn" type="button" title="Atelier multi-IA pour ce message" data-i="users" style="display:none"></button>
@@ -179,7 +181,11 @@
         <div class="stage-top"><span>Atom</span><button class="iconbtn" id="panelClose" title="Fermer" data-i="x"></button></div>
         <div class="stage-meta"><span id="emoName">Veille</span><span id="emoState">en attente</span></div>
       </div>
-      <details class="sec" id="sysSec">
+      <details class="sec" id="pxSec" hidden open>
+        <summary><h3>Serveur</h3></summary>
+        <div id="pxMini"></div>
+      </details>
+      <details class="sec" id="sysSec" open>
         <summary><h3>Système</h3></summary>
         <div class="metric"><div class="l"><span>Processeur</span><span id="cpuV">—</span></div><div class="bar"><i id="cpuB"></i></div></div>
         <div class="metric"><div class="l"><span>Mémoire</span><span id="ramV">—</span></div><div class="bar"><i id="ramB"></i></div></div>
@@ -187,11 +193,11 @@
         <div class="kv"><span>Vitesse</span><span id="speedV">—</span></div>
         <div class="kv"><span>Serveur actif depuis</span><span id="upV">—</span></div>
       </details>
-      <details class="sec">
+      <details class="sec" open>
         <summary><h3>Prochains rappels</h3></summary>
         <ul class="list" id="pRem"></ul>
       </details>
-      <details class="sec">
+      <details class="sec" open>
         <summary><h3>Derniers souvenirs</h3></summary>
         <ul class="list" id="pMem"></ul>
       </details>
