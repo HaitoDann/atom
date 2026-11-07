@@ -547,7 +547,19 @@ def _progress(cid: int, phase: str, done: int = 0, total: int = 0) -> None:
     p.update(phase=phase, done=done, total=total)
 
 
+_index_locks: dict[int, asyncio.Lock] = {}
+
+
 async def index_project(cid: int) -> None:
+    """Une seule indexation à la fois par projet (mise à jour Git, application de l'agent, etc.)."""
+    lock = _index_locks.setdefault(cid, asyncio.Lock())
+    if lock.locked():
+        log.info("indexation du projet %s déjà en cours : la demande attend son tour", cid)
+    async with lock:
+        await _index_project(cid)
+
+
+async def _index_project(cid: int) -> None:
     """Deux temps : 1) les fichiers sont enregistrés (le projet est tout de suite consultable),
     2) les passages sont vectorisés par gros lots, avec progression (c'est la partie lente sur CPU)."""
     col = get_collection(cid)
