@@ -20,6 +20,16 @@ async function login(page) {
   if (await page.locator("#loginPw2").isVisible()) await page.fill("#loginPw2", PASSWORD);   // premier lancement
   await page.click("#loginBtn");
   await expect(page.locator("#login")).toBeHidden();
+  await page.waitForLoadState("networkidle");   // conversations et brouillon restaurés
+}
+
+/** Saisit puis envoie ; recommence si l'interface a vidé le champ entre-temps (restauration du brouillon). */
+async function send(page, text) {
+  await expect(async () => {
+    await page.fill("#input", text);
+    await expect(page.locator("#send")).toBeEnabled({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await page.click("#send");
 }
 
 test.describe.configure({ mode: "serial" });
@@ -27,8 +37,7 @@ test.describe.configure({ mode: "serial" });
 test("connexion puis discussion en streaming", async ({ page }) => {
   const errors = watchErrors(page);
   await login(page);
-  await page.fill("#input", "Bonjour Atom");
-  await page.click("#send");
+  await send(page, "Bonjour Atom");
   await expect(page.locator(".msg.user").last()).toContainText("Bonjour Atom");
   await expect(page.locator(".msg.atom").last()).toContainText("Tu m'as dit : « Bonjour Atom »", { timeout: 15_000 });
   expect(errors).toEqual([]);
@@ -37,8 +46,7 @@ test("connexion puis discussion en streaming", async ({ page }) => {
 test("la conversation survit au rechargement", async ({ page }) => {
   const errors = watchErrors(page);
   await login(page);
-  await page.fill("#input", "Message à retrouver");
-  await page.click("#send");
+  await send(page, "Message à retrouver");
   await expect(page.locator(".msg.atom").last()).toContainText("Message à retrouver", { timeout: 15_000 });
   await page.reload();
   await expect(page.locator(".msg.user").filter({ hasText: "Message à retrouver" })).toBeVisible();
