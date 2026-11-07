@@ -16,7 +16,7 @@ jobs:
       - name: Tests et couverture
         run: cd api && python -m pytest -q --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=70
       - name: Syntaxe de l'interface
-        run: node --check web/atom.js && node --check web/sw.js
+        run: for f in web/js/*.js web/sw.js; do node --check "$f"; done
   docker:
     runs-on: ubuntu-latest
     steps:
@@ -27,3 +27,20 @@ jobs:
           SEARXNG_SECRET=ci docker compose -f docker-compose.yml -f docker-compose.sandbox.yml config -q
       - name: Construction de l'image
         run: docker build -f api/Dockerfile -t atom-ci .
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r api/requirements.txt
+      - name: Playwright
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Tests de l'interface
+        working-directory: e2e
+        run: npm test

@@ -14,7 +14,8 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 
 | Chemin | Rôle |
 |---|---|
-| `web/index.html`, `web/atom.js`, `web/atom.css` | L'interface (sans build), `web/sw.js` pour le mode hors ligne (PWA) |
+| `web/index.html`, `web/atom.css`, `web/js/` | L'interface (sans build) : un script par domaine, chargés dans l'ordre ; `web/sw.js` pour le mode hors ligne (PWA) |
+| `e2e/` | Tests de bout en bout de l'interface (Playwright, modèle simulé) : `cd e2e && npm ci && npm test` |
 | `api/app/main.py` | Application FastAPI : authentification, santé, montage des routes |
 | `api/app/routes/` | Routes HTTP réparties par domaine (conversations, mémoire, code, Git, canevas, espaces…) |
 | `api/app/agent.py` | Cœur de l'agent : prompt, streaming, commandes (partagé web / Telegram) |
@@ -608,7 +609,7 @@ Atom relève chaque minute l'état de ton serveur et t'alerte en cas de problèm
 ## Structure du code
 
 - `api/app/` : le serveur FastAPI, un module par fonction (`agent` pour la discussion, `agentcode` pour l'agent du mode Code, `library`, `providers`, `sandbox`, `gitops`, `research`, `analysis`, `canvas`, `spaces`, `proxmox`, `telegram`…).
-- `web/index.html` : la structure de la page. `web/atom.css` : les styles. `web/atom.js` : la logique de l'interface. Les fichiers sont servis avec un numéro de version, donc le navigateur recharge dès qu'ils changent.
+- `web/index.html` : la structure de la page. `web/atom.css` : les styles. `web/js/` : la logique de l'interface, un fichier par domaine (`01-icones-emotions.js` … `14-demarrage.js`), chargés dans l'ordre et partageant la même portée : une fonction définie dans un fichier est utilisable dans les autres une fois la page chargée, mais le code exécuté au chargement ne doit appeler que ce qui est défini dans un fichier précédent. Les fichiers sont servis avec un numéro de version, donc le navigateur recharge dès qu'ils changent.
 - `api/tests/` : les tests (`cd api && python -m pytest -q`), lancés aussi par GitHub Actions avec une vérification de la syntaxe du JavaScript.
 
 ### Couches du serveur

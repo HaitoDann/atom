@@ -404,7 +404,8 @@ def service_worker():
 
 def _asset_version() -> str:
     """Version des fichiers de l'interface (date de modification) : le navigateur recharge dès qu'ils changent."""
-    m = max((WEB_DIR / f).stat().st_mtime for f in ("atom.css", "atom.js", "index.html") if (WEB_DIR / f).exists())
+    files = [WEB_DIR / "atom.css", WEB_DIR / "index.html", *sorted((WEB_DIR / "js").glob("*.js"))]
+    m = max(f.stat().st_mtime for f in files if f.exists())
     return format(int(m), "x")
 
 
