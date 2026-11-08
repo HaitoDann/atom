@@ -285,7 +285,7 @@ chat.addEventListener("click", async (e) => {
       a.download = name; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
       toast(`${esc(name)} téléchargé.`);
-    } else openPreview(code, box.dataset.name || "page.html");
+    } else openPreview(code, box.dataset.name || "page.html", box);
     return;
   }
   const b = e.target.closest("[data-copy]");
@@ -342,15 +342,39 @@ $("toBottom").onclick = () => scroller.scrollTo({ top: scroller.scrollHeight, be
 
 
 /* Aperçu d'une page HTML : servie par Atom dans un bac à sable (origine isolée), affichée dans un cadre. */
-async function openPreview(html, name) {
+let pvw = { name: "", versions: [], idx: 0 };
+async function openPreview(html, name, box) {
+  // Toutes les versions de ce fichier dans la conversation, dans l'ordre : on peut passer de l'une à l'autre.
+  const blocks = [...chat.querySelectorAll(".code")].filter((b) => (b.dataset.name || "page.html") === name);
+  pvw = { name, versions: blocks.map((b) => b.querySelector("pre").textContent), idx: Math.max(0, blocks.indexOf(box)) };
+  if (!pvw.versions.length) pvw.versions = [html];
+  $("pvwTitle").textContent = name;
+  $("pvwVers").innerHTML = pvw.versions.length > 1 ? pvw.versions.map((_, i) => `<button type="button" data-v="${i}">v${i + 1}</button>`).join("") : "";
+  $("pvwVers").querySelectorAll("button").forEach((b) => b.onclick = () => showPreviewVersion(+b.dataset.v));
+  $("pvw").hidden = false;
+  await showPreviewVersion(pvw.idx);
+  $("pvwAskIn").value = "";
+}
+async function showPreviewVersion(i) {
+  pvw.idx = i;
+  const html = pvw.versions[i];
+  $("pvwVers").querySelectorAll("button").forEach((b) => b.classList.toggle("on", +b.dataset.v === i));
   let r;
   try { r = await (await send_("/api/preview", "POST", { html })).json(); } catch (e) { toast(esc(e.message)); return; }
-  $("pvwTitle").textContent = name;
   $("pvwFrame").src = r.url;
   $("pvwOpen").onclick = () => window.open(r.url, "_blank", "noopener");
-  $("pvwDl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" })); a.download = name; a.click(); };
-  $("pvw").hidden = false;
+  $("pvwDl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" })); a.download = pvw.name; a.click(); };
 }
+// Itérer : la version affichée et ta consigne partent dans la conversation ; la nouvelle version arrive en réponse.
+$("pvwAsk").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const ask = $("pvwAskIn").value.trim(); if (!ask || busy) return;
+  const lang = /\.css$/.test(pvw.name) ? "css" : /\.js$/.test(pvw.name) ? "js" : "html";
+  closePreview();
+  input.value = `Modifie le fichier **${pvw.name}** : ${ask}\n\nGarde tout le reste à l'identique et renvoie le fichier COMPLET, ` +
+    `précédé de son nom (**${pvw.name}**).\n\nVersion actuelle (v${pvw.idx + 1}) :\n\n**${pvw.name}**\n\n\`\`\`${lang}\n${pvw.versions[pvw.idx]}\n\`\`\``;
+  autoGrow(); sendBtn.click();
+});
 function closePreview() { $("pvw").hidden = true; $("pvwFrame").src = "about:blank"; }
 $("pvwClose").onclick = closePreview;
 $("pvw").addEventListener("click", (e) => { if (e.target.id === "pvw") closePreview(); });
@@ -397,10 +421,13 @@ function zipFiles(body) {
 }
 function addZipBar(body) {
   const files = zipFiles(body);
-  if (files.length < 2) return;
+  if (!files.length) return;
   const bar = document.createElement("div"); bar.className = "zip-bar";
-  bar.innerHTML = `<span>${files.length} fichiers : ${files.map((f) => `<code>${esc(f.name)}</code>`).join(" ")}</span>` +
-    `<button class="btn sm" data-zip>${icon("download")}Tout télécharger (.zip)</button>`;
+  bar.innerHTML = `<span>${files.length > 1 ? `${files.length} fichiers` : "1 fichier"} : ${files.map((f) => `<code>${esc(f.name)}</code>`).join(" ")}</span>` +
+    `<button class="btn sm" data-project title="Enregistrer comme projet et l'ouvrir dans le mode Code (modifier, versions Git, agent, tests)">${icon("code")}Ouvrir dans le mode Code</button>` +
+    (files.length > 1 ? `<button class="btn sm" data-zip>${icon("download")}Tout télécharger (.zip)</button>` : "");
+  bar.querySelector("[data-project]").onclick = (e) => saveAsProject(e.currentTarget, zipFiles(body));
+  if (files.length < 2) { body.appendChild(bar); return; }
   bar.querySelector("[data-zip]").onclick = () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(makeZip(zipFiles(body)));
@@ -409,4 +436,25 @@ function addZipBar(body) {
     toast(`${files.length} fichiers téléchargés (.zip).`);
   };
   body.appendChild(bar);
+}
+
+
+/* Les fichiers d'une réponse deviennent un projet du mode Code : on peut alors les modifier (avec validation),
+   garder des versions Git, lancer l'agent ou les tests. */
+async function saveAsProject(btn, files) {
+  const html = files.find((f) => /\.html?$/.test(f.name));
+  const title = html?.text.match(/<title>([^<]{1,60})<\/title>/i)?.[1]?.trim();
+  const name = prompt("Nom du projet :", title || files[0].name.replace(/\.[^.]+$/, ""));
+  if (!name) return;
+  btn.disabled = true;
+  try {
+    const r = await (await send_("/api/projects/from-files", "POST", { name, files: files.map((f) => ({ path: f.name, content: f.text })) })).json();
+    toast(`Projet « ${esc(name)} » créé (${r.files} fichier${r.files > 1 ? "s" : ""}).`);
+    code.project = r.collection_id; code.open = []; codeRestored = true;
+    showView("code");
+    await loadCodeProjects();
+    const main = html?.name || files[0].name;
+    if (code.files.some((f) => f.path === main)) await openFile(main);
+  } catch (e) { toast(esc(e.message)); }
+  finally { btn.disabled = false; }
 }

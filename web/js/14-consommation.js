@@ -238,3 +238,17 @@ $("dashCheck").onclick = async (e) => {
   } catch (err) { box.innerHTML = `<p class="us-ko">${esc(err.message)}</p>`; box.hidden = false; }
   finally { b.disabled = false; b.textContent = "Vérifier le tableau"; }
 };
+
+/* ---- Diagnostic complet (Réglages → État) */
+let diagText = "";
+$("diagGo").onclick = async (e) => {
+  const b = e.currentTarget; b.disabled = true; b.innerHTML = '<span class="spin"></span> Diagnostic en cours…';
+  try {
+    const r = await (await send_("/api/diagnostic", "POST")).json();
+    diagText = r.report;
+    $("diagOut").textContent = r.report; $("diagOut").hidden = false; $("diagCopy").hidden = false;
+    toast(r.status === "ok" ? "Tout fonctionne." : r.status === "warn" ? "Diagnostic terminé : quelques points à surveiller." : "Diagnostic terminé : des problèmes ont été détectés.");
+  } catch (err) { toast(esc(err.message)); }
+  finally { b.disabled = false; b.textContent = "Lancer le diagnostic"; }
+};
+$("diagCopy").onclick = () => { copyText(diagText); toast("Rapport copié : colle-le dans ta demande d'aide."); };
