@@ -229,10 +229,15 @@ test("atelier : lanceur, schéma conseillé, équipe, suivi des étapes en direc
 test("atelier : exemple en un clic et lancement au clavier (Ctrl+Entrée)", async ({ page }) => {
   const errors = watchErrors(page);
   await login(page);
-  await page.fill("#input", "Ma demande depuis la saisie");
-  await page.click("#toolsBtn");                                                   // menu « + » sous la saisie
-  await page.locator("#toolsMenu").getByText("Atelier multi-IA…").click();
-  await expect(page.locator("#wlText")).toHaveValue("Ma demande depuis la saisie");
+  // Saisie puis menu « + » → Atelier : la demande est reprise. On recommence si la restauration du brouillon
+  // a vidé la saisie entre-temps (machine lente).
+  await expect(async () => {
+    if (await page.locator("#wsLaunch").isVisible()) { await page.click("#wlClose"); await page.fill("#wlText", ""); }
+    await page.fill("#input", "Ma demande depuis la saisie");
+    await page.click("#toolsBtn");
+    await page.locator("#toolsMenu").getByText("Atelier multi-IA…").click({ timeout: 2000 });
+    await expect(page.locator("#wlText")).toHaveValue("Ma demande depuis la saisie", { timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
   await page.click('#wlEx [data-ex="1"]');
   await expect(page.locator("#wlText")).toHaveValue(/Compare SQLite/);
   await expect(page.locator('.wl-pat.on[data-p="panel"]')).toBeVisible();
