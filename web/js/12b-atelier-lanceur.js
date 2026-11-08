@@ -10,7 +10,11 @@ const WL_PATTERNS = {
   panel: { flow: ["A", "B", "Arbitre"], arrow: "⇢", d: "Deux modèles répondent chacun de leur côté, un arbitre compare et fait la synthèse. Idéal pour analyser ou comparer." },
   debate: { flow: ["Pour", "Contre", "Arbitre"], arrow: "⇄", d: "Deux modèles défendent des positions opposées, un arbitre tranche. Idéal pour une décision." },
 };
-let wl = { pattern: null, participants: null, rounds: 1, touched: false, preview: null, timer: 0, options: [] };
+let wl = { pattern: null, participants: null, rounds: 1, touched: false, preview: null, timer: 0, options: [], fresh: true };
+// Couleur de chaque fournisseur : la même que dans le tableau de bord Grafana.
+const PROV_COLORS = { local: "#cfcfcf", groq: "#f2a65a", gemini: "#7aa6f0", openrouter: "#b48cf2", mistral: "#f28c8c",
+  cerebras: "#6fcf97", github: "#9aa0a6", openai: "#5ec8c8", deepseek: "#7f8cf0" };
+const provColor = (engine) => PROV_COLORS[(engine || "").split(/[ ·]/)[0].toLowerCase()] || "#9aa0a6";
 
 async function openWsLauncher(text = "") {
   // Affiché tout de suite (réactif), rempli dès que la configuration arrive.
@@ -19,8 +23,11 @@ async function openWsLauncher(text = "") {
   $("wsLaunch").hidden = false;
   document.body.classList.add("wl-open");
   try { workshopCfg = await getJSON("/api/workshop"); } catch (e) { toast(esc(e.message)); closeWsLauncher(); return; }
-  wl = { pattern: workshopCfg.pattern, participants: [...workshopCfg.participants], rounds: workshopCfg.rounds, touched: false,
-         preview: null, timer: 0, options: workshopCfg.options, architect: workshopCfg.architect || "auto" };
+  // Fermer puis rouvrir garde tes choix (méthode, équipe, options) tant que l'atelier n'a pas été lancé.
+  if (wl.fresh) {
+    wl = { pattern: workshopCfg.pattern, participants: [...workshopCfg.participants], rounds: workshopCfg.rounds, touched: false,
+           preview: null, timer: 0, options: workshopCfg.options, architect: workshopCfg.architect || "auto", fresh: false };
+  } else wl.options = workshopCfg.options;
   await wlRefresh();
   requestAnimationFrame(() => { $("wlText").focus(); $("wlText").setSelectionRange($("wlText").value.length, $("wlText").value.length); });
 }
@@ -53,7 +60,9 @@ function wlRender() {
     const on = k === r.pattern, sug = k === r.suggested && $("wlText").value.trim();
     const flow = p.flow.map((x) => `<span>${esc(x)}</span>`).join(`<em>${p.arrow}</em>`);
     return `<button type="button" class="wl-pat${on ? " on" : ""}" role="radio" aria-checked="${on}" data-p="${k}">
-      ${sug ? '<span class="wl-sug">Conseillé</span>' : ""}<b>${esc(workshopCfg.patterns[k])}</b><span class="wl-mini">${flow}</span><small>${esc(p.d)}</small></button>`;
+      <span class="wl-radio" aria-hidden="true"></span>
+      <span class="wl-pat-t"><b>${esc(workshopCfg.patterns[k])}</b>${sug ? '<span class="wl-sug">Conseillé</span>' : ""}</span>
+      <small>${esc(p.d)}</small><span class="wl-mini">${flow}</span></button>`;
   }).join("");
   $("wlPatterns").querySelectorAll("[data-p]").forEach((b) => b.onclick = () => { wl.pattern = b.dataset.p; wl.touched = true; wlRefresh(); });
   $("wlHint").textContent = $("wlText").value.trim() ? `Conseil d'Atom : ${r.suggested_name.toLowerCase()} — ${r.suggested_reason}.` : "";
@@ -66,9 +75,10 @@ function wlRender() {
     const cur = wl.participants[i] || "auto";
     const shown = firstOf[role] || (role === "Correction" ? firstOf["Rédacteur"] : null);
     const opts = wl.options.map((o) => `<option value="${esc(o.id)}"${o.id === cur ? " selected" : ""}>${esc(o.id === "auto" && shown ? `Automatique · ${shown.engine}` : o.label)}</option>`).join("");
-    return `<label class="wl-member"><span class="wl-role">${esc(role)}</span>
-      <select class="field" data-slot="${i}" aria-label="Modèle pour le rôle ${esc(role)}">${opts}</select>
-      ${shown ? `<span class="wl-fam" title="Famille du modèle">${esc(shown.family)}${shown.remote ? "" : " · local"}</span>` : ""}</label>`;
+    return `<div class="wl-member" style="--pc:${provColor(shown?.engine)}">
+      <span class="wl-dot" aria-hidden="true"></span>
+      <span class="wl-mrole"><b>${esc(role)}</b>${shown ? `<small>${esc(shown.family)}${shown.remote ? "" : " · local"}</small>` : ""}</span>
+      <select class="field" data-slot="${i}" aria-label="Modèle pour le rôle ${esc(role)}">${opts}</select></div>`;
   }).join("");
   $("wlTeam").querySelectorAll("select").forEach((sel) => sel.onchange = () => { wl.participants[+sel.dataset.slot] = sel.value; wlRefresh(); });
 
@@ -80,11 +90,11 @@ function wlRender() {
   $("wlRounds").querySelectorAll("button").forEach((b) => { b.classList.toggle("on", +b.dataset.r === r.rounds); b.onclick = () => { wl.rounds = +b.dataset.r; wlRefresh(); }; });
 
   // Étapes prévues, dans l'ordre
-  $("wlFlow").innerHTML = r.steps.map((st, i) => `${i ? '<span class="ws-arrow" aria-hidden="true">→</span>' : ""}<span class="ws-node pending"><b>${esc(st.role)}</b><small>${esc(st.engine)}</small></span>`).join("");
+  $("wlFlow").innerHTML = r.steps.map((st) => `<li class="ws-node pending" style="--pc:${provColor(st.engine)}"><b>${esc(st.role)}</b><small>${esc(st.engine)}</small></li>`).join("");
   $("wlWarn").innerHTML = r.warnings.map((w) => `⚠ ${esc(w)}`).join("<br>");
   $("wlWarn").hidden = !r.warnings.length;
   const remote = r.remote_calls ? `${r.remote_calls} vers des API` : "tout en local";
-  $("wlSum").textContent = `${r.calls} appels (${remote})${r.pattern === "review" ? " · correction sautée si la relecture est favorable" : ""}`;
+  $("wlSum").innerHTML = `<span><b>${r.calls} appels</b> · ${remote}</span>${r.pattern === "review" ? '<small>La correction est sautée si la relecture est favorable.</small>' : ""}`;
   $("wlGo").disabled = !$("wlText").value.trim();
 }
 
@@ -95,7 +105,7 @@ async function wlLaunch() {
   closeWsLauncher();
   if (currentView !== "chat") showView("chat");
   input.value = ""; autoGrow();
-  $("wlText").value = "";
+  $("wlText").value = ""; wl.fresh = true;
   sendWorkshop(text, { pattern: r.pattern, participants: wl.participants, rounds: r.rounds, architect: wl.architect });
 }
 
@@ -103,6 +113,6 @@ $("wlText").addEventListener("input", () => { $("wlGo").disabled = !$("wlText").
 $("wlText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); wlLaunch(); } });
 $("wlGo").onclick = wlLaunch;
 $("wlClose").onclick = closeWsLauncher;
-$("wsLaunch").addEventListener("click", (e) => { if (e.target.id === "wsLaunch") closeWsLauncher(); });
+// Pas de fermeture au clic à côté (trop de fermetures involontaires) : croix ou Échap, et ta demande est conservée.
 $("wsLaunch").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); closeWsLauncher(); } });
 $("navWs").onclick = () => openWsLauncher(input.value);

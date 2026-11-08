@@ -519,29 +519,34 @@
   <div class="wl-box">
     <header class="wl-head">
       <span class="wl-ic" data-i="users"></span>
-      <div><h2 id="wlTitle">Atelier multi-IA</h2><p>Plusieurs modèles travaillent ensemble sur ta demande, chacun dans un rôle.</p></div>
-      <button class="iconbtn" id="wlClose" type="button" aria-label="Fermer" data-i="x"></button>
+      <div><h2 id="wlTitle">Atelier multi-IA</h2><p>Plusieurs modèles collaborent sur ta demande, chacun dans un rôle.</p></div>
+      <button class="iconbtn" id="wlClose" type="button" aria-label="Fermer (ta demande est conservée)" data-i="x"></button>
     </header>
     <div class="wl-body">
-      <label class="wl-label" for="wlText">Ta demande</label>
-      <textarea id="wlText" class="field" rows="4" placeholder="Une question importante, une décision, un texte ou du code à soigner…"></textarea>
-      <div class="wl-ex" id="wlEx" aria-label="Exemples de demandes"></div>
-
-      <div class="wl-label">Comment travaillent-ils ?</div>
-      <div class="wl-patterns" id="wlPatterns" role="radiogroup" aria-label="Schéma de travail"></div>
-      <p class="wl-hint" id="wlHint"></p>
-
-      <div class="wl-label">L'équipe</div>
-      <div class="wl-team" id="wlTeam"></div>
-      <div class="wl-rounds"><span>Architecte</span><div class="seg" id="wlArch" role="radiogroup" aria-label="Architecte en premier"><button role="radio" data-a="auto" title="Pour les livrables (code, page web)">Auto</button><button role="radio" data-a="on">Toujours</button><button role="radio" data-a="off">Jamais</button></div><small id="wlArchNote"></small></div>
-      <div class="wl-rounds" id="wlRoundsRow"><span>Tours de relecture</span><div class="seg" id="wlRounds"><button data-r="1">1</button><button data-r="2">2</button><button data-r="3">3</button></div></div>
-      <div class="wl-flow" id="wlFlow" aria-label="Étapes prévues"></div>
-      <p class="wl-warn" id="wlWarn" hidden></p>
+      <section class="wl-col">
+        <h3 class="wl-step"><span>1</span><label for="wlText">Ta demande</label></h3>
+        <textarea id="wlText" class="field" rows="5" placeholder="Une question importante, une décision, un texte ou du code à soigner…"></textarea>
+        <div class="wl-ex" id="wlEx" aria-label="Exemples de demandes"></div>
+        <h3 class="wl-step"><span>2</span>Méthode de travail</h3>
+        <div class="wl-patterns" id="wlPatterns" role="radiogroup" aria-label="Méthode de travail"></div>
+        <p class="wl-hint" id="wlHint"></p>
+      </section>
+      <section class="wl-col">
+        <h3 class="wl-step"><span>3</span>L'équipe</h3>
+        <div class="wl-team" id="wlTeam"></div>
+        <div class="wl-opts">
+          <div class="wl-opt"><span>Architecte</span><div class="seg" id="wlArch" role="radiogroup" aria-label="Architecte en premier"><button role="radio" data-a="auto" title="Pour les livrables (code, page web)">Auto</button><button role="radio" data-a="on">Toujours</button><button role="radio" data-a="off">Jamais</button></div><small id="wlArchNote"></small></div>
+          <div class="wl-opt" id="wlRoundsRow"><span>Relectures</span><div class="seg" id="wlRounds" aria-label="Tours de relecture"><button data-r="1">1</button><button data-r="2">2</button><button data-r="3">3</button></div></div>
+        </div>
+        <h3 class="wl-step wl-sub">Déroulé prévu</h3>
+        <ol class="wl-flow" id="wlFlow" aria-label="Étapes prévues"></ol>
+        <p class="wl-warn" id="wlWarn" hidden></p>
+      </section>
     </div>
     <footer class="wl-foot">
       <span class="wl-sum" id="wlSum"></span>
       <label class="wl-keep"><input type="checkbox" id="wlKeep" checked> Mémoriser ces choix</label>
-      <button class="btn primary" id="wlGo" type="button">Lancer l'atelier</button>
+      <button class="btn primary wl-go" id="wlGo" type="button"><span>Lancer l'atelier</span><kbd>Ctrl ↵</kbd></button>
     </footer>
   </div>
 </div>

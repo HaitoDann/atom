@@ -302,3 +302,18 @@ test("atelier : architecte en premier pour un livrable", async ({ page }) => {
   await expect(msg.locator(".ws-node").first()).toContainText("Architecte");
   await expect(msg.locator(".ws-node.done")).toHaveCount(4, { timeout: 20_000 });
 });
+
+test("atelier : un clic à côté ne ferme pas la fenêtre, et les choix sont conservés", async ({ page }) => {
+  await login(page);
+  await page.click("#navWs");
+  await expect(page.locator("#wlGo")).toBeVisible();
+  await page.fill("#wlText", "Compare deux hébergeurs pour mon site");
+  await page.click('.wl-pat[data-p="debate"]');
+  await page.mouse.click(8, 8);                                                   // clic sur le fond assombri
+  await expect(page.locator("#wsLaunch")).toBeVisible();
+  await page.click("#wlClose");
+  await expect(page.locator("#wsLaunch")).toBeHidden();
+  await page.click("#navWs");                                                     // rouvert : rien n'est perdu
+  await expect(page.locator("#wlText")).toHaveValue("Compare deux hébergeurs pour mon site");
+  await expect(page.locator('.wl-pat.on[data-p="debate"]')).toBeVisible();
+});
