@@ -366,9 +366,17 @@ async function showPreviewVersion(i) {
   $("pvwDl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" })); a.download = pvw.name; a.click(); };
 }
 // Itérer : la version affichée et ta consigne partent dans la conversation ; la nouvelle version arrive en réponse.
-$("pvwAsk").addEventListener("submit", (e) => {
+$("pvwAsk").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const ask = $("pvwAskIn").value.trim(); if (!ask || busy) return;
+  const ask = $("pvwAskIn").value.trim(); if (!ask) return;
+  // Atom termine encore une réponse : on attend (au plus 2 min) au lieu d'ignorer la demande.
+  const btn = $("pvwAsk").querySelector("button");
+  if (busy) {
+    btn.disabled = true; btn.textContent = "Atom termine…";
+    for (let i = 0; i < 240 && busy; i++) await new Promise((r) => setTimeout(r, 500));
+    btn.disabled = false; btn.textContent = "Modifier";
+    if (busy) { toast("Atom est encore occupé : réessaie dans un instant."); return; }
+  }
   const lang = /\.css$/.test(pvw.name) ? "css" : /\.js$/.test(pvw.name) ? "js" : "html";
   closePreview();
   input.value = `Modifie le fichier **${pvw.name}** : ${ask}\n\nGarde tout le reste à l'identique et renvoie le fichier COMPLET, ` +
