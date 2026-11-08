@@ -460,6 +460,12 @@ Pour une demande importante, plusieurs IA collaborent. Clique sur **Atelier mult
 3. **L'équipe** — le modèle de chaque rôle (Automatique, local ou un fournisseur précis), avec sa famille, et les **étapes prévues** dans l'ordre, le nombre d'appels et les avertissements (même famille pour rédacteur et relecteur, arbitre trop faible…).
 4. **Lancer l'atelier** (ou Ctrl+Entrée). Pendant le travail, la chaîne des étapes montre qui travaille, ce qui est fait, la durée de chaque étape et les relais ; elle reste affichée sur la réponse pour comparer après coup.
 
+**Livrables (code, page web)** : l'atelier impose au rédacteur des fichiers complets et nommés, sans texte d'exemple, un contenu réaliste, un design responsive et lisible ; le relecteur vérifie ces points. Les réponses longues ont un budget de 8 000 tokens (`ATOM_MAX_TOKENS_LONG`) et, si un modèle s'arrête faute de place, Atom lui redemande la suite automatiquement (`ATOM_MAX_CONTINUATIONS`, 3 reprises).
+
+Chaque bloc de code a un bouton **Télécharger** (nom de fichier repris de la réponse, ex. `index.html`) et, pour une page HTML, **Aperçu** : la page s'affiche (ordinateur, tablette, téléphone) dans un bac à sable isolé d'Atom — elle n'a accès ni à ta session ni à l'API.
+
+**Architecte** (lanceur : Auto / Toujours / Jamais) : pour un livrable, un modèle fort transforme d'abord ta demande en cahier des charges (contenu de chaque partie, palette, exigences techniques, critères de réussite) ; tous les autres rôles travaillent à partir de lui. **Relais** : si les fournisseurs distants sont seulement en pause pour quelques secondes (limite par minute), l'atelier attend et réessaie (`ATOM_WORKSHOP_RETRY_WAIT`, 45 s) au lieu de confier l'étape au petit modèle local. Une réponse avec plusieurs fichiers propose **Tout télécharger (.zip)**. Les mêmes exigences de livrable s'appliquent aussi à la discussion normale.
+
 « Mémoriser ces choix » en fait les réglages par défaut (Réglages → Atelier). Pas besoin d'activer l'atelier pour le lancer ; l'option « Activer l'atelier » des réglages sert seulement au passage rapide du message suivant.
 
 - **Rédaction puis relecture** : un rédacteur écrit, un relecteur critique, une version corrigée est produite (1 à 3 tours).

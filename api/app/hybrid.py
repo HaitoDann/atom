@@ -19,7 +19,7 @@ import re
 from typing import AsyncIterator
 
 from . import db, providers
-from .config import REMOTE_DAILY_LIMIT, REMOTE_MODEL, REMOTE_NAME
+from .config import MAX_TOKENS_LONG, REMOTE_DAILY_LIMIT, REMOTE_MODEL, REMOTE_NAME
 
 log = logging.getLogger("atom.hybrid")
 last_stats: dict = {}
@@ -163,7 +163,9 @@ async def stream(messages: list[dict], model_name: str | None = None, sensitive:
     order = [r["provider"] for r in rows]
     used: dict = {}
     try:
-        async for t in providers.stream_chain(order, messages, used, model_name, task=task, reason=providers.explain(rows)):
+        long = task in ("code", "long", "complexe")
+        async for t in providers.stream_complete(order, messages, used, model_name, max_tokens=MAX_TOKENS_LONG if long else None,
+                                                 task=task, reason=providers.explain(rows)):
             yield t
     finally:
         last_used.clear()

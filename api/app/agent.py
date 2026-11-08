@@ -153,14 +153,21 @@ async def chat_events(
     provider, route_reason = hybrid.decide(engine, message, bool(mem_block), bool(docs_block) or bool(attachments))
     web_block_cur = ""
 
+    from .workshop import DELIVERABLE_RULES, is_deliverable
+    deliverable = is_deliverable(message)
+
     def system_for(prov: str) -> str:
-        """Prompt système selon le moteur : pour Mistral, seulement ce que tu as autorisé à sortir."""
+        """Prompt système selon le moteur : pour Mistral, seulement ce que tu as autorisé à sortir.
+        Demande de livrable (code, page web) : mêmes exigences que l'atelier (fichiers complets, pas de texte d'exemple…)."""
         if prov == "local":
-            return system_prompt(persona, mem_block, web if web == "auto" and not web_block_cur else "off",
+            base = system_prompt(persona, mem_block, web if web == "auto" and not web_block_cur else "off",
                                  web_block_cur, docs_block)
-        return system_prompt(persona, mem_block if hs["allow_memory"] else "",
+            return base + ("\n\nLivrable demandé : donne des fichiers complets et fonctionnels, sans texte d'exemple "
+                           "(« Nom de votre entreprise »…), avec un contenu réaliste." if deliverable else "")
+        base = system_prompt(persona, mem_block if hs["allow_memory"] else "",
                              web if web == "auto" and not web_block_cur else "off",
                              web_block_cur if hs["allow_web"] else "", docs_block if hs["allow_docs"] else "")
+        return base + ("\n\n" + DELIVERABLE_RULES.strip() if deliverable else "")
 
     msgs[0]["content"] = system_for(provider)
     if provider != "local" or route_reason:

@@ -77,7 +77,7 @@ function msgEl(m, idx, fresh = false) {
   }
   const body = document.createElement("div");
   body.className = "body" + (isUser ? "" : " md");
-  if (isUser || m.error) body.textContent = m.content; else setMd(body, m.content);
+  if (isUser || m.error) body.textContent = m.content; else { setMd(body, m.content); addZipBar(body); }
   if (isUser && !m.content) body.style.display = "none";
   el.appendChild(body);
   if (!isUser && m.meta?.workshop) { el.insertBefore(workshopPipe(m.meta.workshop), body); el.insertBefore(workshopEl(m.meta.workshop), body); }
@@ -274,7 +274,20 @@ function markLast() {
   if (lastAtom && lastAtom === chat.lastElementChild) lastAtom.classList.add("last");
 }
 
-chat.addEventListener("click", (e) => {
+chat.addEventListener("click", async (e) => {
+  const dl = e.target.closest("[data-dl]"), pv = e.target.closest("[data-preview]");
+  if (dl || pv) {
+    const box = (dl || pv).closest(".code"), code = box.querySelector("pre").textContent;
+    if (dl) {
+      const name = box.dataset.name || "fichier.txt";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([code], { type: name.endsWith(".html") ? "text/html" : "text/plain" }));
+      a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast(`${esc(name)} téléchargé.`);
+    } else openPreview(code, box.dataset.name || "page.html");
+    return;
+  }
   const b = e.target.closest("[data-copy]");
   if (!b) return;
   copyText(b.closest(".code").querySelector("pre").innerText);
@@ -326,3 +339,74 @@ scroller.addEventListener("scroll", () => {
   $("topbar").classList.toggle("scrolled", scroller.scrollTop > 4);
 });
 $("toBottom").onclick = () => scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+
+
+/* Aperçu d'une page HTML : servie par Atom dans un bac à sable (origine isolée), affichée dans un cadre. */
+async function openPreview(html, name) {
+  let r;
+  try { r = await (await send_("/api/preview", "POST", { html })).json(); } catch (e) { toast(esc(e.message)); return; }
+  $("pvwTitle").textContent = name;
+  $("pvwFrame").src = r.url;
+  $("pvwOpen").onclick = () => window.open(r.url, "_blank", "noopener");
+  $("pvwDl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([html], { type: "text/html" })); a.download = name; a.click(); };
+  $("pvw").hidden = false;
+}
+function closePreview() { $("pvw").hidden = true; $("pvwFrame").src = "about:blank"; }
+$("pvwClose").onclick = closePreview;
+$("pvw").addEventListener("click", (e) => { if (e.target.id === "pvw") closePreview(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("pvw").hidden) closePreview(); });
+document.querySelectorAll("#pvw .seg button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("#pvw .seg button").forEach((x) => x.classList.toggle("on", x === b));
+  $("pvwFrame").style.width = b.dataset.w;
+});
+
+
+/* ---- Plusieurs fichiers dans une réponse : tout télécharger en .zip (format zip « stocké », sans dépendance). */
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b) { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC_TABLE[(c ^ b[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
+function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  let offset = 0;
+  const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1),
+    date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  for (const f of files) {
+    const name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, data.length, 4],
+     [22, data.length, 4], [26, name.length, 2], [28, 0, 2]].forEach(([o, v, n]) => n === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+    const c = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, data.length, 4],
+     [24, data.length, 4], [28, name.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, offset, 4]]
+      .forEach(([o, v, n]) => n === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true));
+    parts.push(h, name, data); central.push(c, name);
+    offset += 30 + name.length + data.length;
+  }
+  const size = central.reduce((a, x) => a + (x.byteLength ?? x.length), 0);
+  const end = new DataView(new ArrayBuffer(22));
+  [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, files.length, 2], [10, files.length, 2], [12, size, 4], [16, offset, 4], [20, 0, 2]]
+    .forEach(([o, v, n]) => n === 4 ? end.setUint32(o, v, true) : end.setUint16(o, v, true));
+  return new Blob([...parts, ...central, end], { type: "application/zip" });
+}
+function zipFiles(body) {
+  const seen = {};
+  return [...body.querySelectorAll(".code[data-name]")].filter((b) => b.dataset.name).map((b) => {
+    let name = b.dataset.name;
+    if (seen[name]) { seen[name]++; name = name.replace(/(\.[^.]+)?$/, `-${seen[name]}$1`); } else seen[name] = 1;   // noms en double
+    return { name, text: b.querySelector("pre").textContent };
+  });
+}
+function addZipBar(body) {
+  const files = zipFiles(body);
+  if (files.length < 2) return;
+  const bar = document.createElement("div"); bar.className = "zip-bar";
+  bar.innerHTML = `<span>${files.length} fichiers : ${files.map((f) => `<code>${esc(f.name)}</code>`).join(" ")}</span>` +
+    `<button class="btn sm" data-zip>${icon("download")}Tout télécharger (.zip)</button>`;
+  bar.querySelector("[data-zip]").onclick = () => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(makeZip(zipFiles(body)));
+    a.download = (files.find((f) => f.name.endsWith(".html"))?.name.replace(/\.html?$/, "") || "fichiers") + ".zip";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`${files.length} fichiers téléchargés (.zip).`);
+  };
+  body.appendChild(bar);
+}

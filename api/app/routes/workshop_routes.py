@@ -17,6 +17,7 @@ from ..streaming import event  # noqa: E402
 
 class WorkshopIn(BaseModel):
     enabled: bool | None = None
+    architect: str | None = Field(default=None, pattern="^(auto|on|off)$")
     pattern: str | None = Field(default=None, pattern="^(review|panel|debate)$")
     participants: list[str] | None = Field(default=None, max_length=3)
     rounds: int | None = Field(default=None, ge=1, le=3)
@@ -28,6 +29,7 @@ class WorkshopRunIn(BaseModel):
     pattern: str | None = Field(default=None, pattern="^(review|panel|debate)$")
     participants: list[str] | None = Field(default=None, max_length=3)
     rounds: int | None = Field(default=None, ge=1, le=3)
+    architect: str | None = Field(default=None, pattern="^(auto|on|off)$")
 
 
 class WorkshopPreviewIn(BaseModel):
@@ -35,6 +37,7 @@ class WorkshopPreviewIn(BaseModel):
     pattern: str | None = Field(default=None, pattern="^(review|panel|debate)$")
     participants: list[str] | None = Field(default=None, max_length=3)
     rounds: int | None = Field(default=None, ge=1, le=3)
+    architect: str | None = Field(default=None, pattern="^(auto|on|off)$")
 
 
 EXAMPLES = [
@@ -56,7 +59,7 @@ EXAMPLES = [
 @router.post("/api/workshop/preview")
 def preview_workshop(body: WorkshopPreviewIn):
     """L'équipe et les étapes que lancerait l'atelier, sans rien envoyer (lanceur)."""
-    return {**workshop.preview(body.pattern, body.participants, body.rounds, body.message), "examples": EXAMPLES}
+    return {**workshop.preview(body.pattern, body.participants, body.rounds, body.message, body.architect), "examples": EXAMPLES}
 
 
 @router.get("/api/workshop")
@@ -81,5 +84,5 @@ async def run_workshop(body: WorkshopRunIn):
     # Lancé explicitement (lanceur ou bouton) : pas besoin d'activer l'atelier dans les réglages.
     return StreamingResponse(
         (event(**ev) async for ev in workshop.run(body.message.strip(), body.conversation_id, body.pattern, body.participants,
-                                                  rounds=body.rounds)),
+                                                  rounds=body.rounds, architect=body.architect)),
         media_type="application/x-ndjson")
