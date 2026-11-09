@@ -393,3 +393,24 @@ test("brief du matin : réglages, aperçu et envoi", async ({ page }) => {
   await expect(page.locator("#convList")).toContainText("Brief du matin", { timeout: 5000 });
   expect(errors).toEqual([]);
 });
+
+test("tâche difficile : orchestration proposée, puis automatique", async ({ page }) => {
+  test.setTimeout(420_000);
+  const errors = watchErrors(page);
+  await login(page);
+  const hard = "Cherche les prix, puis compare-les, ensuite rédige une synthèse et enfin vérifie les calculs";
+  await page.request.put("/api/hybrid", { data: { orchestrate: "suggest" }, headers: { "X-Atom": "1" } });
+  await send(page, hard);
+  const btn = page.locator(".msg.atom .orch-suggest").last();
+  await expect(btn).toBeVisible({ timeout: 20_000 });                         // réponse directe, puis proposition
+  await btn.click();
+  await expect(page.locator(".ws-pipe").last()).toBeVisible({ timeout: 10_000 });   // relancée en orchestration
+  await expect(page.locator("#send")).not.toHaveClass(/stop/, { timeout: 180_000 });   // orchestration terminée
+  await page.request.put("/api/hybrid", { data: { orchestrate: "auto" }, headers: { "X-Atom": "1" } });
+  const before = await page.locator(".ws-pipe").count();
+  await send(page, hard);
+  await expect(page.locator(".ws-pipe")).toHaveCount(before + 1, { timeout: 10_000 });   // directement orchestrée
+  await expect(page.locator("#send")).not.toHaveClass(/stop/, { timeout: 180_000 });
+  await page.request.put("/api/hybrid", { data: { orchestrate: "suggest" }, headers: { "X-Atom": "1" } });
+  expect(errors).toEqual([]);
+});

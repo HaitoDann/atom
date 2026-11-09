@@ -682,6 +682,18 @@ Le schéma **Orchestration vérifiée** de l'atelier (`api/app/orchestrator.py`)
 
 Conseils : configure au moins un fournisseur d'une **autre famille** que le modèle local, pour que le juge ne partage pas ses erreurs (le lanceur prévient sinon), et active le **bac à sable** pour que les calculs soient réellement exécutés. Confidentialité : comme le reste de l'atelier, seuls ta demande et le fil récent sont envoyés. `ATOM_ORCH_MAX_STEPS` borne le nombre d'étapes (5).
 
+### Dans la discussion
+
+Réglages → Mode hybride → **Tâches difficiles** décide quand la discussion passe par l'orchestration. Les mesures du banc d'essai ont montré deux choses : un bon modèle distant répond aussi juste et bien plus vite aux demandes simples ou moyennes, et l'orchestration rattrape surtout le petit modèle local. D'où trois réglages :
+
+- **Proposer** (par défaut) : Atom répond normalement ; si la demande enchaîne plusieurs étapes, un bouton « Refaire avec l'orchestration vérifiée » apparaît sous la réponse.
+- **Automatique** : une demande difficile part directement en orchestration.
+- **Jamais**.
+
+Une demande avec des fichiers joints, ou envoyée avec un modèle distant imposé, reste toujours dans la discussion normale.
+
+**Modèle disparu** : quand un fournisseur ne propose plus le modèle réglé (erreur « modèle introuvable »), Atom choisit le plus proche dans sa liste : même lignée, même gabarit (flash, mini, 70b…), version la plus récente, préversions évitées. Il te prévient sur Telegram et ntfy. Le brief du matin fait la même vérification chaque jour. Désactivable dans le même écran ; sans modèle proche, Atom ne devine pas et te demande d'en choisir un.
+
 ### Banc d'essai
 
 `bench/bench.py` envoie les tâches de `bench/tasks.json` à plusieurs méthodes (discussion simple en local, orchestration, rédaction-relecture), corrige automatiquement ce qui peut l'être (nombres attendus, code exécuté avec des tests, mots attendus, sources citées) et écrit `bench/results/<date>/` : `results.csv`, `rapport.md`, les réponses complètes et les statistiques d'échecs. Python standard, sans dépendance :

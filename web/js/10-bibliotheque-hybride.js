@@ -326,6 +326,14 @@ async function loadHybrid() {
     b.onclick = () => saveHybrid({ mode: v });
     $("hyMode").appendChild(b);
   }
+  $("hyOrch").innerHTML = "";
+  for (const [v, t, d] of [["suggest", "Proposer", "Atom répond, puis propose de refaire avec l'orchestration"], ["auto", "Automatique", "Orchestration directe"], ["off", "Jamais", ""]]) {
+    const b = document.createElement("button");
+    b.className = "btn" + (h.orchestrate === v ? " primary" : ""); b.textContent = t; b.title = d;
+    b.onclick = () => saveHybrid({ orchestrate: v });
+    $("hyOrch").appendChild(b);
+  }
+  $("hyAutoReplace").checked = h.auto_replace !== false;
   $("hyMem").checked = h.allow_memory; $("hyDocs").checked = h.allow_docs; $("hyWeb").checked = h.allow_web;
   const box = $("hyProviders");
   box.innerHTML = h.providers.length ? "" : '<p class="note">Aucun fournisseur configuré.</p>';
@@ -373,3 +381,5 @@ async function saveHybrid(patch) {
 $("hyMem").onchange = () => saveHybrid({ allow_memory: $("hyMem").checked });
 $("hyDocs").onchange = () => saveHybrid({ allow_docs: $("hyDocs").checked });
 $("hyWeb").onchange = () => saveHybrid({ allow_web: $("hyWeb").checked });
+
+$("hyAutoReplace").onchange = () => saveHybrid({ auto_replace: $("hyAutoReplace").checked });

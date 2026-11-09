@@ -39,9 +39,26 @@ form.addEventListener("submit", (e) => {
     if (dataFile) sendSpecial("analyze", text || "", { name: dataFile.name, data: dataFile.b64, question: text || "" }, dataFile.name);
     else if (deepNext && text && !files.length) sendSpecial("research", text, { message: text });
     else if (workshopNext && text && !files.length) sendWorkshop(text);
-    else sendMessage(text, files);
+    else routeAndSend(text, files);
   }
 });
+
+// Tâche difficile : selon le réglage (Réglages → Mode hybride → Tâches difficiles), Atom la confie directement à
+// l'orchestration vérifiée. Les demandes simples et moyennes vont au bon modèle en direct (plus rapide).
+async function routeAndSend(text, files = []) {
+  if (text && !files.length) {
+    try {
+      const p = await send_("/api/route/plan", "POST", { message: text, engine: engineOverride || engine || "default" }).then((r) => r.json());
+      if (p.orchestrate) {
+        engineOverride = null;
+        toast(`<b>Orchestration vérifiée</b> · ${esc(p.reason)}`);
+        sendWorkshop(text, { pattern: "orchestra" });
+        return;
+      }
+    } catch {}
+  }
+  sendMessage(text, files);
+}
 
 function scheduleRest() {
   clearTimeout(idleTimer); clearTimeout(sleepTimer);
@@ -84,6 +101,7 @@ async function sendMessage(text, files = []) {
   scroller.scrollTop = scroller.scrollHeight;
   const body = el.querySelector(".body");
 
+  let suggestOrch = "";
   let reply = "", emotion = "talking", queued = false, finished = false, tokens = 0, t0 = 0, used = null, asstId = null, sources = null, docs = null, provider = "local", remCards = [];
   const engineUsed = engineOverride || engine;
   engineOverride = null;
@@ -103,6 +121,14 @@ async function sendMessage(text, files = []) {
     history.push({ role: "assistant", content: content || "…", emotion, id: asstId, created_at: Date.now() / 1000, meta: { ...(used ? { used } : {}), ...(sources ? { sources } : {}), ...(docs ? { docs } : {}), ...(provider !== "local" ? { provider: hybridState?.name || "Mistral", remote_model: hybridState?.model } : {}), ...(remCards.length ? { reminders: remCards } : {}) } });
     const done = msgEl(history[history.length - 1], history.length - 1);
     el.replaceWith(done);
+    if (suggestOrch && !stopped) {
+      // Tâche difficile : proposer de la refaire avec l'orchestration vérifiée (calculs exécutés, sources, juge).
+      const b = document.createElement("button");
+      b.className = "btn orch-suggest"; b.type = "button";
+      b.innerHTML = `${icon("users")}Refaire avec l'orchestration vérifiée`; b.title = suggestOrch;
+      b.onclick = () => { if (busy) return; b.remove(); sendWorkshop(text, { pattern: "orchestra" }); };
+      done.appendChild(b);
+    }
     markLast();
     [...done.querySelectorAll(".sources .src-l, .used summary")].slice(0, 6).forEach((c, k) => signalTo(c, 150 + k * 140));
     if (serverSpeed) { $("speedV").textContent = serverSpeed.toFixed(1) + " tok/s"; serverSpeed = 0; }
@@ -198,7 +224,7 @@ async function sendMessage(text, files = []) {
           else toast(`<b>Rappel non programmé</b> · ${esc(ev.message)}`);
           refreshPanel();
         } else if (ev.type === "done") {
-          emotion = ev.emotion; asstId = ev.id;
+          emotion = ev.emotion; asstId = ev.id; suggestOrch = ev.suggest_orchestra || "";
           if (ev.stats?.tok_s) { serverSpeed = ev.stats.tok_s; }
           finish();
         } else if (ev.type === "memory") {

@@ -1406,3 +1406,7 @@ textarea.field { line-height: 1.55; }
 .pvw-ask .field { flex: 1; }
 .diag-report { margin: 12px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--code-bg);
                font: 12px/1.6 var(--mono); color: var(--text-2); white-space: pre-wrap; max-height: 340px; overflow: auto; }
+
+/* Discussion : proposer l'orchestration vérifiée pour une tâche difficile */
+.msg .orch-suggest { margin-top: 8px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.msg .orch-suggest svg { width: 14px; height: 14px; }

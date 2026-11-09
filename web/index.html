@@ -408,6 +408,12 @@
           <p class="note">Auto : distant pour les demandes longues ou complexes (analyse, comparaison, rédaction…), local pour le reste. Si aucun fournisseur ne répond, Atom repasse en local. Le choix sous la saisie peut changer le moteur pour une conversation.</p>
         </div>
         <div class="block">
+          <h4>Tâches difficiles</h4>
+          <p class="desc">Quand une demande enchaîne plusieurs étapes (« cherche…, puis calcule…, ensuite rédige… »), l'orchestration vérifiée donne des réponses plus justes : calculs exécutés, sources citées, juge d'une autre famille. Elle est plus lente ; les demandes simples restent en direct.</p>
+          <div class="row" id="hyOrch" style="margin:8px 0 6px;flex-wrap:wrap" role="group" aria-label="Tâches difficiles"></div>
+          <label class="switch"><span>Remplacer automatiquement un modèle qui a disparu chez un fournisseur (tu es prévenu)</span><input type="checkbox" id="hyAutoReplace"></label>
+        </div>
+        <div class="block">
           <h4>Ce qui peut être envoyé aux fournisseurs distants</h4>
           <p class="desc">Ton message et le fil de la conversation sont toujours envoyés quand un modèle distant répond. Le reste ne sort que si tu l'autorises. La mémorisation, la recherche dans tes documents et l'indexation restent toujours en local.</p>
           <label class="switch"><span>Mes souvenirs (ce qu'Atom sait de moi)</span><input type="checkbox" id="hyMem"></label>

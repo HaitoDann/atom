@@ -307,7 +307,9 @@ async def chat_events(
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
         stats = dict(hybrid.last_stats if provider != "local" else llm.last_stats)
-        yield dict(type="done", emotion=emotion, id=asst_id, stats=stats, provider=provider)
+        plan = hybrid.orchestration_plan(message, engine, bool(attachments))
+        yield dict(type="done", emotion=emotion, id=asst_id, stats=stats, provider=provider,
+                   **({"suggest_orchestra": plan["reason"]} if plan["suggest"] else {}))
     except GeneratorExit:
         # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
         partial = (locals().get("state") or {}).get("text", "")
