@@ -229,7 +229,7 @@ async def _external(step: dict, text: str) -> tuple[str, str]:
         step["_tool"] = "indisponible"
         return text, ""                               # pas de bac à sable : on se rabat sur le vote
     try:
-        rc, out, _ = await sandbox.run_python({}, code, timeout=60)
+        rc, out, _ = await sandbox.run_python({}, code, timeout=60, packages=False)
     except Exception as e:                             # noqa: BLE001
         step["_tool"] = f"erreur : {e}"
         return text, ""
@@ -266,7 +266,11 @@ async def run_step(step: dict, request: str, ctx: str, eng: dict, level: str, tr
         k = n if attempt == 0 else 1
         cands = []
         for _ in range(k):
-            text, used = await _ask(engine, msgs)
+            try:
+                text, used = await _ask(engine, msgs)
+            except Exception as e:                      # noqa: BLE001 — moteur indisponible : on monte d'un cran
+                trace["failures"].append(("outil", f"{workshop.engine_label(engine)} indisponible : {str(e)[:150]}"))
+                break
             text, why = await _external(step, text)
             why = why or check_format(step, text)
             trace["calls"] += 1
@@ -278,7 +282,12 @@ async def run_step(step: dict, request: str, ctx: str, eng: dict, level: str, tr
             cands.append(text)
         trace["attempts"] += 1
         if not cands:
-            rung += 1 if attempt >= RETRIES else 0
+            unavailable = trace["failures"] and "indisponible" in trace["failures"][-1][1]
+            rung += 1 if (attempt >= RETRIES or unavailable) else 0
+            if unavailable:
+                trace["escalated"] = True
+            if rung >= len(ladder):
+                break
             continue
         if len(cands) == 1:
             best = cands[0]
@@ -292,8 +301,11 @@ async def run_step(step: dict, request: str, ctx: str, eng: dict, level: str, tr
                 if step["kind"] in ("calcul", "analyse"):
                     trace["failures"].append(("contradiction", "les essais se contredisent"))
                 listing = "\n\n".join(f"Candidat {i + 1} :\n{c[:2500]}" for i, c in enumerate(cands))
-                pick, _ = await _ask(eng["judge"], [{"role": "system", "content": BASE + PICK},
-                                                   {"role": "user", "content": f"{brief}\n\n{listing}"}])
+                try:
+                    pick, _ = await _ask(eng["judge"], [{"role": "system", "content": BASE + PICK},
+                                                       {"role": "user", "content": f"{brief}\n\n{listing}"}])
+                except Exception:                       # noqa: BLE001 — arbitre indisponible : premier candidat
+                    pick = ""
                 trace["calls"] += 1
                 m = re.search(r"choix\s*:\s*(\d+)", pick.lower())
                 idx = int(m.group(1)) - 1 if m else 0
@@ -302,8 +314,13 @@ async def run_step(step: dict, request: str, ctx: str, eng: dict, level: str, tr
         if step.get("_tool") == "exécuté" or level == "simple":
             trace["verified"] = "outil" if step.get("_tool") == "exécuté" else "format"
             return best, used
-        verdict, _ = await _ask(eng["judge"], [{"role": "system", "content": BASE + JUDGE},
-                                              {"role": "user", "content": f"{brief}\n\nRésultat à vérifier :\n{best[:4000]}"}])
+        try:
+            verdict, _ = await _ask(eng["judge"], [{"role": "system", "content": BASE + JUDGE},
+                                                  {"role": "user", "content": f"{brief}\n\nRésultat à vérifier :\n{best[:4000]}"}])
+        except Exception as e:                          # noqa: BLE001 — juge indisponible : on garde le contrôle de format
+            trace["failures"].append(("outil", f"juge indisponible : {str(e)[:150]}"))
+            trace["verified"] = "format (juge indisponible)"
+            return best, used
         trace["calls"] += 1
         if judge_ok(verdict):
             trace["verified"] = "juge" + (" (même famille)" if eng["same_family_judge"] else "")
@@ -386,8 +403,12 @@ async def run(request: str, record: list, worker: str | None = None, allow_local
                    steps=[node("Chef d'orchestre", eng["planner"]), node("Étapes", eng["worker"]), node("Assemblage", eng["planner"])])
         yield dict(type="step", status="start", index=0, role="Chef d'orchestre", engine=workshop.engine_label(eng["planner"]), final=False)
         t = time.time()
-        raw, used = await _ask(eng["planner"], [{"role": "system", "content": BASE + PLANNER.format(n=MAX_STEPS)},
-                                               {"role": "user", "content": request}])
+        try:
+            raw, used = await _ask(eng["planner"], [{"role": "system", "content": BASE + PLANNER.format(n=MAX_STEPS)},
+                                                   {"role": "user", "content": request}])
+        except Exception as e:                          # noqa: BLE001 — chef indisponible : une seule étape
+            log.info("orchestration : chef d'orchestre indisponible (%s), une seule étape", e)
+            raw, used = "", eng["planner"]
         steps = parse_plan(raw, request)
         summary = "\n".join(f"{i + 1}. [{s['kind']}] {s['goal']}" for i, s in enumerate(steps))
         yield dict(type="step", status="done", index=0, text=summary, seconds=round(time.time() - t, 1))
@@ -439,14 +460,20 @@ async def run(request: str, record: list, worker: str | None = None, allow_local
         msgs = [{"role": "system", "content": BASE + AGGREGATE},
                 {"role": "user", "content": f"Demande :\n{request[:3000]}\n\nRésultats des étapes :\n{parts}"}]
         t, text, sent, switched = time.time(), "", 0, []
-        async for tok in workshop._gen(eng["planner"], msgs, lambda e, why: switched.append(e), allow_local=allow_local):
-            text += tok
-            clean = workshop.TAG_RE.sub("", workshop.THINK_RE.sub("", text))
-            if len(text) < 30 and "]" not in text[:25]:
-                continue
-            if clean[sent:]:
-                yield dict(type="token", text=clean[sent:])
-                sent = len(clean)
+        try:
+            async for tok in workshop._gen(eng["planner"], msgs, lambda e, why: switched.append(e), allow_local=allow_local):
+                text += tok
+                clean = workshop.TAG_RE.sub("", workshop.THINK_RE.sub("", text))
+                if len(text) < 30 and "]" not in text[:25]:
+                    continue
+                if clean[sent:]:
+                    yield dict(type="token", text=clean[sent:])
+                    sent = len(clean)
+        except Exception as e:                          # agrégateur indisponible : résultats bout à bout
+            if sent:
+                raise
+            log.info("orchestration : agrégateur indisponible (%s), résultats juxtaposés", e)
+            text = "\n\n".join(f"**{s['goal']}**\n\n{results[s['id']]}" for s in steps)
         clean = workshop.TAG_RE.sub("", workshop.THINK_RE.sub("", text))
         if clean[sent:]:
             yield dict(type="token", text=clean[sent:])
