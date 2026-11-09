@@ -454,6 +454,8 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                         _cooldown[p.id] = time.time() + 120
                         raise Unavailable(f"limite de l'offre {p.name} atteinte pour le moment")
                     if r.status_code == 404 and "model" in body.lower():
+                        # Erreur de configuration, pas une panne passagère : écarté 10 min (atelier, orchestration).
+                        _cooldown[p.id] = time.time() + 600
                         raise Unavailable(f"le modèle « {model} » n'existe pas chez {p.name}")
                     if r.status_code >= 500:
                         _cooldown[p.id] = time.time() + 60

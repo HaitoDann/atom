@@ -77,14 +77,14 @@ document.querySelectorAll("[data-goto]").forEach((b) => { b.onclick = () => open
 const SET_GROUPS = {
   atom: ["general", "look", "entity"],
   discussion: ["workshop"],
-  data: ["memory", "reminders", "backup"],
+  data: ["memory", "reminders", "brief", "backup"],
   connections: ["hybrid"],
   system: ["status", "proxmox", "lab", "security"],
 };
 const PANE_TITLES = { general: "Général", look: "Apparence", entity: "Entité", workshop: "Atelier multi-IA", memory: "Souvenirs",
-  reminders: "Rappels", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", proxmox: "Serveur Proxmox", lab: "Modèles locaux", security: "Sécurité" };
+  reminders: "Rappels", brief: "Brief du matin", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", proxmox: "Serveur Proxmox", lab: "Modèles locaux", security: "Sécurité" };
 const PANE_LOAD = { memory: () => loadMemories(), reminders: () => loadReminders(), backup: () => { loadBackups(); loadOffsite(); }, status: () => loadStatus(),
-  security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop(), lab: () => loadLab(), proxmox: () => loadProxmox() };
+  security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop(), lab: () => loadLab(), proxmox: () => loadProxmox(), brief: () => loadBrief() };
 const setGroupOf = (pane) => Object.keys(SET_GROUPS).find((g) => SET_GROUPS[g].includes(pane)) || pane;
 document.querySelectorAll(".pane").forEach((p) => {
   const h = document.createElement("h3"); h.className = "pane-title"; h.textContent = PANE_TITLES[p.dataset.pane] || ""; p.prepend(h);
@@ -219,7 +219,33 @@ async function loadReminders() {
     ul.appendChild(li);
   }
   $("remInfo").textContent = data.notifications ? "" : "Aucun canal de notification configuré (ntfy ou Telegram) : les rappels n'apparaîtront que dans la conversation.";
+  loadUnacked();
 }
+async function loadUnacked() {
+  let d = { reminders: [], followups: null };
+  try { d = await getJSON("/api/reminders/unacked"); } catch { return; }
+  const ul = $("remUnacked");
+  ul.innerHTML = d.reminders.length ? "" : '<li class="none">Rien en attente.</li>';
+  for (const r of d.reminders) {
+    const li = document.createElement("li");
+    li.style.display = "flex"; li.style.alignItems = "center"; li.style.gap = "8px"; li.style.flexWrap = "wrap";
+    li.innerHTML = `<div style="flex:1;min-width:140px"><small>${esc(r.when)}${r.nudges ? ` · relancé ${r.nudges} fois` : ""}</small>${esc(r.text)}</div>`;
+    for (const [label, url, body] of [["Fait", `/api/reminders/${r.id}/done`, null], ["+1 h", `/api/reminders/${r.id}/snooze`, { minutes: 60 }], ["Demain", `/api/reminders/${r.id}/snooze`, { tomorrow: true }]]) {
+      const b = document.createElement("button"); b.className = "btn" + (label === "Fait" ? " primary" : ""); b.textContent = label;
+      b.onclick = async () => { try { const x = await send_(url, "POST", body || {}).then((y) => y.json()); toast(esc(x.message)); } catch (e) { toast(esc(e.message)); } loadReminders(); refreshPanel(); };
+      li.appendChild(b);
+    }
+    ul.appendChild(li);
+  }
+  const f = d.followups; if (!f) return;
+  $("fuEnabled").checked = f.enabled; $("fuDelay").value = f.delay; $("fuMax").value = f.max; $("fuQs").value = f.quiet_start.padStart(5, "0"); $("fuQe").value = f.quiet_end.padStart(5, "0");
+}
+const fuSave = (patch) => send_("/api/reminders/followups", "PUT", patch).then(() => toast("Relances enregistrées.")).catch((e) => toast(esc(e.message)));
+$("fuEnabled").onchange = () => fuSave({ enabled: $("fuEnabled").checked });
+$("fuDelay").onchange = () => fuSave({ delay: +$("fuDelay").value });
+$("fuMax").onchange = () => fuSave({ max: +$("fuMax").value });
+$("fuQs").onchange = () => $("fuQs").value && fuSave({ quiet_start: $("fuQs").value });
+$("fuQe").onchange = () => $("fuQe").value && fuSave({ quiet_end: $("fuQe").value });
 $("notifTest").onclick = async () => {
   try { await send_("/api/notify/test", "POST"); toast("<b>Notification envoyée</b> · regarde ton téléphone."); }
   catch (e) { toast(esc(e.message)); }

@@ -26,7 +26,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
 | `api/app/canvas.py`, `workshop.py`, `orchestrator.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, orchestration vérifiée de petits modèles, analyse de données, labo des modèles |
-| `api/app/reminders.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, notifications (ntfy, Telegram), bot et agent Telegram |
+| `api/app/reminders.py`, `brief.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, brief du matin, notifications (ntfy, Telegram), bot et agent Telegram |
 | `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
 | `api/app/db.py`, `migrations/`, `backup.py`, `offsite.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
 | `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
@@ -702,11 +702,37 @@ python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini
 
 1. ✅ Backend + Docker Compose + streaming
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
-3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel — prochain : brief du matin, relances
-4. Documents : import de notes et de PDF, puis recherche dedans
-5. Outils : Proxmox, recherche web, domotique
-6. Accès distant via Tailscale ; plus tard, API externes en secours
+3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels
+4. ✅ Documents : bibliothèque (notes, PDF, OCR), recherche dedans, espaces
+5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée — prochain : domotique
+6. ✅ Accès distant via Tailscale, fournisseurs distants avec relais et mode hybride
 
+
+## Relances des rappels
+
+Un rappel envoyé attend ta confirmation. Sur Telegram, il arrive avec trois boutons :
+- **✅ Fait** : plus de relance ;
+- **⏰ +1 h** : le rappel revient dans une heure ;
+- **📅 Demain** : le rappel revient demain à 9 h.
+
+Sans réponse, Atom **relance** le rappel après 60 min, 2 fois au plus, jamais pendant les **heures calmes** (22:00 → 07:30 par défaut). Réglages → Données → Rappels → **À confirmer** liste les rappels en attente, avec les mêmes boutons, et permet de régler le délai, le nombre de relances et les heures calmes. Le brief du matin rappelle aussi ce qui n'a pas été fait.
+
+## Brief du matin
+
+Chaque jour à l'heure choisie, Atom envoie un résumé sur Telegram et ntfy, et le range dans la conversation « ☀️ Brief du matin ». Réglages → Données → **Brief du matin** :
+
+- **Heure et jours** d'envoi. Si Atom démarre en retard, le brief part quand même dans les 4 heures qui suivent, une seule fois par jour.
+- **Contenu**, section par section :
+  - **rappels du jour** ;
+  - **météo** de ta ville (Open-Meteo, sans clé) ;
+  - **serveur Proxmox** : invités arrêtés, stockages remplis à 80 % ou plus, alertes ;
+  - **fournisseurs d'IA** : un appel minimal à chacun, qui signale une clé refusée, un modèle disparu ou un fournisseur injoignable ;
+  - **actualités** sur tes sujets (SearXNG) ;
+  - **souvenirs récents**.
+- **Mot d'Atom** : deux phrases d'ouverture rédigées par le modèle local, qui mettent en avant ce qui demande ton attention. Sans réponse du modèle, le brief part sans elles.
+- **Aperçu** construit le brief sans l'envoyer ; **Envoyer maintenant** le teste tout de suite. Sur Telegram, la commande `/brief` l'envoie à la demande.
+
+Une section en panne (météo injoignable…) n'empêche pas l'envoi des autres.
 
 ## Agent de code depuis Telegram
 

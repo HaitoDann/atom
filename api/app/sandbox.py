@@ -349,7 +349,8 @@ def _untar(data: bytes) -> dict[str, bytes]:
     return out
 
 
-async def run_python(files: dict[str, bytes], code: str, timeout: int = 180) -> tuple[int, str, dict[str, bytes]]:
+async def run_python(files: dict[str, bytes], code: str, timeout: int = 180,
+                     packages: bool = True) -> tuple[int, str, dict[str, bytes]]:
     """Exécute un script Python (pandas, matplotlib) sur des fichiers, sans réseau.
     Renvoie (code de sortie, sortie, fichiers produits dans /work/out)."""
     if not enabled():
@@ -359,10 +360,13 @@ async def run_python(files: dict[str, bytes], code: str, timeout: int = 180) -> 
     async with _client() as c:
         async for _ in _ensure_image(c, PY_IMAGE):
             pass
-        # bibliothèques téléchargées une fois (cache), puis installées hors ligne
-        await _run_container(c, PY_IMAGE, f"pip download -q -d /cache/pip-data {PY_PACKAGES}", env, archive, True, 600)
-        cmd = (f"pip install -q --no-index --find-links /cache/pip-data {PY_PACKAGES} >/tmp/pip.log 2>&1 || "
-               "(echo 'Installation des bibliothèques impossible :'; tail -5 /tmp/pip.log; exit 3); python analysis.py")
+        if packages:
+            # bibliothèques téléchargées une fois (cache), puis installées hors ligne
+            await _run_container(c, PY_IMAGE, f"pip download -q -d /cache/pip-data {PY_PACKAGES}", env, archive, True, 600)
+            cmd = (f"pip install -q --no-index --find-links /cache/pip-data {PY_PACKAGES} >/tmp/pip.log 2>&1 || "
+                   "(echo 'Installation des bibliothèques impossible :'; tail -5 /tmp/pip.log; exit 3); python analysis.py")
+        else:   # bibliothèque standard seule (calculs de l'orchestration) : un seul conteneur, sans installation
+            cmd = "python analysis.py"
         code_, out, _ = await _run_container(c, PY_IMAGE, cmd, env, archive, False, timeout, collect="/work/out")
     produced = {}
     for k in list(_collected):

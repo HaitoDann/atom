@@ -125,7 +125,8 @@ def test_calc_verified_by_tool(monkeypatch):
     monkeypatch.setattr(sandbox, "enabled", lambda: True)
     runs = []
 
-    async def run_python(files, code, timeout=180):
+    async def run_python(files, code, timeout=180, packages=True):
+        assert packages is False                     # calcul : bibliothèque standard, sans installation
         runs.append(code)
         return (1, "NameError: x", {}) if "x" in code else (0, "42\n", {})
     monkeypatch.setattr(sandbox, "run_python", run_python)
@@ -221,3 +222,21 @@ def test_bench_ask(client):
     assert r.status_code == 200 and r.json()["answer"] and "seconds" in r.json()
     assert client.post("/api/bench/ask", json={"message": "x", "engine": "p:inexistant"}).status_code == 404
     assert client.post("/api/bench/ask", json={"message": "x", "engine": "rm -rf"}).status_code == 422
+
+
+def test_unavailable_judge_and_planner_do_not_abort(client, monkeypatch):
+    """Un juge, un chef ou un exécutant en panne ne fait plus échouer toute l'orchestration."""
+    from app import orchestrator, providers
+    monkeypatch.setattr(orchestrator, "SAMPLES", 1)
+
+    def replies(engine, sys, user):
+        if engine == "p:panne":
+            raise providers.Unavailable("le modèle n'existe pas")
+        return "Réponse correcte"
+    _fake(monkeypatch, replies)
+    eng = {"worker": "p:panne", "planner": "p:panne", "judge": "p:panne", "ladder": ["p:panne", "p:ok"], "same_family_judge": False}
+    trace = {"calls": 0, "attempts": 0, "failures": [], "verified": "", "escalated": False}
+    step = orchestrator.parse_plan("", "Explique la photosynthèse")[0]
+    text, used = run(orchestrator.run_step(step, "Explique", "", eng, "moyenne", trace))
+    assert text == "Réponse correcte" and used == "p:ok" and trace["escalated"]
+    assert trace["verified"].startswith("format")

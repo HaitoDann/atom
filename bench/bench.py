@@ -157,7 +157,11 @@ def numbers_in(text: str) -> list[float]:
 
 
 def fold(s: str) -> str:
-    return "".join(c for c in unicodedata.normalize("NFD", s.lower()) if unicodedata.category(c) != "Mn")
+    """Minuscules sans accents ; tirets typographiques → « - » ; « euros » → « € »."""
+    s = "".join(c for c in unicodedata.normalize("NFKD", s.lower()) if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[\u2010-\u2015\u2212]", "-", s)
+    s = re.sub(r"\b(\d+)\s*-\s*(\d+)\s*-\s*(\d+)\b", r"\1-\2-\3", s)
+    return re.sub(r"\beuros?\b|\beur\b", "€", s)
 
 
 def run_code(answer: str, tests: list[str], timeout: int = 20) -> tuple[bool, str]:

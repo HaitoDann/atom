@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, alerts, analysis, auth, backup, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
+from . import agent, agentcode, alerts, analysis, auth, backup, brief, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +43,8 @@ async def run_chat(*args) -> AsyncIterator[bytes]:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
-             asyncio.create_task(backup.scheduler()), asyncio.create_task(alerts.scheduler())]
+             asyncio.create_task(backup.scheduler()), asyncio.create_task(alerts.scheduler()),
+             asyncio.create_task(brief.scheduler())]
     asyncio.create_task(sandbox.cleanup())
 
     async def maintenance():   # tous les jours : rétention des échanges indexés
@@ -87,7 +88,7 @@ app.include_router(_r_git.router)
 import importlib
 
 log = logging.getLogger("atom.main")
-for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes', 'preview', 'diagnostic'):
+for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes', 'preview', 'diagnostic', 'brief_routes'):
     _m = importlib.import_module(f".routes.{_n}", __package__)
     app.include_router(_m.router)
 

@@ -76,7 +76,7 @@ def test_stream_plain_json_body(real_mode):
     (401, "nope", "clé API", False),
     (429, "rate limit", "limite", True),
     (500, "boom", "a répondu 500", True),
-    (404, "model not found", "n'existe pas", False),
+    (404, "model not found", "n'existe pas", True),     # erreur de configuration : écarté 10 min
 ])
 def test_stream_errors(real_mode, status, body, match, paused):
     from app import providers

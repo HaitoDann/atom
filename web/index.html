@@ -357,7 +357,45 @@
           <ul class="list" id="remList"></ul>
           <p class="note" id="remInfo"></p>
         </div>
+        <div class="block">
+          <h4>À confirmer</h4>
+          <p class="desc">Rappels envoyés mais pas encore marqués comme faits. Atom les relance tant que tu ne réponds pas (boutons Fait, +1 h, Demain sur Telegram ou ici).</p>
+          <ul class="list" id="remUnacked"></ul>
+          <label class="switch"><span>Relancer les rappels non confirmés</span><input type="checkbox" id="fuEnabled"></label>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <label class="note" for="fuDelay">Relancer après</label><input class="field" type="number" id="fuDelay" min="5" max="1440" style="width:80px"><span class="note">min,</span>
+            <input class="field" type="number" id="fuMax" min="0" max="5" style="width:60px" aria-label="Nombre maximum de relances"><span class="note">fois au plus</span>
+          </div>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <span class="note">Heures calmes, sans relance : de</span><input class="field" type="time" id="fuQs" style="width:auto" aria-label="Début des heures calmes"><span class="note">à</span><input class="field" type="time" id="fuQe" style="width:auto" aria-label="Fin des heures calmes">
+          </div>
+        </div>
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
+      </section>
+
+      <section class="pane" data-pane="brief">
+        <div class="block">
+          <h4>Brief du matin</h4>
+          <p class="desc">Chaque jour à l'heure choisie, Atom t'envoie l'essentiel sur Telegram et ntfy : rappels du jour, météo, état du serveur, fournisseurs d'IA en panne, actualités. Il est aussi rangé dans la conversation « Brief du matin ».</p>
+          <label class="switch"><span>Envoyer le brief chaque matin</span><input type="checkbox" id="brEnabled"></label>
+          <div class="row" style="gap:10px;margin:10px 0;flex-wrap:wrap;align-items:center">
+            <label class="note" for="brTime">Heure</label><input class="field" type="time" id="brTime" style="width:auto">
+          </div>
+          <div class="row" id="brDays" style="gap:6px;flex-wrap:wrap;margin-bottom:10px" role="group" aria-label="Jours d'envoi"></div>
+          <div class="row" style="gap:10px;margin-bottom:8px;flex-wrap:wrap">
+            <input class="field" id="brCity" placeholder="Ville pour la météo (ex. Lyon)" maxlength="80" style="flex:1;min-width:160px">
+            <input class="field" id="brNews" placeholder="Sujets d'actualité, séparés par des virgules" maxlength="200" style="flex:2;min-width:200px">
+          </div>
+          <h4 style="font-size:13px;margin-top:8px">Contenu</h4>
+          <div id="brSections"></div>
+          <label class="switch"><span>Mot d'Atom en ouverture (rédigé par le modèle local)</span><input type="checkbox" id="brIntro"></label>
+          <p class="note" id="brInfo"></p>
+          <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn" id="brPreview">Aperçu</button>
+            <button class="btn primary" id="brSend">Envoyer maintenant</button>
+          </div>
+          <div class="md" id="brOut" style="margin-top:12px" hidden></div>
+        </div>
       </section>
 
       <section class="pane" data-pane="hybrid">
@@ -667,6 +705,7 @@
 <script src="/js/12b-atelier-lanceur.js?v=__V__"></script>
 <script src="/js/13-interface-commandes-mobile.js?v=__V__"></script>
 <script src="/js/14-consommation.js?v=__V__"></script>
+<script src="/js/14b-brief.js?v=__V__"></script>
 <script src="/js/15-demarrage.js?v=__V__"></script>
 </body>
 </html>

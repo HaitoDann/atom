@@ -59,7 +59,7 @@ def init() -> None:
                 conversation_id INTEGER,
                 text TEXT NOT NULL,
                 due_at REAL NOT NULL,          -- timestamp UTC
-                status TEXT NOT NULL DEFAULT 'pending',  -- pending | sent | failed
+                status TEXT NOT NULL DEFAULT 'pending',  -- pending | sent | failed | done | snoozed (m004 : acked_at, nudges)
                 created_at REAL NOT NULL,
                 sent_at REAL
             );
@@ -409,6 +409,32 @@ def mark_reminder(rid: int, status: str) -> None:
         c.execute(
             "UPDATE reminders SET status = ?, sent_at = ? WHERE id = ?", (status, time.time(), rid)
         )
+
+
+def get_reminder(rid: int) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT * FROM reminders WHERE id = ?", (rid,)).fetchone()
+    return dict(r) if r else None
+
+
+def unacked_reminders(limit: int = 50) -> list[dict]:
+    """Rappels envoyés mais pas encore confirmés (« Fait »), du plus ancien au plus récent."""
+    with conn() as c:
+        rows = c.execute("SELECT * FROM reminders WHERE status IN ('sent', 'failed') AND acked_at IS NULL "
+                         "ORDER BY due_at LIMIT ?", (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def ack_reminder(rid: int, status: str = "done") -> bool:
+    """Confirme un rappel envoyé : plus de relance. status : done (fait) ou snoozed (reporté)."""
+    with conn() as c:
+        return c.execute("UPDATE reminders SET acked_at = ?, status = ? WHERE id = ? AND acked_at IS NULL "
+                         "AND status IN ('sent', 'failed', 'pending')", (time.time(), status, rid)).rowcount > 0
+
+
+def nudge_reminder(rid: int) -> None:
+    with conn() as c:
+        c.execute("UPDATE reminders SET nudges = nudges + 1, last_nudge_at = ? WHERE id = ?", (time.time(), rid))
 
 
 def delete_reminder(rid: int) -> bool:
