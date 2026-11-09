@@ -17,6 +17,7 @@ Confidentialité : comme l'atelier, seuls la demande et le fil récent partent �
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import re
@@ -71,23 +72,33 @@ def guess_kind(text: str) -> str:
 
 # ---------------------------------------------------------------- moteurs
 
-def engines() -> dict:
-    """Rôles concrets : exécutant (petit modèle d'abord), planificateur/agrégateur (le plus fort),
-    juge (autre famille que l'exécutant), échelle d'escalade (du plus faible au plus fort)."""
+def engines(worker: str | None = None, allow_local: bool = True) -> dict:
+    """Rôles concrets : exécutant (petit modèle d'abord, ou celui imposé), planificateur/agrégateur (le plus fort),
+    juge (autre famille que l'exécutant), échelle d'escalade (du plus faible au plus fort).
+    allow_local=False : le modèle local n'intervient nulle part (comparaison de fournisseurs distants)."""
     cands = workshop.candidates()                  # du plus fort au plus faible, local en dernier
+    if not allow_local:
+        cands = [c for c in cands if c != "local"] or cands
     strongest = cands[0]
-    worker = "local"
+    worker = worker if worker and (worker in cands or worker.startswith("p:")) else ("local" if allow_local else cands[-1])
     fam = workshop._info(worker)[1]
-    judge = next((c for c in cands if workshop._info(c)[1] != fam), strongest)
-    ladder = [worker] + [c for c in reversed(cands) if c != worker]
-    return {"worker": worker, "planner": strongest, "judge": judge, "ladder": ladder,
+    judge = next((c for c in cands if c != worker and workshop._info(c)[1] != fam),
+                 next((c for c in cands if c != worker), strongest))
+    rank = {c: i for i, c in enumerate(cands)}
+    stronger = [c for c in reversed(cands) if c != worker and rank.get(c, 99) < rank.get(worker, 99)]
+    ladder = [worker] + stronger
+    return {"worker": worker, "planner": strongest, "judge": judge, "ladder": ladder, "allow_local": allow_local,
             "same_family_judge": workshop._info(judge)[1] == fam}
+
+
+ALLOW_LOCAL = contextvars.ContextVar("orch_allow_local", default=True)
 
 
 async def _ask(engine: str, messages: list[dict]) -> tuple[str, str]:
     """Texte complet d'un appel (avec relais) et le moteur réellement utilisé."""
     switched: list = []
-    out = "".join([t async for t in workshop._gen(engine, messages, lambda e, why: switched.append(e))])
+    out = "".join([t async for t in workshop._gen(engine, messages, lambda e, why: switched.append(e),
+                                                  allow_local=ALLOW_LOCAL.get())])
     return workshop.TAG_RE.sub("", workshop.THINK_RE.sub("", out)).strip(), (switched[-1] if switched else engine)
 
 
@@ -355,11 +366,12 @@ def preview(message: str) -> dict:
     return {"difficulty": level, "steps": steps, "calls": calls, "warnings": warn}
 
 
-async def run(request: str, record: list) -> AsyncIterator[dict]:
+async def run(request: str, record: list, worker: str | None = None, allow_local: bool = True) -> AsyncIterator[dict]:
     """Événements au format de l'atelier (plan, step start/token/done, token). Remplit `record` ;
     le dernier élément yieldé est {"type": "_final", "text": …, "orchestra": …} (consommé par workshop.run)."""
     level = difficulty(request)
-    eng = engines()
+    eng = engines(worker, allow_local)
+    ALLOW_LOCAL.set(allow_local)
     t0 = time.time()
     info = {"difficulty": level, "steps": [], "judge": workshop.engine_label(eng["judge"]),
             "same_family_judge": eng["same_family_judge"]}
@@ -427,7 +439,7 @@ async def run(request: str, record: list) -> AsyncIterator[dict]:
         msgs = [{"role": "system", "content": BASE + AGGREGATE},
                 {"role": "user", "content": f"Demande :\n{request[:3000]}\n\nRésultats des étapes :\n{parts}"}]
         t, text, sent, switched = time.time(), "", 0, []
-        async for tok in workshop._gen(eng["planner"], msgs, lambda e, why: switched.append(e)):
+        async for tok in workshop._gen(eng["planner"], msgs, lambda e, why: switched.append(e), allow_local=allow_local):
             text += tok
             clean = workshop.TAG_RE.sub("", workshop.THINK_RE.sub("", text))
             if len(text) < 30 and "]" not in text[:25]:

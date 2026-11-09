@@ -145,7 +145,7 @@ def test_calc_verified_by_tool(monkeypatch):
 def test_full_run_plan_steps_and_assembly(client, monkeypatch):
     from app import orchestrator, workshop
     monkeypatch.setattr(orchestrator, "SAMPLES", 1)
-    monkeypatch.setattr(orchestrator, "engines", lambda: {"worker": "local", "planner": "local", "judge": "local",
+    monkeypatch.setattr(orchestrator, "engines", lambda *a, **k: {"worker": "local", "planner": "local", "judge": "local",
                                                          "ladder": ["local"], "same_family_judge": True})
 
     def replies(engine, sys, user):
@@ -157,7 +157,7 @@ def test_full_run_plan_steps_and_assembly(client, monkeypatch):
         return "liste" if "Lister" in user else "résumé"
     calls = _fake(monkeypatch, replies)
 
-    async def gen(engine, messages, on_engine):
+    async def gen(engine, messages, on_engine, **kw):
         assert "AGRÉGATEUR" in messages[0]["content"] and "liste" in messages[-1]["content"]
         for w in ["Réponse ", "finale ", "assemblée."]:
             yield w
@@ -191,3 +191,33 @@ def test_route_preview_and_run(client):
     assert meta.get("orchestra", {}).get("difficulty") == "simple"
     s = client.get("/api/orchestra/stats").json()
     assert s["runs"] >= 1 and set(s["failures"]) >= {"format", "verification", "outil"}
+
+
+def test_engines_without_local(monkeypatch):
+    """Comparaison de fournisseurs distants : le local n'apparaît dans aucun rôle, l'exécutant imposé est respecté."""
+    from app import orchestrator, workshop
+    monkeypatch.setattr(workshop, "candidates", lambda: ["p:fort", "p:moyen", "p:faible", "local"])
+    fam = {"p:fort": "gpt", "p:moyen": "llama", "p:faible": "qwen", "local": "qwen"}
+    monkeypatch.setattr(workshop, "_info", lambda e: (2, fam[e]))
+    e = orchestrator.engines("p:faible", allow_local=False)
+    roles = [e["worker"], e["planner"], e["judge"], *e["ladder"]]
+    assert "local" not in roles and e["worker"] == "p:faible" and e["ladder"] == ["p:faible", "p:moyen", "p:fort"]
+    assert e["judge"] != "p:faible" and not e["same_family_judge"]
+    assert orchestrator.engines(allow_local=False)["worker"] == "p:faible"     # le plus faible distant par défaut
+    assert orchestrator.engines()["worker"] == "local"
+
+
+def test_gen_refuses_local_fallback():
+    from app import providers, workshop
+
+    async def go():
+        return [t async for t in workshop._gen("local", [{"role": "user", "content": "x"}], lambda *a: None, allow_local=False)]
+    with pytest.raises(providers.Unavailable):
+        run(go())
+
+
+def test_bench_ask(client):
+    r = client.post("/api/bench/ask", json={"message": "Bonjour", "engine": "local"})
+    assert r.status_code == 200 and r.json()["answer"] and "seconds" in r.json()
+    assert client.post("/api/bench/ask", json={"message": "x", "engine": "p:inexistant"}).status_code == 404
+    assert client.post("/api/bench/ask", json={"message": "x", "engine": "rm -rf"}).status_code == 422
