@@ -9,6 +9,7 @@ const WL_PATTERNS = {
   review: { flow: ["Rédacteur", "Relecteur", "Correction"], arrow: "→", d: "Un modèle rédige, un autre le relit avec une grille stricte, puis la version est corrigée. Idéal pour du code ou un texte soigné." },
   panel: { flow: ["A", "B", "Arbitre"], arrow: "⇢", d: "Deux modèles répondent chacun de leur côté, un arbitre compare et fait la synthèse. Idéal pour analyser ou comparer." },
   debate: { flow: ["Pour", "Contre", "Arbitre"], arrow: "⇄", d: "Deux modèles défendent des positions opposées, un arbitre tranche. Idéal pour une décision." },
+  orchestra: { flow: ["Plan", "Étapes vérifiées", "Assemblage"], arrow: "→", d: "Atom découpe la tâche, de petits modèles font plusieurs essais vérifiés (Python, sources, juge d'une autre famille), corrigent ou passent à un modèle plus fort, puis tout est assemblé. Idéal pour une tâche en plusieurs étapes." },
 };
 let wl = { pattern: null, participants: null, rounds: 1, touched: false, preview: null, timer: 0, options: [], fresh: true };
 // Couleur de chaque fournisseur : la même que dans le tableau de bord Grafana.
@@ -80,6 +81,8 @@ function wlRender() {
       <span class="wl-mrole"><b>${esc(role)}</b>${shown ? `<small>${esc(shown.family)}${shown.remote ? "" : " · local"}</small>` : ""}</span>
       <select class="field" data-slot="${i}" aria-label="Modèle pour le rôle ${esc(role)}">${opts}</select></div>`;
   }).join("");
+  // Orchestration : l'équipe est choisie par Atom (petit modèle d'abord, juge d'une autre famille, escalade).
+  $("wlTeam").querySelectorAll("select").forEach((sel) => { sel.disabled = r.pattern === "orchestra"; });
   $("wlTeam").querySelectorAll("select").forEach((sel) => sel.onchange = () => { wl.participants[+sel.dataset.slot] = sel.value; wlRefresh(); });
 
   // Architecte : un modèle fort transforme la demande en cahier des charges avant que les autres travaillent.
@@ -94,7 +97,8 @@ function wlRender() {
   $("wlWarn").innerHTML = r.warnings.map((w) => `⚠ ${esc(w)}`).join("<br>");
   $("wlWarn").hidden = !r.warnings.length;
   const remote = r.remote_calls ? `${r.remote_calls} vers des API` : "tout en local";
-  $("wlSum").innerHTML = `<span><b>${r.calls} appels</b> · ${remote}</span>${r.pattern === "review" ? '<small>La correction est sautée si la relecture est favorable.</small>' : ""}`;
+  $("wlSum").innerHTML = `<span><b>${r.calls} appels</b> · ${remote}</span>${r.pattern === "review" ? '<small>La correction est sautée si la relecture est favorable.</small>'
+    : r.pattern === "orchestra" ? `<small>Difficulté estimée : ${esc(r.difficulty || "")} — appels au plus, moins si les vérifications passent du premier coup.</small>` : ""}`;
   $("wlGo").disabled = !$("wlText").value.trim();
 }
 

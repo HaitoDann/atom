@@ -39,11 +39,13 @@ ROLES = {
     "review": ["Rédacteur", "Relecteur", "Correction"],
     "panel": ["Proposition A", "Proposition B", "Arbitre"],
     "debate": ["Pour", "Contre", "Arbitre"],
+    "orchestra": ["Exécutant", "Vérificateur", "Chef d'orchestre"],
 }
 PATTERNS = {
     "review": "Rédaction puis relecture",
     "panel": "Comité et arbitre",
     "debate": "Débat contradictoire",
+    "orchestra": "Orchestration vérifiée",
 }
 
 TAG_RE = re.compile(r"^\s*\[[a-zA-Z]+\]\s*")
@@ -312,6 +314,10 @@ PANEL_RE = re.compile(r"\b(compare|comparer|comparatif|analyse|analyser|évalue|
 def suggest(message: str) -> tuple[str, str]:
     """Schéma conseillé pour une demande, avec la raison (affichée dans le lanceur)."""
     m = message or ""
+    from . import orchestrator
+    if orchestrator.difficulty(m) == "difficile":
+        return "orchestra", ("une tâche en plusieurs étapes : découpage, petits modèles vérifiés (outils, juge d'une "
+                             "autre famille), corrections, puis assemblage")
     if DEBATE_RE.search(m):
         return "debate", "une décision à prendre : deux positions opposées, puis un arbitre tranche"
     if PANEL_RE.search(m):
@@ -327,6 +333,15 @@ def preview(pattern: str | None, participants: list[str] | None, rounds: int | N
     pattern = pattern if pattern in ROLES else s["pattern"]
     participants = participants or s["participants"]
     rounds = max(1, min(3, int(rounds or s["rounds"])))
+    if pattern == "orchestra":
+        from . import orchestrator
+        o = orchestrator.preview(message)
+        labels = [{"role": r, "engine": engine_label(e), "remote": e.startswith("p:"), "family": _info(e)[1]} for r, e in o["steps"]]
+        return {"pattern": pattern, "name": PATTERNS[pattern], "rounds": rounds, "participants": participants,
+                "suggested": suggested, "suggested_name": PATTERNS[suggested], "suggested_reason": why,
+                "steps": labels, "calls": o["calls"], "remote_calls": sum(1 for x in labels if x["remote"]),
+                "warnings": o["warnings"], "roles": ROLES[pattern], "architect": "off", "architect_active": False,
+                "deliverable": is_deliverable(message), "difficulty": o["difficulty"]}
     steps = plan(pattern, participants, rounds)
     arch_mode = architect if architect in ("auto", "on", "off") else s["architect"]
     if wants_architect(arch_mode, message):
@@ -344,6 +359,9 @@ def preview(pattern: str | None, participants: list[str] | None, rounds: int | N
 
 def plan(pattern: str, participants: list[str], rounds: int) -> list[tuple[str, str]]:
     """[(rôle, moteur concret)] dans l'ordre d'exécution."""
+    if pattern == "orchestra":
+        from . import orchestrator
+        return orchestrator.preview("")["steps"]
     p = assign(pattern, participants)
     if pattern == "review":
         steps = [("Rédacteur", p[0])]
@@ -372,6 +390,26 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
     request = (f"Contexte de la conversation :\n{context}\n\nDemande actuelle :\n{message}" if context else message)
     user_id = db.add_message(conversation_id, "user", message)
     yield dict(type="ids", user_id=user_id)
+
+    if pattern == "orchestra":
+        from . import orchestrator
+        record: list = []
+        try:
+            final_text, info = "…", {}
+            async for ev in orchestrator.run(request, record):
+                if ev["type"] == "_final":
+                    final_text, info = ev["text"] or "…", ev["orchestra"]
+                else:
+                    yield ev
+            last = {k: v for k, v in record[-1].items() if k != "text"} if record else None
+            meta = {"workshop": {"pattern": pattern, "name": PATTERNS[pattern], "steps": record[:-1], "final": last},
+                    "orchestra": info}
+            asst_id = db.add_message(conversation_id, "assistant", final_text, "focus", meta=meta)
+            yield dict(type="done", emotion="focus", id=asst_id, final=final_text)
+        except Exception as e:
+            log.warning("orchestration : erreur gérée", exc_info=True)
+            yield dict(type="error", message=f"Orchestration interrompue : {e}")
+        return
 
     steps = plan(pattern, participants, max(1, min(3, int(rounds or s["rounds"]))))
     arch = ("Architecte", candidates()[0]) if wants_architect(architect or s["architect"], message) else None

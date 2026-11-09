@@ -25,7 +25,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
 | `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
-| `api/app/canvas.py`, `workshop.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, analyse de données, labo des modèles |
+| `api/app/canvas.py`, `workshop.py`, `orchestrator.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, orchestration vérifiée de petits modèles, analyse de données, labo des modèles |
 | `api/app/reminders.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, notifications (ntfy, Telegram), bot et agent Telegram |
 | `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
 | `api/app/db.py`, `migrations/`, `backup.py`, `offsite.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
@@ -475,6 +475,7 @@ Chaque bloc de code a un bouton **Télécharger** (nom de fichier repris de la r
 - **Rédaction puis relecture** : un rédacteur écrit, un relecteur critique, une version corrigée est produite (1 à 3 tours).
 - **Comité et arbitre** : deux propositions indépendantes, un arbitre fait la synthèse.
 - **Débat contradictoire** : deux positions opposées, un arbitre tranche — utile pour une décision.
+- **Orchestration vérifiée** : pour une tâche en plusieurs étapes, de petits modèles travaillent sous contrôle (voir ci-dessous). Atom la conseille quand la demande enchaîne plusieurs actions (« cherche…, puis compare…, ensuite rédige… »).
 - Chaque rôle est en **Automatique** par défaut, ou tenu par le modèle **local** ou par un fournisseur précis. En automatique :
   - le modèle le **plus fort** rédige ;
   - le relecteur vient d'une **autre famille** (Llama, Qwen, Gemini…), qui ne fait pas les mêmes erreurs ;
@@ -665,6 +666,21 @@ cd api && OLLAMA_URL=http://localhost:11434 uvicorn app.main:app --reload --port
 | PATCH / DELETE | `/api/conversations/{id}` | Renommer / supprimer |
 | GET / POST / DELETE | `/api/memories` | Lister / ajouter / tout effacer |
 | PATCH / DELETE | `/api/memories/{id}` | Modifier / oublier un souvenir |
+
+## Orchestration de petits modèles
+
+Le schéma **Orchestration vérifiée** de l'atelier (`api/app/orchestrator.py`) applique ce que montrent les études sur les systèmes multi-modèles : de petits modèles rivalisent avec de bien plus gros s'ils font **plusieurs essais contrôlés par un vrai vérificateur** ; un modèle qui se relit seul se corrige mal ; le vote vaut souvent un débat pour bien moins cher ; et la plupart des échecs viennent de consignes floues et d'une vérification absente.
+
+1. **Routage par difficulté** : *simple* → un seul appel ; *moyenne* → plusieurs essais puis vérification ; *difficile* → plan complet.
+2. **Chef d'orchestre** (le modèle le plus fort disponible) : découpe la demande en 5 étapes au plus, chacune avec un objectif, un type (recherche, calcul, code, rédaction, analyse), un format attendu et un critère de réussite. Chaque exécutant ne reçoit que la demande et le résumé des étapes dont il dépend.
+3. **Petit modèle d'abord** : les étapes sont exécutées en local, avec `ATOM_ORCH_SAMPLES` essais (3 par défaut).
+4. **Vérification extérieure avant tout** : un calcul est **exécuté en Python** dans le bac à sable (un script en échec est renvoyé avec l'erreur) ; une recherche doit citer ses sources [n] ; un JSON demandé doit être valide ; pas de texte d'exemple. Sinon, un **juge d'une autre famille** que l'exécutant (jamais l'auteur) rend « Verdict : OK » ou une critique.
+5. **Vote** sur les calculs et analyses ; si les essais se contredisent, un arbitre choisit en un seul échange (pas de long débat). Pour un texte, le juge garde le meilleur des essais.
+6. **Corrections puis escalade** : la critique est renvoyée à l'exécutant (`ATOM_ORCH_RETRIES`, 2 par défaut), puis l'étape passe à un modèle plus fort.
+7. **Assemblage** : un agrégateur fusionne les résultats vérifiés (sources et résultats d'exécution conservés) et signale ce qui reste non vérifié.
+8. **Trace et mesures** : sous la réponse, chaque étape indique sa vérification (outil, juge, format), ses appels, ses échecs et une éventuelle escalade. `GET /api/orchestra/stats` cumule les échecs par famille (consigne, format, vérification, outil, contradiction) pour repérer où l'équipe pèche.
+
+Conseils : configure au moins un fournisseur d'une **autre famille** que le modèle local, pour que le juge ne partage pas ses erreurs (le lanceur prévient sinon), et active le **bac à sable** pour que les calculs soient réellement exécutés. Confidentialité : comme le reste de l'atelier, seuls ta demande et le fil récent sont envoyés. `ATOM_ORCH_MAX_STEPS` borne le nombre d'étapes (5).
 
 ## Feuille de route
 
