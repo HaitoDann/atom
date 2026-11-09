@@ -376,3 +376,20 @@ test("aperçu : versions successives et demande de modification", async ({ page 
   await expect(page.locator('#pvwVers button[data-v="0"]')).toHaveClass(/on/);
   expect(errors).toEqual([]);
 });
+
+test("brief du matin : réglages, aperçu et envoi", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => openSettings("brief"));
+  await expect(page.locator("#brDays [data-d]")).toHaveCount(7);
+  await page.fill("#brCity", "Lyon"); await page.locator("#brCity").blur();
+  await expect(page.locator("#brCity")).toHaveValue("Lyon");
+  await page.click('#brDays [data-d="6"]');                                       // dimanche décoché puis enregistré
+  await expect(page.locator('#brDays [data-d="6"]')).toHaveAttribute("aria-pressed", "false");
+  await page.click("#brPreview");
+  await expect(page.locator("#brOut")).toContainText("Brief du");
+  await expect(page.locator("#brOut")).toContainText("Lyon");
+  await page.click("#brSend");
+  await expect(page.locator("#convList")).toContainText("Brief du matin", { timeout: 5000 });
+  expect(errors).toEqual([]);
+});

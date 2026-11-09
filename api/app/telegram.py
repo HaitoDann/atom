@@ -38,6 +38,7 @@ HELP = (
     "/rappels — voir les rappels programmés\n"
     "/souvenirs — ce que je sais de toi\n"
     "/serveur — état du serveur Proxmox\n"
+    "/brief — le brief du matin, maintenant\n"
     "/agent projet tâche — confier une tâche à l'agent de code\n"
     "/aide — ce message"
 )
@@ -242,6 +243,11 @@ async def handle_command(client, chat_id: int, text: str) -> None:
 
         from . import tgagent
         await tgagent.start(sys.modules[__name__], client, chat_id, args.strip())
+    elif cmd == "/brief":
+        from . import brief
+
+        b = await brief.build()
+        await send_text(client, chat_id, f"**{b['title']}**\n\n{b['text']}")
     elif cmd == "/serveur":
         from . import proxmox
 
@@ -359,6 +365,7 @@ async def run() -> None:
                 {"command": "souvenirs", "description": "Ce qu'Atom sait de toi"},
                 {"command": "agent", "description": "Confier une tâche à l'agent de code"},
                 {"command": "serveur", "description": "État du serveur Proxmox"},
+                {"command": "brief", "description": "Brief du matin, maintenant"},
                 {"command": "aide", "description": "Aide"},
             ])
         except (TelegramError, httpx.HTTPError) as e:
