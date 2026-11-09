@@ -1,0 +1,23 @@
+[
+  {"id": "interets", "kind": "calcul",
+   "text": "Je place 15 000 € à 3,2 % d'intérêts composés par an pendant 10 ans. Calcule le capital final, puis compare avec un livret à 2,4 % et donne la différence.",
+   "numbers": [20553.62, 19014.76, 1538.86]},
+  {"id": "jours", "kind": "calcul",
+   "text": "Combien de jours y a-t-il entre le 9 novembre 2026 et le 14 mars 2027 ?",
+   "numbers": [125]},
+  {"id": "somme35", "kind": "calcul",
+   "text": "Calcule la somme de tous les entiers de 1 à 1000 divisibles par 3 ou par 5.",
+   "numbers": [234168]},
+  {"id": "remise", "kind": "calcul",
+   "text": "Un article coûte 249 € TTC. Il est soldé à -30 %, puis une remise supplémentaire de 10 % s'applique sur le prix soldé. Quel est le prix final, et quel pourcentage de réduction totale cela représente-t-il ?",
+   "numbers": [156.87, 37]},
+  {"id": "palindrome", "kind": "code",
+   "text": "Écris une fonction Python est_palindrome(texte) qui vérifie si une chaîne est un palindrome en ignorant les accents, la casse, les espaces et la ponctuation. Ajoute 5 fonctions de test test_... avec assert. Tout dans un seul bloc ```python```.",
+   "code_tests": ["assert est_palindrome('Ésope reste ici et se repose')", "assert est_palindrome('A man, a plan, a canal: Panama')", "assert not est_palindrome('Bonjour')", "assert est_palindrome('')"]},
+  {"id": "debian", "kind": "recherche",
+   "text": "Cherche la dernière version stable de Debian, puis explique en 5 points ce qu'elle apporte, avec les sources.",
+   "contains": ["debian"], "sources": true},
+  {"id": "sauvegarde", "kind": "redaction",
+   "text": "Rédige un guide d'une page pour sauvegarder ses photos selon la règle 3-2-1 : d'abord le principe, puis trois solutions à moins de 100 €, ensuite les erreurs à éviter.",
+   "contains": ["3-2-1", "€"], "criteria": ["explique la règle 3-2-1 (3 copies, 2 supports, 1 hors site)", "donne trois solutions concrètes à moins de 100 €", "liste des erreurs à éviter", "clair et d'environ une page"]}
+]

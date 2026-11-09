@@ -682,6 +682,16 @@ Le schéma **Orchestration vérifiée** de l'atelier (`api/app/orchestrator.py`)
 
 Conseils : configure au moins un fournisseur d'une **autre famille** que le modèle local, pour que le juge ne partage pas ses erreurs (le lanceur prévient sinon), et active le **bac à sable** pour que les calculs soient réellement exécutés. Confidentialité : comme le reste de l'atelier, seuls ta demande et le fil récent sont envoyés. `ATOM_ORCH_MAX_STEPS` borne le nombre d'étapes (5).
 
+### Banc d'essai
+
+`bench/bench.py` envoie les tâches de `bench/tasks.json` à plusieurs méthodes (discussion simple en local, orchestration, rédaction-relecture), corrige automatiquement ce qui peut l'être (nombres attendus, code exécuté avec des tests, mots attendus, sources citées) et écrit `bench/results/<date>/` : `results.csv`, `rapport.md`, les réponses complètes et les statistiques d'échecs. Python standard, sans dépendance :
+
+```bash
+python3 bench/bench.py --url http://IP-DE-LA-VM:8000 --methods simple,orchestra --run-code
+```
+
+`--only interets,jours` pour quelques tâches, `--repeat 3` pour lisser les variations, `--keep` pour garder les conversations créées (supprimées sinon). Le mot de passe est demandé au clavier, ou lu dans `ATOM_BENCH_PASSWORD`.
+
 ## Feuille de route
 
 1. ✅ Backend + Docker Compose + streaming
