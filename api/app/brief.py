@@ -84,9 +84,11 @@ def section_reminders() -> str:
     from .reminders import TZ, human, now_local
     today = now_local().date()
     rows = [r for r in db.list_reminders("pending", limit=100) if datetime.fromtimestamp(r["due_at"], TZ).date() == today]
+    late = [r for r in db.unacked_reminders() if r["due_at"] < time.time() - 3600]
+    lines = [f"- ⚠️ Pas encore fait : {r['text']} (rappel de {human(r['due_at'])})" for r in late[:5]]
     if not rows:
-        return "Aucun rappel aujourd'hui."
-    return "\n".join(f"- {human(r['due_at']).replace("aujourd'hui à ", "")} : {r['text']}" for r in rows)
+        return "\n".join(lines + ["Aucun rappel aujourd'hui."]) if lines else "Aucun rappel aujourd'hui."
+    return "\n".join(lines) + ("\n" if lines else "") + "\n".join(f"- {human(r['due_at']).replace("aujourd'hui à ", "")} : {r['text']}" for r in rows)
 
 
 async def section_weather(city: str) -> str:

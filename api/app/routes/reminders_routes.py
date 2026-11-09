@@ -41,6 +41,46 @@ def remove_reminder(rid: int):
     return {"ok": True}
 
 
+class SnoozeIn(BaseModel):
+    minutes: int | None = Field(default=None, ge=5, le=7 * 24 * 60)
+    tomorrow: bool = False
+
+
+class FollowupsIn(BaseModel):
+    enabled: bool | None = None
+    delay: int | None = Field(default=None, ge=5, le=24 * 60)
+    max: int | None = Field(default=None, ge=0, le=5)
+    quiet_start: str | None = Field(default=None, pattern=r"^\d{1,2}:\d{2}$")
+    quiet_end: str | None = Field(default=None, pattern=r"^\d{1,2}:\d{2}$")
+
+
+@router.get("/api/reminders/unacked")
+def unacked():
+    """Rappels envoyés en attente de confirmation (relancés tant qu'ils ne sont pas « faits »)."""
+    return {"reminders": [_reminder_out(r) for r in db.unacked_reminders()], "followups": reminders.followup_settings()}
+
+
+@router.post("/api/reminders/{rid}/done")
+def reminder_done(rid: int):
+    res = reminders.act(rid, "done")
+    if not res["ok"]:
+        raise HTTPException(409, res["message"])
+    return res
+
+
+@router.post("/api/reminders/{rid}/snooze")
+def reminder_snooze(rid: int, body: SnoozeIn):
+    res = reminders.act(rid, "tomorrow" if body.tomorrow else "snooze", body.minutes or 60)
+    if not res["ok"]:
+        raise HTTPException(409, res["message"])
+    return res
+
+
+@router.put("/api/reminders/followups")
+def put_followups(body: FollowupsIn):
+    return reminders.save_followup_settings(body.model_dump(exclude_none=True))
+
+
 @router.post("/api/notify/test")
 async def notify_test():
     if not notify.enabled():

@@ -702,11 +702,20 @@ python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini
 
 1. ✅ Backend + Docker Compose + streaming
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
-3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin — prochain : relances
+3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels
 4. ✅ Documents : bibliothèque (notes, PDF, OCR), recherche dedans, espaces
 5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée — prochain : domotique
 6. ✅ Accès distant via Tailscale, fournisseurs distants avec relais et mode hybride
 
+
+## Relances des rappels
+
+Un rappel envoyé attend ta confirmation. Sur Telegram, il arrive avec trois boutons :
+- **✅ Fait** : plus de relance ;
+- **⏰ +1 h** : le rappel revient dans une heure ;
+- **📅 Demain** : le rappel revient demain à 9 h.
+
+Sans réponse, Atom **relance** le rappel après 60 min, 2 fois au plus, jamais pendant les **heures calmes** (22:00 → 07:30 par défaut). Réglages → Données → Rappels → **À confirmer** liste les rappels en attente, avec les mêmes boutons, et permet de régler le délai, le nombre de relances et les heures calmes. Le brief du matin rappelle aussi ce qui n'a pas été fait.
 
 ## Brief du matin
 

@@ -32,11 +32,14 @@ def _ascii_header(v: str) -> str:
         return "=?UTF-8?B?" + base64.b64encode(v.encode()).decode() + "?="
 
 
-async def send(title: str, body: str, conversation_id: int | None = None, tags: str = "") -> bool:
-    """Envoie sur tous les canaux configurés. Vrai si au moins un a réussi."""
+async def send(title: str, body: str, conversation_id: int | None = None, tags: str = "",
+               buttons: list[list[tuple[str, str]]] | None = None) -> bool:
+    """Envoie sur tous les canaux configurés. Vrai si au moins un a réussi.
+    buttons : boutons Telegram [[(texte, callback_data)]] (ntfy : lien vers l'interface)."""
     from . import telegram
 
-    results = [await telegram.broadcast(f"**{title}**\n{body}")]
+    markup = {"inline_keyboard": [[{"text": t, "callback_data": d} for t, d in row] for row in buttons]} if buttons else None
+    results = [await telegram.broadcast(f"**{title}**\n{body}", markup)]
     if NTFY_URL:
         results.append(await _ntfy(title, body, conversation_id, tags))
     if not any(results):

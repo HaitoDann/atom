@@ -182,7 +182,7 @@ def split_long(text: str) -> list[str]:
 # ---------------------------------------------------------------- envoi sortant
 
 
-async def broadcast(text: str) -> bool:
+async def broadcast(text: str, markup: dict | None = None) -> bool:
     """Envoie un message à tous les utilisateurs autorisés (rappels…)."""
     if not enabled() or not TELEGRAM_ALLOWED:
         return False
@@ -190,11 +190,30 @@ async def broadcast(text: str) -> bool:
     async with httpx.AsyncClient(timeout=15) as client:
         for chat_id in TELEGRAM_ALLOWED:
             try:
-                await send_text(client, chat_id, text)
+                await send_text(client, chat_id, text, **({"reply_markup": markup} if markup else {}))
                 ok = True
             except (TelegramError, httpx.HTTPError) as e:
                 log.warning("envoi Telegram à %s impossible : %s", chat_id, e)
     return ok
+
+
+async def reminder_button(client, cq: dict) -> None:
+    """Boutons d'un rappel : Fait, +1 h, Demain. Les boutons disparaissent une fois l'action faite."""
+    from . import reminders
+    m = re.fullmatch(r"rem:(done|snooze|tomorrow):(\d+)(?::(\d+))?", cq.get("data") or "")
+    msg = cq["message"]
+    try:
+        if not m:
+            await call(client, "answerCallbackQuery", callback_query_id=cq["id"])
+            return
+        res = reminders.act(int(m.group(2)), m.group(1), int(m.group(3) or 60))
+        await call(client, "answerCallbackQuery", callback_query_id=cq["id"], text=res["message"][:190])
+        await call(client, "editMessageReplyMarkup", chat_id=msg["chat"]["id"], message_id=msg["message_id"],
+                   reply_markup={"inline_keyboard": []})
+        if res["ok"]:
+            await send_text(client, msg["chat"]["id"], res["message"])
+    except (TelegramError, httpx.HTTPError) as e:
+        log.warning("bouton de rappel : %s", e)
 
 
 def conversation_for(chat_id: int) -> int | None:
@@ -393,7 +412,10 @@ async def run() -> None:
                         await queue.put(u["message"])
                     elif "callback_query" in u:   # boutons (agent : diff, appliquer, commit…)
                         cq = u["callback_query"]
-                        if cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message"):
+                        if cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message") \
+                                and str(cq.get("data", "")).startswith("rem:"):
+                            asyncio.create_task(reminder_button(client, cq))
+                        elif cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message"):
                             import sys
 
                             from . import tgagent

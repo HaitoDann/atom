@@ -357,6 +357,19 @@
           <ul class="list" id="remList"></ul>
           <p class="note" id="remInfo"></p>
         </div>
+        <div class="block">
+          <h4>À confirmer</h4>
+          <p class="desc">Rappels envoyés mais pas encore marqués comme faits. Atom les relance tant que tu ne réponds pas (boutons Fait, +1 h, Demain sur Telegram ou ici).</p>
+          <ul class="list" id="remUnacked"></ul>
+          <label class="switch"><span>Relancer les rappels non confirmés</span><input type="checkbox" id="fuEnabled"></label>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <label class="note" for="fuDelay">Relancer après</label><input class="field" type="number" id="fuDelay" min="5" max="1440" style="width:80px"><span class="note">min,</span>
+            <input class="field" type="number" id="fuMax" min="0" max="5" style="width:60px" aria-label="Nombre maximum de relances"><span class="note">fois au plus</span>
+          </div>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <span class="note">Heures calmes, sans relance : de</span><input class="field" type="time" id="fuQs" style="width:auto" aria-label="Début des heures calmes"><span class="note">à</span><input class="field" type="time" id="fuQe" style="width:auto" aria-label="Fin des heures calmes">
+          </div>
+        </div>
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
       </section>
 

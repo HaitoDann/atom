@@ -144,16 +144,105 @@ class CommandFilter:
         return rest
 
 
-# ---------------------------------------------------------------- planificateur
+# ---------------------------------------------------------------- planificateur et relances
+# Un rappel envoyé attend une confirmation (« Fait ») : boutons Telegram, interface web.
+# Sans réponse, Atom relance après FOLLOWUP_DEFAULTS["delay"] minutes, au plus « max » fois, jamais pendant
+# les heures calmes. « +1 h » et « Demain » reprogramment le rappel (l'ancien est marqué « reporté »).
+
+FOLLOWUP_DEFAULTS = {"enabled": True, "delay": 60, "max": 2, "quiet_start": "22:00", "quiet_end": "07:30"}
+
+
+def followup_settings() -> dict:
+    import json
+    s = dict(FOLLOWUP_DEFAULTS)
+    try:
+        s.update({k: v for k, v in json.loads(db.kv_get("followups") or "{}").items() if k in FOLLOWUP_DEFAULTS})
+    except ValueError:
+        pass
+    return s
+
+
+def save_followup_settings(new: dict) -> dict:
+    import json
+    s = followup_settings()
+    s.update({k: v for k, v in new.items() if k in FOLLOWUP_DEFAULTS and v is not None})
+    s["delay"] = max(5, min(24 * 60, int(s["delay"])))
+    s["max"] = max(0, min(5, int(s["max"])))
+    for k in ("quiet_start", "quiet_end"):
+        if not re.fullmatch(r"\d{1,2}:\d{2}", str(s[k])):
+            s[k] = FOLLOWUP_DEFAULTS[k]
+    db.kv_set("followups", json.dumps(s))
+    return s
+
+
+def quiet(now: datetime, s: dict) -> bool:
+    """Heures calmes (ex. 22:00 → 07:30, à cheval sur minuit) : pas de relance."""
+    def mins(t: str) -> int:
+        h, m = (int(x) for x in t.split(":"))
+        return h * 60 + m
+    a, b, n = mins(s["quiet_start"]), mins(s["quiet_end"]), now.hour * 60 + now.minute
+    return (a <= n < b) if a <= b else (n >= a or n < b)
+
+
+def buttons(rid: int) -> list[list[tuple[str, str]]]:
+    return [[("✅ Fait", f"rem:done:{rid}"), ("⏰ +1 h", f"rem:snooze:{rid}:60"), ("📅 Demain", f"rem:tomorrow:{rid}")]]
 
 
 async def fire(r: dict) -> None:
     text = r["text"]
     cid = r["conversation_id"] if r["conversation_id"] and db.conversation_exists(r["conversation_id"]) else None
-    ok = await notify.send("⏰ Rappel d'Atom", text, cid, tags="alarm_clock")
+    ok = await notify.send("⏰ Rappel d'Atom", text, cid, tags="alarm_clock", buttons=buttons(r["id"]))
     db.mark_reminder(r["id"], "sent" if ok or not notify.enabled() else "failed")
     if cid:
         db.add_message(cid, "assistant", f"⏰ **Rappel** : {text}", "surprise")
+
+
+def followups_due(now_ts: float, now_local_dt: datetime, s: dict) -> list[dict]:
+    """Rappels envoyés, non confirmés, dont la prochaine relance est due."""
+    if not s["enabled"] or s["max"] <= 0 or quiet(now_local_dt, s):
+        return []
+    out = []
+    for r in db.unacked_reminders():
+        if (r.get("nudges") or 0) >= s["max"]:
+            continue
+        since = r.get("last_nudge_at") or r.get("sent_at") or r["due_at"]
+        if now_ts - since >= s["delay"] * 60 and now_ts - r["due_at"] < 2 * 86400:   # pas de relance après 2 jours
+            out.append(r)
+    return out
+
+
+async def nudge(r: dict) -> None:
+    n = (r.get("nudges") or 0) + 1
+    late = human(r["due_at"])
+    ok = await notify.send("🔁 Relance d'Atom", f"{r['text']}\n_(rappel de {late}, pas encore marqué comme fait)_",
+                           r["conversation_id"], tags="repeat", buttons=buttons(r["id"]))
+    db.nudge_reminder(r["id"])
+    log.info("relance %d du rappel #%s (%s)", n, r["id"], "envoyée" if ok else "aucun canal")
+
+
+def act(rid: int, action: str, minutes: int = 60) -> dict:
+    """Fait / reporter de N minutes / demain 9 h. Renvoie {ok, message, new_id?}."""
+    r = db.get_reminder(rid)
+    if not r:
+        return {"ok": False, "message": "Rappel introuvable."}
+    if r.get("acked_at"):
+        return {"ok": False, "message": "Ce rappel est déjà traité."}
+    if action == "done":
+        db.ack_reminder(rid, "done")
+        return {"ok": True, "message": f"✅ Noté : « {r['text']} » est fait."}
+    if action == "snooze":
+        due = time.time() + max(5, min(7 * 24 * 60, minutes)) * 60
+    elif action == "tomorrow":
+        d = now_local() + timedelta(days=1)
+        due = d.replace(hour=9, minute=0, second=0, microsecond=0).timestamp()
+    else:
+        return {"ok": False, "message": "Action inconnue."}
+    new_id = db.add_reminder(r["conversation_id"], r["text"], due)
+    if r["status"] == "pending":
+        db.delete_reminder(rid)
+    else:
+        db.ack_reminder(rid, "snoozed")
+    return {"ok": True, "message": f"⏰ Je te le rappelle {human(due)}.", "new_id": new_id}
 
 
 async def scheduler() -> None:
@@ -162,6 +251,8 @@ async def scheduler() -> None:
         try:
             for r in db.due_reminders(time.time()):
                 await fire(r)
+            for r in followups_due(time.time(), now_local(), followup_settings()):
+                await nudge(r)
         except Exception:
             log.exception("erreur du planificateur")
         await asyncio.sleep(SCHEDULER_INTERVAL)
