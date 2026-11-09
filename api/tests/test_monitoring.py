@@ -217,3 +217,17 @@ def test_grafana_check_reports_exact_errors(client, monkeypatch):
     assert r["checked"] == 3 and not r["ok"]
     assert r["errors"] == [{"panel": "Cassé", "error": "bad_data: parse error: unclosed left parenthesis", "query": "A"}]
     assert r["empty"] == ["Vide"]
+
+
+def test_diagnostic_report(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("ATOM_OFFSITE_DIR", str(tmp_path))
+    monkeypatch.setenv("ATOM_OFFSITE_KEY", "phrase de test diagnostic")
+    from app import backup, offsite
+    offsite.push(backup.path_of(backup.create("manual")["name"]))
+    r = client.post("/api/diagnostic").json()
+    names = [c["name"] for c in r["checks"]]
+    assert sum(n.startswith("Copie sur") for n in names) == 1
+    nas = next(c for c in r["checks"] if c["name"].startswith("Copie sur"))
+    assert nas["status"] == "ok" and "restauration testée" in nas["detail"]
+    assert "Atelier multi-IA" in names and "Tableau de bord Grafana" in names
+    assert r["report"].startswith("Diagnostic Atom") and "phrase de test" not in r["report"]   # aucun secret

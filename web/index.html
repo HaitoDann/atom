@@ -255,6 +255,12 @@
           <p class="desc" id="stInfo">Chaque service d'Atom est vérifié ici.</p>
           <ul class="list st-list" id="stList"></ul>
         </div>
+        <div class="block">
+          <h4>Diagnostic complet</h4>
+          <p class="desc">Vérifie tout d'un coup : services, fournisseurs d'IA, tableau Grafana (chaque panneau), copie sur le NAS (avec un test de restauration) et composition de l'atelier. Le rapport ne contient aucun secret : tu peux le copier pour demander de l'aide.</p>
+          <div class="row"><button class="btn primary" id="diagGo">Lancer le diagnostic</button><button class="btn" id="diagCopy" hidden>Copier le rapport</button></div>
+          <pre class="diag-report" id="diagOut" hidden></pre>
+        </div>
       </section>
 
       <section class="pane" data-pane="lab">
@@ -506,6 +512,7 @@
   <div class="pvw-box">
     <header class="pvw-head">
       <b id="pvwTitle">page.html</b>
+      <div class="seg pvw-vers" id="pvwVers" aria-label="Versions de ce fichier dans la conversation"></div>
       <span class="pvw-note">Aperçu isolé d'Atom (bac à sable)</span>
       <div class="seg" aria-label="Largeur"><button data-w="100%" class="on">Ordinateur</button><button data-w="820px">Tablette</button><button data-w="390px">Téléphone</button></div>
       <button class="btn sm" id="pvwDl" type="button">Télécharger</button>
@@ -513,6 +520,10 @@
       <button class="iconbtn" id="pvwClose" type="button" aria-label="Fermer l'aperçu" data-i="x"></button>
     </header>
     <div class="pvw-stage"><iframe id="pvwFrame" title="Aperçu de la page" sandbox="allow-scripts allow-forms allow-popups allow-modals"></iframe></div>
+    <form class="pvw-ask" id="pvwAsk">
+      <input class="field" id="pvwAskIn" placeholder="Demander une modification : « garde tout, mais rends l'en-tête plus compact »…" autocomplete="off" aria-label="Modification à demander">
+      <button class="btn primary" type="submit">Modifier</button>
+    </form>
   </div>
 </div>
 <div id="wsLaunch" class="wl" role="dialog" aria-modal="true" aria-labelledby="wlTitle" hidden>

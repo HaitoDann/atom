@@ -32,7 +32,7 @@ SYSTEM = (
 
 def writable(col: dict) -> bool:
     src = col.get("source") or ""
-    return src.startswith(("http://", "https://", "git@")) and (library._code_root(col) / ".git").exists()
+    return src.startswith(("http://", "https://", "git@", "atom:")) and (library._code_root(col) / ".git").exists()
 
 
 def _root_and_path(cid: int, rel: str) -> tuple[dict, Path, Path]:

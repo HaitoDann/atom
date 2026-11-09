@@ -322,3 +322,57 @@ test("atelier : un clic à côté ne ferme pas la fenêtre, et les choix sont co
   await expect(page.locator("#wlText")).toHaveValue("Compare deux hébergeurs pour mon site");
   await expect(page.locator('.wl-pat.on[data-p="debate"]')).toBeVisible();
 });
+
+test("diagnostic complet : rapport copiable (NAS et Grafana simulés)", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => openSettings("backup"));
+  await page.click("#nasPush");                                                    // une copie, pour tester la restauration
+  await expect(page.locator("#nasList li:not(.none)").first()).toBeVisible({ timeout: 15_000 });
+  await page.evaluate(() => openSettings("status"));
+  await page.click("#diagGo");
+  await expect(page.locator("#diagOut")).toContainText("Diagnostic Atom", { timeout: 20_000 });
+  await expect(page.locator("#diagOut")).toContainText("Copie sur NAS-VinX : ");
+  await expect(page.locator("#diagOut")).toContainText("restauration testée");
+  await expect(page.locator("#diagOut")).toContainText("panneaux sans erreur");
+  await expect(page.locator("#diagCopy")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("fichiers d'une réponse → projet ouvert dans le mode Code", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  page.once("dialog", (d) => d.accept("Boulangerie e2e"));
+  await send(page, "**index.html**\n\n```html\n<!doctype html><title>Ma boulangerie</title><h1>Pain</h1>\n```");
+  const bar = page.locator(".msg.atom").last().locator(".zip-bar");
+  await expect(bar).toContainText("1 fichier", { timeout: 15_000 });
+  await bar.locator("[data-project]").click();
+  await expect(page.locator("#title")).toHaveText("Code");
+  await expect(page.locator("#cvProject option:checked")).toHaveText("Boulangerie e2e", { timeout: 15_000 });
+  await expect(page.locator("#codeView")).toContainText("index.html");
+  expect(errors).toEqual([]);
+});
+
+test("aperçu : versions successives et demande de modification", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await send(page, "**page.html**\n\n```html\n<!doctype html><h1 id=\"t\">Version un</h1>\n```");
+  const block = page.locator(".msg.atom").last().locator(".code").first();
+  await expect(block.locator("[data-preview]")).toBeVisible({ timeout: 15_000 });
+  await block.locator("[data-preview]").click();
+  await expect(page.frameLocator("#pvwFrame").locator("#t")).toHaveText("Version un");
+  await expect(page.locator("#pvwVers button")).toHaveCount(0);                     // une seule version pour l'instant
+  await page.fill("#pvwAskIn", "mets le titre en rouge");
+  await page.click("#pvwAsk button[type=submit]");
+  await expect(page.locator("#pvw")).toBeHidden();
+  await expect(page.locator(".msg.user").last()).toContainText("Modifie le fichier **page.html**");
+  // La réponse (modèle simulé) renvoie le fichier : deux versions dans la conversation.
+  const last = page.locator(".msg.atom").last().locator(".code").first();
+  await expect(last.locator("[data-preview]")).toBeVisible({ timeout: 15_000 });
+  await last.locator("[data-preview]").click();
+  await expect(page.locator("#pvwVers button")).toHaveCount(2);
+  await expect(page.locator('#pvwVers button[data-v="1"]')).toHaveClass(/on/);
+  await page.click('#pvwVers button[data-v="0"]');
+  await expect(page.locator('#pvwVers button[data-v="0"]')).toHaveClass(/on/);
+  expect(errors).toEqual([]);
+});

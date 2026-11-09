@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -34,7 +35,7 @@ def _git_url(url: str) -> str:
 
 def _code_root(col: dict) -> Path:
     src = col["source"] or ""
-    if src.startswith(("http://", "https://", "git@")):
+    if src.startswith(("http://", "https://", "git@", "atom:")):   # atom: projet créé par Atom (fichiers d'une réponse)
         return REPOS_DIR / str(col["id"])
     p = Path(src)
     if not p.is_absolute():
@@ -283,3 +284,41 @@ def grep(cid: int, q: str, limit: int = 300) -> list[dict]:
                 if len(out) >= limit:
                     return out
     return out
+
+
+# ---------------------------------------------------------------- projets créés par Atom (fichiers d'une réponse)
+
+SAFE_PATH = re.compile(r"^(?!/)(?!.*\.\.)[\w .@+/-]{1,200}$")
+
+
+def create_from_files(name: str, files: list[dict]) -> int:
+    """Crée un projet modifiable (dépôt Git local) à partir de fichiers [{path, content}] : il s'ouvre ensuite dans
+    le mode Code (lecture, modifications validées, agent, tests en bac à sable)."""
+    from . import library
+    clean = []
+    for f in files:
+        path = str(f.get("path", "")).strip()
+        while path.startswith("./"):
+            path = path[2:]
+        if not SAFE_PATH.match(path) or path.startswith(".git"):
+            raise ValueError(f"nom de fichier refusé : {path!r}")
+        clean.append((path, str(f.get("content", ""))))
+    if not clean:
+        raise ValueError("aucun fichier à enregistrer")
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "projet"
+    cid = library.create_collection(name.strip()[:80] or "Projet", "code", f"atom:{slug}")
+    root = REPOS_DIR / str(cid)
+    shutil.rmtree(root, ignore_errors=True)
+    root.mkdir(parents=True)
+    for path, content in clean:
+        dest = (root / path).resolve()
+        if root.resolve() not in dest.parents:
+            raise ValueError(f"nom de fichier refusé : {path!r}")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(content)
+    g = ["git", "-C", str(root), "-c", "user.name=Atom", "-c", "user.email=atom@localhost"]
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], capture_output=True, timeout=30)
+    subprocess.run([*g, "add", "-A"], capture_output=True, timeout=30)
+    subprocess.run([*g, "commit", "-q", "-m", "Version générée par Atom"], capture_output=True, timeout=30)
+    log.info("projet %s créé à partir de %d fichier(s)", name, len(clean))
+    return cid

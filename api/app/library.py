@@ -321,6 +321,6 @@ async def index_document(did: int) -> None:
 # ---------------------------------------------------------------- projets de code (app/codeprojects.py)
 # Importés en fin de module : codeprojects réutilise les constantes et collections définies ci-dessus.
 from .codeprojects import (  # noqa: E402,F401 (API publique)
-    _code_files, _code_root, _git_url, _index_project, _sync_repo, grep, index_project, list_server_projects, read_file,
+    _code_files, _code_root, _git_url, create_from_files, _index_project, _sync_repo, grep, index_project, list_server_projects, read_file,
     resolve_server_path, tree,
 )

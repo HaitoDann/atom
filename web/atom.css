@@ -1401,3 +1401,8 @@ textarea.field { line-height: 1.55; }
 .wl-flow { align-items: stretch; flex-wrap: nowrap; }
 .wl-flow .ws-node { justify-self: stretch; }
 .field:focus-visible { outline: none; }
+.pvw-vers:empty { display: none; }
+.pvw-ask { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); background: var(--surface); }
+.pvw-ask .field { flex: 1; }
+.diag-report { margin: 12px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--code-bg);
+               font: 12px/1.6 var(--mono); color: var(--text-2); white-space: pre-wrap; max-height: 340px; overflow: auto; }

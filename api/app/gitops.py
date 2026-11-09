@@ -29,7 +29,7 @@ def _repo(cid: int) -> tuple[dict, Path]:
         raise FileNotFoundError("projet")
     src = col.get("source") or ""
     root = library._code_root(col)
-    if not src.startswith(("http://", "https://", "git@")) or not (root / ".git").exists():
+    if not src.startswith(("http://", "https://", "git@", "atom:")) or not (root / ".git").exists():
         raise PermissionError("Ce projet n'est pas un dépôt cloné par Atom (lecture seule).")
     return col, root
 
@@ -141,6 +141,9 @@ def commit(cid: int, message: str, paths: list[str]) -> dict:
 
 def push(cid: int) -> dict:
     col, root = _repo(cid)
+    if (col.get("source") or "").startswith("atom:"):
+        raise PermissionError("Projet créé par Atom : il n'a pas de dépôt GitHub. Télécharge les fichiers (.zip) ou "
+                              "crée un dépôt et ajoute-le à la Bibliothèque.")
     branch, base = _current(root), _default_branch(root)
     if not branch:
         raise GitError("Aucune branche active.")

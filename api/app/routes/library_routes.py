@@ -136,3 +136,24 @@ def project_file(cid: int, path: str):
         return {"path": path, "content": library.read_file(cid, path)}
     except FileNotFoundError as e:
         raise HTTPException(404, "Fichier introuvable") from e
+
+
+class ProjectFile(BaseModel):
+    path: str = Field(min_length=1, max_length=200)
+    content: str = Field(max_length=2_000_000)
+
+
+class ProjectFromFilesIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    files: list[ProjectFile] = Field(min_length=1, max_length=200)
+
+
+@router.post("/api/projects/from-files")
+async def project_from_files(body: ProjectFromFilesIn):
+    """Enregistre les fichiers d'une réponse comme projet : ouvert ensuite dans le mode Code."""
+    try:
+        cid = library.create_from_files(body.name, [f.model_dump() for f in body.files])
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    background(library.index_project(cid))
+    return {"collection_id": cid, "files": len(body.files)}
