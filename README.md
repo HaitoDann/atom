@@ -690,6 +690,12 @@ Conseils : configure au moins un fournisseur d'une **autre famille** que le mod�
 python3 bench/bench.py --url http://IP-DE-LA-VM:8000 --methods simple,orchestra --run-code
 ```
 
+**Sans le modèle local** (comparer seulement les fournisseurs distants, plus rapide) : `--no-local` exclut le local de tous les rôles, sans repli silencieux vers lui. `--list` affiche les moteurs disponibles. Méthodes : `ask:<moteur>` (un seul appel, sans relais), `orchestra:<moteur>` (orchestration avec cet exécutant), `review:<moteur>`.
+
+```bash
+python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini,orchestra:groq --run-code
+```
+
 `--only interets,jours` pour quelques tâches, `--repeat 3` pour lisser les variations, `--keep` pour garder les conversations créées (supprimées sinon). Le mot de passe est demandé au clavier, ou lu dans `ATOM_BENCH_PASSWORD`.
 
 ## Feuille de route

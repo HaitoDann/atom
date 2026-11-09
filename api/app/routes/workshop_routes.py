@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .. import orchestrator, providers, workshop
+from ..config import MAX_TOKENS_LONG
 
 router = APIRouter()
 
@@ -30,6 +31,12 @@ class WorkshopRunIn(BaseModel):
     participants: list[str] | None = Field(default=None, max_length=3)
     rounds: int | None = Field(default=None, ge=1, le=3)
     architect: str | None = Field(default=None, pattern="^(auto|on|off)$")
+    allow_local: bool = True
+
+
+class AskIn(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    engine: str = Field(pattern=r"^(local|p:[a-z0-9_-]{1,40})$")
 
 
 class WorkshopPreviewIn(BaseModel):
@@ -88,7 +95,7 @@ async def run_workshop(body: WorkshopRunIn):
     # Lancé explicitement (lanceur ou bouton) : pas besoin d'activer l'atelier dans les réglages.
     return StreamingResponse(
         (event(**ev) async for ev in workshop.run(body.message.strip(), body.conversation_id, body.pattern, body.participants,
-                                                  rounds=body.rounds, architect=body.architect)),
+                                                  rounds=body.rounds, architect=body.architect, allow_local=body.allow_local)),
         media_type="application/x-ndjson")
 
 
@@ -99,3 +106,27 @@ def orchestra_stats():
     return {**orchestrator.stats(), "worker": workshop.engine_label(e["worker"]), "planner": workshop.engine_label(e["planner"]),
             "judge": workshop.engine_label(e["judge"]), "ladder": [workshop.engine_label(x) for x in e["ladder"]],
             "same_family_judge": e["same_family_judge"]}
+
+
+@router.post("/api/bench/ask")
+async def bench_ask(body: AskIn):
+    """Un seul appel à un moteur précis, sans relais vers un autre fournisseur ni vers le local (banc d'essai)."""
+    import time as _t
+    if body.engine.startswith("p:") and not (providers.get(body.engine[2:]) and providers.get(body.engine[2:]).configured):
+        raise HTTPException(404, f"Fournisseur inconnu ou non configuré : {body.engine[2:]}")
+    msgs = [{"role": "system", "content": "Réponds en français, directement, sans émotion entre crochets. /no_think"},
+            {"role": "user", "content": body.message}]
+    t0, out = _t.time(), ""
+    try:
+        if body.engine == "local":
+            from .. import llm
+            async for tok in llm.stream_chat(workshop._local_model(), msgs, task="banc"):
+                out += tok
+        else:
+            async for tok in providers.stream_complete([providers.get(body.engine[2:])], msgs, {},
+                                                       max_tokens=MAX_TOKENS_LONG, task="banc"):
+                out += tok
+    except providers.Unavailable as e:
+        raise HTTPException(503, f"{body.engine} indisponible : {e}") from e
+    text = workshop.TAG_RE.sub("", workshop.THINK_RE.sub("", out)).strip()
+    return {"answer": text, "engine": workshop.engine_label(body.engine), "seconds": round(_t.time() - t0, 1)}

@@ -165,7 +165,7 @@ def engine_label(engine: str) -> str:
 RETRY_WAIT = float(os.getenv("ATOM_WORKSHOP_RETRY_WAIT", "45"))
 
 
-async def _gen(engine: str, messages: list[dict], on_engine) -> AsyncIterator[str]:
+async def _gen(engine: str, messages: list[dict], on_engine, allow_local: bool = True) -> AsyncIterator[str]:
     """Jetons du participant ; s'il est indisponible, relais vers un autre fournisseur, puis — si tous sont seulement
     en pause pour quelques secondes (limite par minute) — attente et nouvel essai, et le local en dernier recours :
     un petit modèle local relit mal du code et prend plusieurs minutes."""
@@ -192,7 +192,11 @@ async def _gen(engine: str, messages: list[dict], on_engine) -> AsyncIterator[st
                 break
             log.info("atelier : fournisseurs en pause, nouvel essai dans %.0f s", wait)
             await asyncio.sleep(wait + 1)
+        if not allow_local:   # comparaison sans modèle local (banc d'essai) : pas de repli silencieux
+            raise providers.Unavailable(last or "aucun fournisseur distant disponible (modèle local exclu)")
         on_engine("local", [last or "aucun fournisseur distant disponible"])
+    elif not allow_local:
+        raise providers.Unavailable("modèle local exclu pour cette exécution")
     async for t in llm.stream_chat(_local_model(), messages):
         yield t
 
@@ -373,7 +377,7 @@ def plan(pattern: str, participants: list[str], rounds: int) -> list[tuple[str, 
 
 async def run(message: str, conversation_id: int | None, pattern: str | None = None,
               participants: list[str] | None = None, title: str = "", rounds: int | None = None,
-              architect: str | None = None) -> AsyncIterator[dict]:
+              architect: str | None = None, allow_local: bool = True) -> AsyncIterator[dict]:
     """Événements : meta, step (start/token/done), token… (réponse finale), done — ou error."""
     from .agent import make_title
 
@@ -396,7 +400,8 @@ async def run(message: str, conversation_id: int | None, pattern: str | None = N
         record: list = []
         try:
             final_text, info = "…", {}
-            async for ev in orchestrator.run(request, record):
+            worker = _norm(participants[0]) if participants and participants[0] not in ("auto", "") else None
+            async for ev in orchestrator.run(request, record, worker=worker, allow_local=allow_local):
                 if ev["type"] == "_final":
                     final_text, info = ev["text"] or "…", ev["orchestra"]
                 else:

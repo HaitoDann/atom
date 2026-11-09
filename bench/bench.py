@@ -2,13 +2,18 @@
 """Banc d'essai d'Atom : envoie les mêmes tâches à plusieurs méthodes, corrige les réponses et produit un rapport.
 
 Méthodes :
-  simple     discussion normale, moteur local (un seul appel)
-  orchestra  atelier « Orchestration vérifiée »
-  review     atelier « Rédaction puis relecture » (référence multi-IA classique)
+  simple               discussion normale, moteur local (un seul appel)
+  ask:<moteur>         un seul appel à un moteur précis (local, groq, gemini…), sans relais
+  orchestra            orchestration vérifiée (exécutant : le local, ou le plus faible distant avec --no-local)
+  orchestra:<moteur>   orchestration avec cet exécutant (ex. orchestra:groq)
+  review[:<moteur>]    rédaction puis relecture (référence multi-IA classique)
+--no-local : le modèle local n'intervient nulle part (aucun repli silencieux vers lui).
+--list     : affiche les moteurs disponibles.
 
 Usage (depuis le dossier atom, sur le serveur ou ton PC) :
   python3 bench/bench.py --url http://IP-DE-LA-VM:8000
   python3 bench/bench.py --methods simple,orchestra --only interets,jours --repeat 2
+  python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini
 
 Aucune dépendance : bibliothèque standard de Python 3.9+.
 Le mot de passe d'Atom est lu dans ATOM_BENCH_PASSWORD, sinon demandé au clavier (jamais écrit sur disque).
@@ -80,8 +85,11 @@ def run_simple(atom: Atom, text: str) -> dict:
     return {"answer": re.sub(r"^\s*\[[a-zA-Z]+\]\s*", "", answer), "cid": cid, "error": err, "steps": 1, "calls": 1}
 
 
-def run_workshop(atom: Atom, text: str, pattern: str) -> dict:
-    ev = atom.stream("/api/workshop/run", {"message": text, "pattern": pattern})
+def run_workshop(atom: Atom, text: str, pattern: str, participants: list[str] | None = None, allow_local: bool = True) -> dict:
+    body = {"message": text, "pattern": pattern, "allow_local": allow_local}
+    if participants:
+        body["participants"] = participants
+    ev = atom.stream("/api/workshop/run", body)
     done = next((e for e in ev if e.get("type") == "done"), None)
     cid = next((e.get("conversation_id") for e in ev if e.get("type") == "meta"), None)
     err = next((e.get("message") for e in ev if e.get("type") == "error"), "")
@@ -101,11 +109,30 @@ def run_workshop(atom: Atom, text: str, pattern: str) -> dict:
     return out
 
 
-METHODS = {
-    "simple": run_simple,
-    "orchestra": lambda a, t: run_workshop(a, t, "orchestra"),
-    "review": lambda a, t: run_workshop(a, t, "review"),
-}
+def run_ask(atom: Atom, text: str, engine: str) -> dict:
+    try:
+        r = atom.json("POST", "/api/bench/ask", {"message": text, "engine": engine})
+    except urllib.error.HTTPError as e:
+        return {"answer": "", "cid": None, "error": f"{e.code} {e.read().decode(errors='replace')[:150]}", "steps": 0, "calls": 0}
+    return {"answer": r["answer"], "cid": None, "error": "", "steps": 1, "calls": 1}
+
+
+def method_fn(spec: str, no_local: bool):
+    """Méthodes : simple | ask:<moteur> | orchestra[:<fournisseur>] | review[:<fournisseur>]
+    (<moteur> = local ou l'identifiant d'un fournisseur, ex. groq ; voir --list)."""
+    name, _, eng = spec.partition(":")
+    pid = "" if eng in ("", "local") else eng
+    participants = [f"p:{pid}", "auto", "auto"] if pid else (["local", "auto", "auto"] if eng == "local" else None)
+    if name == "simple" and not eng:
+        return None if no_local else run_simple
+    if name in ("ask", "simple") and eng:
+        engine = f"p:{pid}" if pid else "local"
+        return None if (no_local and engine == "local") else (lambda a, t: run_ask(a, t, engine))
+    if name in ("orchestra", "review"):
+        def fn(a, t):
+            return run_workshop(a, t, name, participants, not no_local)
+        return fn
+    return None
 
 
 # ---------------------------------------------------------------- correction automatique
@@ -227,7 +254,9 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--url", default=os.getenv("ATOM_BENCH_URL", "http://localhost:8000"))
     ap.add_argument("--tasks", default=str(HERE / "tasks.json"), help="fichier de tâches (JSON)")
-    ap.add_argument("--methods", default="simple,orchestra", help="simple,orchestra,review")
+    ap.add_argument("--methods", default="simple,orchestra", help="simple, ask:<moteur>, orchestra[:<moteur>], review[:<moteur>]")
+    ap.add_argument("--no-local", action="store_true", help="n'utilise jamais le modèle local")
+    ap.add_argument("--list", action="store_true", help="liste les moteurs disponibles puis quitte")
     ap.add_argument("--only", default="", help="identifiants de tâches, séparés par des virgules")
     ap.add_argument("--repeat", type=int, default=1, help="répétitions (les petits modèles varient d'un essai à l'autre)")
     ap.add_argument("--timeout", type=int, default=1800, help="délai max par réponse, en secondes")
@@ -240,12 +269,27 @@ def main() -> None:
         wanted = set(a.only.split(","))
         tasks = [t for t in tasks if t["id"] in wanted]
     methods = [m for m in a.methods.split(",") if m]
-    bad = [m for m in methods if m not in METHODS]
-    if bad or not tasks:
-        sys.exit(f"Méthode inconnue : {bad}" if bad else "Aucune tâche sélectionnée.")
+    fns = {m: method_fn(m, a.no_local) for m in methods}
+    bad = [m for m, f in fns.items() if f is None]
+    if (bad or not tasks) and not a.list:
+        sys.exit(f"Méthode inconnue ou incompatible avec --no-local : {bad}" if bad else "Aucune tâche sélectionnée.")
 
     atom = Atom(a.url, a.timeout)
-    atom.login(os.getenv("ATOM_BENCH_PASSWORD") or getpass.getpass("Mot de passe d'Atom : "))
+    password = os.getenv("ATOM_BENCH_PASSWORD", "")
+    if not password:
+        if not sys.stdin.isatty():
+            # En arrière-plan (nohup … &), demander le mot de passe bloquerait le processus (état « Stopped »).
+            sys.exit("Mot de passe absent : exporte ATOM_BENCH_PASSWORD avant de lancer le script en arrière-plan.")
+        password = getpass.getpass("Mot de passe d'Atom : ")
+    atom.login(password)
+    if a.list:
+        opts = atom.json("GET", "/api/workshop")["options"]
+        print("Moteurs disponibles (à utiliser après « ask: », « orchestra: »…) :")
+        print("  local            " + next((o["label"] for o in opts if o["id"] == "local"), "modèle local"))
+        for o in opts:
+            if o["id"].startswith("p:"):
+                print(f"  {o['id'][2:]:<16} {o['label']} · famille {o.get('family', '?')} · force {o.get('strength', '?')}")
+        return
     out = HERE / "results" / time.strftime("%Y-%m-%d_%H%M")
     (out / "answers").mkdir(parents=True, exist_ok=True)
     fields = ["task", "kind", "method", "run", "score", "seconds", "calls", "steps", "difficulty", "verified",
@@ -263,7 +307,7 @@ def main() -> None:
                     print(f"[{n}/{total}] {t['id']} · {m} · essai {rep} … ", end="", flush=True)
                     t0 = time.time()
                     try:
-                        res = METHODS[m](atom, t["text"])
+                        res = fns[m](atom, t["text"])
                     except Exception as e:  # noqa: BLE001
                         res = {"answer": "", "cid": None, "error": str(e)[:200], "steps": 0, "calls": 0}
                     secs = time.time() - t0
