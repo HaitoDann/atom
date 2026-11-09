@@ -245,7 +245,13 @@ def main() -> None:
         sys.exit(f"Méthode inconnue : {bad}" if bad else "Aucune tâche sélectionnée.")
 
     atom = Atom(a.url, a.timeout)
-    atom.login(os.getenv("ATOM_BENCH_PASSWORD") or getpass.getpass("Mot de passe d'Atom : "))
+    password = os.getenv("ATOM_BENCH_PASSWORD", "")
+    if not password:
+        if not sys.stdin.isatty():
+            # En arrière-plan (nohup … &), demander le mot de passe bloquerait le processus (état « Stopped »).
+            sys.exit("Mot de passe absent : exporte ATOM_BENCH_PASSWORD avant de lancer le script en arrière-plan.")
+        password = getpass.getpass("Mot de passe d'Atom : ")
+    atom.login(password)
     out = HERE / "results" / time.strftime("%Y-%m-%d_%H%M")
     (out / "answers").mkdir(parents=True, exist_ok=True)
     fields = ["task", "kind", "method", "run", "score", "seconds", "calls", "steps", "difficulty", "verified",
