@@ -704,7 +704,7 @@ python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
 3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels
 4. ✅ Documents : bibliothèque (notes, PDF, OCR), recherche dedans, espaces
-5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée — prochain : domotique
+5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée
 6. ✅ Accès distant via Tailscale, fournisseurs distants avec relais et mode hybride
 
 
