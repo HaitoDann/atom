@@ -110,8 +110,8 @@ async function sendWorkshop(text, opts = {}) {
         else if (ev.type === "ids") { userMsg.id = ev.user_id; }
         else if (ev.type === "plan") {
           // Toutes les étapes dès le départ : en attente → en cours → terminée (ou relais).
-          pipe.innerHTML = ev.steps.map((st, i) => `${i ? '<span class="ws-arrow" aria-hidden="true">→</span>' : ""}<span class="ws-node pending" data-i="${i}">` +
-            `<b>${esc(st.role)}</b><small>${esc(st.engine)}</small><i>en attente</i></span>`).join("");
+          pipe.innerHTML = ev.steps.map((st, i) => `${i ? '<span class="ws-arrow" aria-hidden="true">→</span>' : ""}<span class="ws-node ${st.done ? "done" : "pending"}" data-i="${i}">` +
+            `<b>${esc(st.role)}</b><small>${esc(st.engine)}</small><i>${st.done ? "✓" : "en attente"}</i></span>`).join("");
           sum.innerHTML = `${icon("users")}Atelier · ${esc(ev.name)} · ${ev.steps.length} étapes`;
         }
         else if (ev.type === "step" && ev.status === "start") {
