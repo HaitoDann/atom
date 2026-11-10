@@ -32,6 +32,8 @@ DEFAULTS = {
     "allow_web": True,        # envoyer les résultats de recherche web (déjà publics)
     "model": "",              # (ancien) modèle du fournisseur principal — désormais réglé par fournisseur
     "provider": "",           # fournisseur principal ; vide = le premier configuré
+    "orchestrate": "suggest", # tâche difficile dans la discussion : auto (orchestration directe) | suggest | off
+    "auto_replace": True,     # modèle disparu chez un fournisseur : en choisir un autre automatiquement
 }
 
 COMPLEX = re.compile(
@@ -66,6 +68,8 @@ def save_settings(new: dict) -> dict:
     s.update({k: v for k, v in new.items() if k in DEFAULTS})
     if s["mode"] not in ("local", "auto", "mistral"):
         s["mode"] = "local"
+    if s["orchestrate"] not in ("auto", "suggest", "off"):
+        s["orchestrate"] = "suggest"
     if s["provider"] and not providers.get(s["provider"]):
         s["provider"] = ""
     db.kv_set("hybrid", json.dumps(s))
@@ -127,6 +131,24 @@ def decide(engine: str, message: str, needs_memory: bool, needs_docs: bool) -> t
     if kind == "complexe":
         return "mistral", "demande longue ou complexe"
     return "local", ""
+
+
+def orchestration_plan(message: str, engine: str = "default", has_files: bool = False) -> dict:
+    """Faut-il passer cette demande de la discussion à l'orchestration vérifiée ?
+    Conclusions du banc d'essai : un bon modèle distant suffit aux demandes simples et moyennes (rapide) ;
+    l'orchestration rattrape surtout le petit modèle local, et sert pour les tâches en plusieurs étapes.
+    Jamais avec des fichiers joints ni quand un modèle distant est imposé (le plus fort répond déjà)."""
+    from . import orchestrator
+    s = settings()
+    level = orchestrator.difficulty(message or "")
+    mode = s["orchestrate"]
+    out = {"difficulty": level, "mode": mode, "orchestrate": False, "suggest": False, "reason": ""}
+    if mode == "off" or has_files or engine == "mistral" or level != "difficile":
+        return out
+    out["reason"] = ("tâche en plusieurs étapes : découpage, petits modèles vérifiés (calculs exécutés, sources, "
+                     "juge d'une autre famille), puis assemblage")
+    out["orchestrate" if mode == "auto" else "suggest"] = True
+    return out
 
 
 async def list_models(pid: str | None = None) -> list[str]:

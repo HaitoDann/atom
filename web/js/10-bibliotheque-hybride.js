@@ -12,11 +12,13 @@ function showView(v) {
   $("libView").hidden = v !== "library";
   $("codeView").hidden = v !== "code";
   $("dashView").hidden = v !== "dash";
+  $("agendaView").hidden = v !== "agenda";
   $("scroller").hidden = v !== "chat";
   document.querySelector(".composer").hidden = v !== "chat";
   $("navLib").classList.toggle("on", v === "library");
   $("navCode").classList.toggle("on", v === "code");
   $("navDash").classList.toggle("on", v === "dash");
+  $("navAgenda").classList.toggle("on", v === "agenda");
   ["pinBtn", "exportBtn"].forEach((id) => { if (v !== "chat") $(id).style.display = "none"; });
   app.classList.remove("side-open");
   if (v !== "chat") exitHero();
@@ -24,6 +26,7 @@ function showView(v) {
   if (v === "library") { $("title").textContent = "Bibliothèque"; loadLibrary(); }
   else if (v === "code") { $("title").textContent = "Code"; loadCodeProjects(); }
   else if (v === "dash") { $("title").textContent = "Tableau de bord"; loadDashboard(); }
+  else if (v === "agenda") { $("title").textContent = "Agenda"; loadAgendaView(); }
   else { updateTitle(); if (!library.collections.some((c) => c.status === "indexing")) clearTimeout(libTimer); }
   if (typeof syncTabbar === "function") syncTabbar();
 }
@@ -326,6 +329,14 @@ async function loadHybrid() {
     b.onclick = () => saveHybrid({ mode: v });
     $("hyMode").appendChild(b);
   }
+  $("hyOrch").innerHTML = "";
+  for (const [v, t, d] of [["suggest", "Proposer", "Atom répond, puis propose de refaire avec l'orchestration"], ["auto", "Automatique", "Orchestration directe"], ["off", "Jamais", ""]]) {
+    const b = document.createElement("button");
+    b.className = "btn" + (h.orchestrate === v ? " primary" : ""); b.textContent = t; b.title = d;
+    b.onclick = () => saveHybrid({ orchestrate: v });
+    $("hyOrch").appendChild(b);
+  }
+  $("hyAutoReplace").checked = h.auto_replace !== false;
   $("hyMem").checked = h.allow_memory; $("hyDocs").checked = h.allow_docs; $("hyWeb").checked = h.allow_web;
   const box = $("hyProviders");
   box.innerHTML = h.providers.length ? "" : '<p class="note">Aucun fournisseur configuré.</p>';
@@ -373,3 +384,5 @@ async function saveHybrid(patch) {
 $("hyMem").onchange = () => saveHybrid({ allow_memory: $("hyMem").checked });
 $("hyDocs").onchange = () => saveHybrid({ allow_docs: $("hyDocs").checked });
 $("hyWeb").onchange = () => saveHybrid({ allow_web: $("hyWeb").checked });
+
+$("hyAutoReplace").onchange = () => saveHybrid({ auto_replace: $("hyAutoReplace").checked });

@@ -39,6 +39,7 @@ HELP = (
     "/souvenirs — ce que je sais de toi\n"
     "/serveur — état du serveur Proxmox\n"
     "/brief — le brief du matin, maintenant\n"
+    "/agenda — tes rendez-vous des 7 prochains jours\n"
     "/agent projet tâche — confier une tâche à l'agent de code\n"
     "/aide — ce message"
 )
@@ -199,14 +200,17 @@ async def broadcast(text: str, markup: dict | None = None) -> bool:
 
 async def reminder_button(client, cq: dict) -> None:
     """Boutons d'un rappel : Fait, +1 h, Demain. Les boutons disparaissent une fois l'action faite."""
-    from . import reminders
-    m = re.fullmatch(r"rem:(done|snooze|tomorrow):(\d+)(?::(\d+))?", cq.get("data") or "")
+    from . import memory_care, reminders
+    data = cq.get("data") or ""
+    m = re.fullmatch(r"rem:(done|snooze|tomorrow):(\d+)(?::(\d+))?", data)
+    mm = re.fullmatch(r"mem:(keep|forget):(\d+)", data)        # souvenir temporaire : Garder / Oublier
     msg = cq["message"]
     try:
-        if not m:
+        if not m and not mm:
             await call(client, "answerCallbackQuery", callback_query_id=cq["id"])
             return
-        res = reminders.act(int(m.group(2)), m.group(1), int(m.group(3) or 60))
+        res = (reminders.act(int(m.group(2)), m.group(1), int(m.group(3) or 60)) if m
+               else memory_care.act(int(mm.group(2)), mm.group(1)))
         await call(client, "answerCallbackQuery", callback_query_id=cq["id"], text=res["message"][:190])
         await call(client, "editMessageReplyMarkup", chat_id=msg["chat"]["id"], message_id=msg["message_id"],
                    reply_markup={"inline_keyboard": []})
@@ -262,6 +266,12 @@ async def handle_command(client, chat_id: int, text: str) -> None:
 
         from . import tgagent
         await tgagent.start(sys.modules[__name__], client, chat_id, args.strip())
+    elif cmd == "/agenda":
+        from . import agenda
+
+        rows = agenda.between(time.time() - 3600, time.time() + 7 * 86400)
+        txt = "\n".join(f"• {x['when']} — {x['title']}" + (f" ({x['location']})" if x["location"] else "") for x in rows[:30])
+        await send_text(client, chat_id, f"**📅 7 prochains jours**\n\n{txt}" if rows else "Rien de prévu ces 7 prochains jours.")
     elif cmd == "/brief":
         from . import brief
 
@@ -274,6 +284,29 @@ async def handle_command(client, chat_id: int, text: str) -> None:
         await send_text(client, chat_id, "**Serveur Proxmox**\n\n" + proxmox.summary())
     else:
         await send_text(client, chat_id, "Commande inconnue. /aide pour la liste.")
+
+
+async def transcribe_voice(client, chat_id: int, media: dict) -> str:
+    """Message vocal Telegram → texte (serveur de transcription local). Renvoie « » en cas d'échec (déjà signalé)."""
+    from . import voice
+    if not voice.status()["stt"]:
+        await send_text(client, chat_id, "🎤 Les messages vocaux ne sont pas activés : il faut le service de "
+                                         "transcription (README → Voix).")
+        return ""
+    try:
+        info = await call(client, "getFile", file_id=media["file_id"])
+        r = await client.get(f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{info['file_path']}")
+        r.raise_for_status()
+        text = await voice.transcribe(r.content, "vocal.ogg", media.get("mime_type") or "audio/ogg")
+    except (TelegramError, httpx.HTTPError, voice.VoiceError, KeyError) as e:
+        log.warning("message vocal : %s", e)
+        await send_text(client, chat_id, f"🎤 Je n'ai pas pu transcrire ce message ({str(e)[:120]}).")
+        return ""
+    if not text:
+        await send_text(client, chat_id, "🎤 Je n'ai rien entendu dans ce message.")
+        return ""
+    await send_text(client, chat_id, f"🎤 _{text}_")
+    return text
 
 
 async def handle_message(client, msg: dict) -> None:
@@ -289,8 +322,12 @@ async def handle_message(client, msg: dict) -> None:
             "Ajoute-le à ATOM_TELEGRAM_ALLOWED dans le fichier .env d'Atom, puis relance-le.",
         )
         return
+    if not text and (msg.get("voice") or msg.get("audio")):
+        text = await transcribe_voice(client, chat_id, msg.get("voice") or msg.get("audio"))
+        if not text:
+            return
     if not text:
-        await send_text(client, chat_id, "Je ne lis que le texte pour l'instant.")
+        await send_text(client, chat_id, "Je lis le texte et les messages vocaux.")
         return
     if text.startswith("/"):
         await handle_command(client, chat_id, text)
@@ -385,6 +422,7 @@ async def run() -> None:
                 {"command": "agent", "description": "Confier une tâche à l'agent de code"},
                 {"command": "serveur", "description": "État du serveur Proxmox"},
                 {"command": "brief", "description": "Brief du matin, maintenant"},
+                {"command": "agenda", "description": "Rendez-vous des 7 prochains jours"},
                 {"command": "aide", "description": "Aide"},
             ])
         except (TelegramError, httpx.HTTPError) as e:
@@ -413,7 +451,7 @@ async def run() -> None:
                     elif "callback_query" in u:   # boutons (agent : diff, appliquer, commit…)
                         cq = u["callback_query"]
                         if cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message") \
-                                and str(cq.get("data", "")).startswith("rem:"):
+                                and str(cq.get("data", "")).startswith(("rem:", "mem:")):
                             asyncio.create_task(reminder_button(client, cq))
                         elif cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message"):
                             import sys

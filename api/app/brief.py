@@ -32,10 +32,10 @@ DEFAULTS = {
     "days": [0, 1, 2, 3, 4, 5, 6],            # 0 = lundi
     "city": "",
     "news": "",                                # sujets séparés par des virgules ; vide = pas d'actualités
-    "sections": {"reminders": True, "weather": True, "server": True, "providers": True, "news": True, "memories": False},
+    "sections": {"agenda": True, "reminders": True, "weather": True, "server": True, "providers": True, "news": True, "memories": False},
     "intro": True,                             # mot d'Atom rédigé par le modèle
 }
-SECTION_NAMES = {"reminders": "Rappels du jour", "weather": "Météo", "server": "Serveur", "providers": "Fournisseurs d'IA",
+SECTION_NAMES = {"agenda": "Agenda du jour", "reminders": "Rappels du jour", "weather": "Météo", "server": "Serveur", "providers": "Fournisseurs d'IA",
                  "news": "Actualités", "memories": "Souvenirs récents"}
 
 WMO = {0: "ciel dégagé", 1: "plutôt dégagé", 2: "partiellement nuageux", 3: "couvert", 45: "brouillard", 48: "brouillard givrant",
@@ -91,6 +91,11 @@ def section_reminders() -> str:
     return "\n".join(lines) + ("\n" if lines else "") + "\n".join(f"- {human(r['due_at']).replace("aujourd'hui à ", "")} : {r['text']}" for r in rows)
 
 
+def section_agenda() -> str:
+    from . import agenda
+    return agenda.today_text() or "Rien de prévu aujourd'hui."
+
+
 async def section_weather(city: str) -> str:
     if not city:
         return "Ville non renseignée (Réglages → Brief du matin)."
@@ -142,12 +147,20 @@ async def section_providers() -> str:
     confs = [p for p in providers.ALL if p.configured]
     if not confs:
         return ""
-    errs = await asyncio.gather(*[providers.ping(p) for p in confs], return_exceptions=True)
+    errs = list(await asyncio.gather(*[providers.ping(p) for p in confs], return_exceptions=True))
+    fixed = []
+    for i, (p, e) in enumerate(zip(confs, errs, strict=True)):
+        if e == "modèle introuvable":                 # modèle disparu : remplacement automatique (si activé)
+            old = providers.model_of(p)
+            new = await providers.replace_model(p, old)
+            if new:
+                fixed.append(f"- 🔄 {p.name} : « {old} » a disparu, remplacé par « {new} »")
+                errs[i] = await providers.ping(p)
     bad = [(p, e) for p, e in zip(confs, errs, strict=True) if e]
     ok = len(confs) - len(bad)
     if not bad:
-        return f"Tous opérationnels ({ok}/{len(confs)})."
-    lines = [f"{ok}/{len(confs)} opérationnels."]
+        return "\n".join([f"Tous opérationnels ({ok}/{len(confs)})."] + fixed)
+    lines = [f"{ok}/{len(confs)} opérationnels."] + fixed
     for p, e in bad:
         lines.append(f"- ⚠️ {p.name} ({providers.model_of(p)}) : {e if isinstance(e, str) else e.__class__.__name__}"
                      + (" → choisis un autre modèle dans Réglages → Hybride" if "modèle" in str(e) else ""))
@@ -186,6 +199,7 @@ async def build(s: dict | None = None) -> dict:
     s = s or settings()
     on = s["sections"]
     jobs = {
+        "agenda": (lambda: asyncio.sleep(0, section_agenda())) if on.get("agenda", True) else None,
         "reminders": (lambda: asyncio.sleep(0, section_reminders())) if on["reminders"] else None,
         "weather": (lambda: section_weather(s["city"])) if on["weather"] else None,
         "server": section_server if on["server"] else None,

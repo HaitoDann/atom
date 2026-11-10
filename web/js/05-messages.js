@@ -222,6 +222,7 @@ function actions(m, idx) {
   } else {
     btn("copy", "Copier", (e) => flashCopy(e.currentTarget, m.content));
     btn("doc", "Ouvrir dans le canevas (modifier avec Atom)", () => canvasFromMessage(m));
+    btn("speaker", "Lire à voix haute", (e) => speakText(m.content, e.currentTarget));
     if (idx === history.length - 1) btn("refresh", "Régénérer", () => regenerate());
     if (idx === history.length - 1 && !m.meta?.provider && hybridState?.configured) btn("spark", `Réponse approfondie (${hybridState.name})`, () => regenerate("mistral"));
     if (m.id) {

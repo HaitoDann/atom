@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, alerts, analysis, auth, backup, brief, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
+from . import agenda, agent, agentcode, alerts, analysis, auth, backup, brief, memory_care, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -44,7 +44,8 @@ async def run_chat(*args) -> AsyncIterator[bytes]:
 async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
              asyncio.create_task(backup.scheduler()), asyncio.create_task(alerts.scheduler()),
-             asyncio.create_task(brief.scheduler())]
+             asyncio.create_task(brief.scheduler()), asyncio.create_task(memory_care.scheduler()),
+             asyncio.create_task(agenda.scheduler())]
     asyncio.create_task(sandbox.cleanup())
 
     async def maintenance():   # tous les jours : rétention des échanges indexés
@@ -88,7 +89,7 @@ app.include_router(_r_git.router)
 import importlib
 
 log = logging.getLogger("atom.main")
-for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes', 'preview', 'diagnostic', 'brief_routes'):
+for _n in ('spaces', 'proxmox_routes', 'feedback', 'mood', 'conversations', 'memories', 'reminders_routes', 'hybrid_routes', 'workshop_routes', 'library_routes', 'code', 'agent_routes', 'sandbox_routes', 'backups', 'lab', 'usage_routes', 'preview', 'diagnostic', 'brief_routes', 'voice_routes', 'agenda_routes', 'push_routes'):
     _m = importlib.import_module(f".routes.{_n}", __package__)
     app.include_router(_m.router)
 
@@ -160,7 +161,7 @@ def _login_response(request: Request, payload: dict) -> JSONResponse:
 def auth_status(request: Request):
     s = auth.session_for(request.cookies.get(auth.COOKIE))
     return {"setup_needed": not auth.is_set(), "authenticated": bool(s and auth.is_set()),
-            "session_id": s["id"] if s else None}
+            "session_id": s["id"] if s else None, "version": _asset_version()}
 
 
 @app.post("/api/auth/setup")

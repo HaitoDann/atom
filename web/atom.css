@@ -1406,3 +1406,73 @@ textarea.field { line-height: 1.55; }
 .pvw-ask .field { flex: 1; }
 .diag-report { margin: 12px 0 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--code-bg);
                font: 12px/1.6 var(--mono); color: var(--text-2); white-space: pre-wrap; max-height: 340px; overflow: auto; }
+
+/* Discussion : proposer l'orchestration vérifiée pour une tâche difficile */
+.msg .orch-suggest { margin-top: 8px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
+.msg .orch-suggest svg { width: 14px; height: 14px; }
+
+/* Voix : bouton micro (enregistrement, transcription) et lecture en cours */
+#micBtn.rec { color: var(--danger, #e66); animation: micPulse 1.2s ease-in-out infinite; }
+@keyframes micPulse { 50% { opacity: .45; } }
+#micBtn.busy { opacity: .5; pointer-events: none; }
+.acts .iconbtn.on { color: rgb(var(--orb)); }
+
+/* Agenda */
+.ag-day { font-size: 12px; font-weight: 600; opacity: .7; margin: 12px 0 4px; text-transform: none; }
+.ag-ev { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line, rgba(127,127,127,.15)); }
+.ag-ev .ag-t { font-variant-numeric: tabular-nums; font-size: 12.5px; opacity: .8; min-width: 92px; }
+.ag-ev .ag-n { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ag-ev .ag-n small { opacity: .7; font-size: 12px; }
+.ag-form { display: flex; flex-direction: column; gap: 8px; }
+
+/* Page Agenda */
+#agendaView { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+#agendaView[hidden] { display: none; }
+.agv-bar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.agv-bar h2 { font-size: 15px; font-weight: 600; margin: 0 6px; }
+.agv-bar .iconbtn span { font-size: 20px; line-height: 1; }
+.agv-bar .spacer { flex: 1; }
+.agv-bar .btn [data-i], .agv-bar .btn svg { width: 15px; height: 15px; margin-right: 4px; vertical-align: -2px; }
+.agv-tip { margin: 0 16px 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.agv-days { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 16px 90px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-content: start; }
+.agv-day { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.agv-day h3 { font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 6px 0 2px; }
+.agv-day.today h3 { color: rgb(var(--orb)); }
+.agv-day.past { opacity: .6; }
+.agv-ev { display: flex; gap: 10px; text-align: left; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface, transparent); color: inherit; font: inherit; cursor: pointer; }
+.agv-ev:hover { border-color: rgba(var(--orb), .5); }
+.agv-t { font-variant-numeric: tabular-nums; font-size: 12.5px; display: flex; flex-direction: column; min-width: 44px; }
+.agv-t small { color: var(--muted); }
+.agv-n { display: flex; flex-direction: column; min-width: 0; }
+.agv-n b { font-weight: 600; overflow-wrap: anywhere; }
+.agv-n small { color: var(--muted); font-size: 12px; }
+.agv-empty { border: 1px dashed var(--border); border-radius: 10px; padding: 8px; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.agv-empty:disabled { cursor: default; border-style: solid; opacity: .5; }
+.agv-fab { display: none; position: absolute; right: 18px; bottom: 18px; width: 54px; height: 54px; border-radius: 50%; border: 0;
+  background: rgb(var(--orb)); color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.3); cursor: pointer; }
+.agv-fab svg { width: 24px; height: 24px; stroke-width: 2.4; }
+@media (max-width: 1100px) { .agv-days { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
+@media (max-width: 760px) {
+  .agv-days { grid-template-columns: 1fr; padding-bottom: 100px; }
+  .agv-bar #agvAdd { display: none; }
+  .agv-fab { display: grid; place-items: center; }
+}
+.ags-box { max-width: 520px; }
+.ags-body { display: flex; flex-direction: column; gap: 10px; padding: 4px 18px 18px; }
+.ags-row { gap: 8px; flex-wrap: wrap; }
+.ags-row > .field { flex: 1; min-width: 120px; width: auto; }
+.ags-actions { gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.ags-actions .spacer { flex: 1; }
+
+/* Bandeau d'installation (téléphone) */
+.inst-banner { position: fixed; left: 12px; right: 12px; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 150; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 14px; background: var(--surface, #2a2a2a); border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.inst-banner[hidden] { display: none; }
+.inst-banner > [data-i], .inst-banner > svg { width: 26px; height: 26px; flex: none; }
+.inst-banner div { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+.inst-banner small { color: var(--muted); font-size: 12px; }
+.wl-box.ags-box { height: auto; max-height: calc(100dvh - 32px); overflow-y: auto; }
+@media (max-width: 560px) {
+  #agSheet.wl { align-items: flex-end; }
+  #agSheet .wl-box.ags-box { min-height: 0; border-radius: 20px 20px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+}

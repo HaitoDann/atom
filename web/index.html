@@ -8,6 +8,7 @@
 <script src="/theme.js?v=__V__"></script>
 <link rel="stylesheet" href="/vendor/fonts/fonts.css?v=__V__">
 <link rel="manifest" href="/manifest.webmanifest">
+<meta name="atom-version" content="__V__">
 <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -30,6 +31,7 @@
     <div class="side-nav">
       <button id="navLib"><span data-i="library"></span>Bibliothèque</button>
       <button id="navCode"><span data-i="code"></span>Code</button>
+      <button id="navAgenda"><span data-i="calendar"></span>Agenda</button>
       <button id="navDash"><span data-i="pulse"></span>Tableau de bord</button>
       <button id="navWs"><span data-i="users"></span>Atelier multi-IA</button>
       <button data-goto="memory"><span data-i="memory"></span>Souvenirs<span class="count" id="navMem"></span></button>
@@ -133,6 +135,19 @@
       </div>
     </section>
     <div id="quickOpen" class="qo" hidden><div class="qo-box"><input class="field" id="qoIn" placeholder="Ouvrir un fichier… (tape une partie du nom)" spellcheck="false" autocomplete="off"><div id="qoList" class="qo-list"></div></div></div>
+    <section id="agendaView" hidden aria-label="Agenda">
+      <div class="agv-bar">
+        <button class="iconbtn" id="agvPrev" aria-label="Semaine précédente" title="Semaine précédente"><span aria-hidden="true">‹</span></button>
+        <button class="btn sm" id="agvToday">Aujourd'hui</button>
+        <button class="iconbtn" id="agvNext" aria-label="Semaine suivante" title="Semaine suivante"><span aria-hidden="true">›</span></button>
+        <h2 id="agvRange"></h2>
+        <span class="spacer"></span>
+        <button class="btn primary" id="agvAdd"><span data-i="plus"></span>Ajouter</button>
+      </div>
+      <div class="agv-tip" id="agvTip" hidden></div>
+      <div class="agv-days" id="agvDays"></div>
+      <button class="agv-fab" id="agvFab" aria-label="Ajouter un rendez-vous" data-i="plus"></button>
+    </section>
     <section id="dashView" hidden>
       <div class="dash-bar">
         <div class="seg" id="dashRange"><button data-r="now-1h">1 h</button><button data-r="now-24h" class="on">24 h</button><button data-r="now-7d">7 jours</button><button data-r="now-30d">30 jours</button></div>
@@ -170,6 +185,7 @@
             <div class="scope-wrap" id="engineWrap" style="display:none"><button type="button" class="sel" id="engineBtn" title="Quel modèle répond"></button><div class="scope-menu" id="engineMenu"></div></div>
             <div class="scope-wrap"><button type="button" class="sel" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div>
             <span class="spacer"></span>
+            <button id="micBtn" type="button" class="iconbtn" title="Dicter (cliquer pour parler, recliquer pour finir)" aria-label="Dicter" data-i="mic" hidden></button>
             <button id="send" type="submit" disabled title="Envoyer" data-i="up"></button>
           </div>
           <input type="file" id="fileIn" multiple hidden>
@@ -230,6 +246,12 @@
       <button class="iconbtn" id="closeSettings" style="position:absolute;top:10px;right:10px" title="Fermer" data-i="x"></button>
 
       <section class="pane on" data-pane="general">
+        <div class="block" id="voiceBlock">
+          <h4>Voix</h4>
+          <p class="desc" id="voiceInfo">Dicte avec le bouton micro de la saisie, et écoute les réponses avec le bouton haut-parleur sous chaque réponse. La lecture utilise la voix de ton appareil.</p>
+          <label class="switch"><span>Envoyer la dictée directement</span><input type="checkbox" id="voiceAutoSend"></label>
+          <label class="switch"><span>Lire la réponse à voix haute après une dictée</span><input type="checkbox" id="voiceRead"></label>
+        </div>
         <div class="block">
           <h4>Personnalité</h4>
           <p class="desc">Comment Atom se présente et se comporte. Utilisée aussi par Telegram.</p>
@@ -347,6 +369,23 @@
             <button class="btn" id="memAdd">Ajouter</button>
           </div>
         </div>
+        <div class="block">
+          <h4>Entretien</h4>
+          <p class="desc">Chaque semaine, Atom range sa mémoire : il fusionne les doublons, met à jour ce qui a changé, te demande si les faits temporaires sont toujours vrais et archive les anecdotes jamais utilisées. Puis il t'envoie ce qu'il a retenu, pour que tu corriges. Rien n'est supprimé : tout reste restaurable.</p>
+          <label class="switch"><span>Entretien hebdomadaire</span><input type="checkbox" id="mcEnabled"></label>
+          <label class="switch"><span>M'envoyer le résumé (Telegram, ntfy)</span><input type="checkbox" id="mcSummary"></label>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0">
+            <label class="note" for="mcDay">Le</label>
+            <select class="field" id="mcDay" style="width:auto"><option value="0">lundi</option><option value="1">mardi</option><option value="2">mercredi</option><option value="3">jeudi</option><option value="4">vendredi</option><option value="5">samedi</option><option value="6">dimanche</option></select>
+            <label class="note" for="mcTime">à</label><input class="field" type="time" id="mcTime" style="width:auto">
+          </div>
+          <p class="note" id="mcInfo"></p>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="btn" id="mcDry">Simuler</button>
+            <button class="btn primary" id="mcRun">Lancer l'entretien maintenant</button>
+          </div>
+          <div class="md" id="mcOut" style="margin-top:12px" hidden></div>
+        </div>
         <button class="btn danger" id="clearMem">Tout oublier</button>
       </section>
 
@@ -370,7 +409,28 @@
             <span class="note">Heures calmes, sans relance : de</span><input class="field" type="time" id="fuQs" style="width:auto" aria-label="Début des heures calmes"><span class="note">à</span><input class="field" type="time" id="fuQe" style="width:auto" aria-label="Fin des heures calmes">
           </div>
         </div>
+        <div class="block">
+          <h4>Notifications sur cet appareil</h4>
+          <p class="desc" id="pushInfo">Rappels, relances, rendez-vous et brief du matin arrivent comme des notifications de l'appli Atom, même fermée, avec les boutons Fait / +1 h. Le contenu est chiffré de bout en bout : le service de notification du téléphone (Google sur Android) ne peut pas le lire.</p>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn primary" id="pushOn">Activer sur cet appareil</button><button class="btn" id="pushOff" hidden>Désactiver sur cet appareil</button><button class="btn" id="pushTest" hidden>Tester</button></div>
+          <p class="note" id="pushState"></p>
+        </div>
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
+      </section>
+
+      <section class="pane" data-pane="agenda">
+        <div class="block">
+          <h4>Agenda</h4>
+          <p class="desc">Tes rendez-vous sont dans la page <b>Agenda</b> (menu, ou onglet Agenda sur le téléphone). Tu peux aussi parler à Atom : « ajoute dentiste jeudi à 14 h », « suis-je libre vendredi ? ». Rappels et brief du matin arrivent en notification sur ton téléphone si tu les actives dans Réglages → Rappels.</p>
+          <button class="btn" id="agOpenView">Ouvrir l'agenda</button>
+        </div>
+        <div class="block">
+          <h4>Facultatif : voir l'agenda dans Google Agenda</h4>
+          <p class="desc">L'appli Atom suffit. Si tu veux aussi voir tes rendez-vous dans le calendrier du téléphone (Google Agenda), abonne-le à ce lien : lecture seule, tu ajoutes et modifies via Atom.</p>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><input class="field" id="agFeed" readonly aria-label="Lien d'abonnement" style="flex:1;min-width:200px"><button class="btn" id="agFeedCopy">Copier</button><button class="btn" id="agFeedNew" title="L'ancien lien cesse de fonctionner">Nouveau lien</button></div>
+          <p class="note"><b>Android (Pixel)</b> : installe l'appli gratuite <b>ICSx⁵</b> (Play Store), « + », colle le lien, puis choisis une synchronisation toutes les 15 min ou 1 h. L'agenda « Atom » apparaît dans Google Agenda sur le téléphone. Le téléphone doit joindre Atom : utilise l'adresse <b>Tailscale</b> (HTTPS) avec Tailscale actif sur le Pixel. N'ajoute pas ce lien sur le site de Google Agenda : il serait lu par les serveurs de Google, qui ne peuvent pas joindre ton serveur.</p>
+          <p class="note">Ce lien donne accès à ton agenda sans mot de passe : ne le partage pas. « Nouveau lien » désactive l'ancien.</p>
+        </div>
       </section>
 
       <section class="pane" data-pane="brief">
@@ -406,6 +466,12 @@
           <h4 style="font-size:13px;margin-top:6px">Moteur par défaut</h4>
           <div class="row" id="hyMode" style="margin:8px 0 6px;flex-wrap:wrap"></div>
           <p class="note">Auto : distant pour les demandes longues ou complexes (analyse, comparaison, rédaction…), local pour le reste. Si aucun fournisseur ne répond, Atom repasse en local. Le choix sous la saisie peut changer le moteur pour une conversation.</p>
+        </div>
+        <div class="block">
+          <h4>Tâches difficiles</h4>
+          <p class="desc">Quand une demande enchaîne plusieurs étapes (« cherche…, puis calcule…, ensuite rédige… »), l'orchestration vérifiée donne des réponses plus justes : calculs exécutés, sources citées, juge d'une autre famille. Elle est plus lente ; les demandes simples restent en direct.</p>
+          <div class="row" id="hyOrch" style="margin:8px 0 6px;flex-wrap:wrap" role="group" aria-label="Tâches difficiles"></div>
+          <label class="switch"><span>Remplacer automatiquement un modèle qui a disparu chez un fournisseur (tu es prévenu)</span><input type="checkbox" id="hyAutoReplace"></label>
         </div>
         <div class="block">
           <h4>Ce qui peut être envoyé aux fournisseurs distants</h4>
@@ -564,6 +630,37 @@
     </form>
   </div>
 </div>
+<div id="agSheet" class="wl" role="dialog" aria-modal="true" aria-labelledby="agsTitle" hidden>
+  <div class="wl-box ags-box">
+    <header class="wl-head">
+      <span class="wl-ic" data-i="calendar"></span>
+      <div><h2 id="agsTitle">Nouveau rendez-vous</h2><p id="agsSub">Ou dis-le simplement à Atom : « dentiste jeudi à 14 h ».</p></div>
+      <button class="iconbtn" id="agsClose" type="button" aria-label="Fermer" data-i="x"></button>
+    </header>
+    <div class="ags-body">
+      <input class="field" id="agsName" placeholder="Titre (ex. Dentiste)" maxlength="200" aria-label="Titre">
+      <div class="row ags-row">
+        <input class="field" type="date" id="agsDate" aria-label="Date">
+        <input class="field" type="time" id="agsTime" aria-label="Heure (vide : journée entière)">
+        <select class="field" id="agsDur" aria-label="Durée"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="180">3 h</option><option value="480">8 h</option></select>
+      </div>
+      <p class="note">Heure vide : journée entière.</p>
+      <input class="field" id="agsLoc" placeholder="Lieu (facultatif)" maxlength="200" aria-label="Lieu">
+      <div class="row ags-row">
+        <select class="field" id="agsRep" aria-label="Récurrence"><option value="">Une seule fois</option><option value="daily">Chaque jour</option><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option><option value="yearly">Chaque année</option></select>
+        <select class="field" id="agsRem" aria-label="Rappel"><option value="">Sans rappel</option><option value="10">10 min avant</option><option value="30" selected>30 min avant</option><option value="60">1 h avant</option><option value="1440">La veille</option></select>
+      </div>
+      <textarea class="field" id="agsNotes" rows="2" placeholder="Notes (facultatif)" maxlength="2000" aria-label="Notes"></textarea>
+      <p class="note" id="agsSeries" hidden>Rendez-vous récurrent : la modification s'applique à toute la série.</p>
+      <div class="row ags-actions">
+        <button class="btn danger" id="agsDelOne" hidden>Supprimer ce jour-là</button>
+        <button class="btn danger" id="agsDel" hidden>Supprimer</button>
+        <span class="spacer"></span>
+        <button class="btn primary" id="agsSave">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="wsLaunch" class="wl" role="dialog" aria-modal="true" aria-labelledby="wlTitle" hidden>
   <div class="wl-box">
     <header class="wl-head">
@@ -607,10 +704,15 @@
 <nav id="tabbar">
   <button data-tab="chats"><span data-i="list"></span>Discussions</button>
   <button data-tab="library"><span data-i="library"></span>Bibliothèque</button>
-  <button data-tab="code"><span data-i="code"></span>Code</button>
+  <button data-tab="agenda"><span data-i="calendar"></span>Agenda</button>
   <button data-tab="atom"><span data-i="orb"></span>Atom</button>
   <button data-tab="settings"><span data-i="settings"></span>Réglages</button>
 </nav>
+<div id="installBanner" class="inst-banner" hidden role="region" aria-label="Installer Atom">
+  <span data-i="orb"></span><div><b>Installer Atom sur ce téléphone</b><small id="instText"></small></div>
+  <button class="btn sm primary" id="instGo" hidden>Installer</button>
+  <button class="iconbtn" id="instClose" aria-label="Plus tard" data-i="x"></button>
+</div>
 <div id="login" hidden>
   <form class="login-card" id="loginForm" autocomplete="on">
     <img class="login-mark" src="/icons/mark-full.svg" alt="">
@@ -706,6 +808,9 @@
 <script src="/js/13-interface-commandes-mobile.js?v=__V__"></script>
 <script src="/js/14-consommation.js?v=__V__"></script>
 <script src="/js/14b-brief.js?v=__V__"></script>
+<script src="/js/14c-voix.js?v=__V__"></script>
+<script src="/js/14d-agenda.js?v=__V__"></script>
+<script src="/js/14e-notifications-installation.js?v=__V__"></script>
 <script src="/js/15-demarrage.js?v=__V__"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ from typing import AsyncIterator
 import httpx
 
 from .security import UNTRUSTED_RULE, untrusted
-from . import db, hybrid, library, llm, memory, proxmox, reminders, search, spaces
+from . import agenda, db, hybrid, library, llm, memory, proxmox, reminders, search, spaces
 from .config import ATTACH_MAX_CHARS, CONTEXT_TURNS, EMOTIONS, OLLAMA_URL
 import logging
 
@@ -40,6 +40,7 @@ def system_prompt(persona: str, memory_block: str, web: str = "off", web_block: 
         "Ne réfléchis pas à voix haute, ne décris pas ton raisonnement : réponds directement.\n"
         "/no_think\n\n"
         + reminders.prompt_block()
+        + "\n\n" + agenda.prompt_block()
     )
     if web == "auto":
         s += (
@@ -289,6 +290,10 @@ async def chat_events(
         text, emotion = state.get("text", ""), state.get("emotion", "talking")
         rem_cards = []
         for cmd, arg in state.get("commands", []):
+            if cmd.lower() in ("rdv", "annuler_rdv"):
+                ev = agenda.execute(cmd, arg, conversation_id)
+                yield ev
+                continue
             if cmd.lower() != "recherche":
                 ev = reminders.execute(cmd, arg, conversation_id)
                 if ev.get("action") in ("created", "cancelled"):
@@ -307,7 +312,9 @@ async def chat_events(
         asst_id = db.add_message(conversation_id, "assistant", text, emotion, meta=asst_meta)
         saved = True
         stats = dict(hybrid.last_stats if provider != "local" else llm.last_stats)
-        yield dict(type="done", emotion=emotion, id=asst_id, stats=stats, provider=provider)
+        plan = hybrid.orchestration_plan(message, engine, bool(attachments))
+        yield dict(type="done", emotion=emotion, id=asst_id, stats=stats, provider=provider,
+                   **({"suggest_orchestra": plan["reason"]} if plan["suggest"] else {}))
     except GeneratorExit:
         # Arrêt demandé par l'utilisateur (bouton Stop) : on garde le début de réponse.
         partial = (locals().get("state") or {}).get("text", "")

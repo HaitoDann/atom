@@ -398,6 +398,90 @@ async def list_models(p: Provider) -> list[str]:
     return sorted(set(ids))
 
 
+# ---------------------------------------------------------------- modèle disparu : remplacement automatique
+
+ODD = ("embed", "tts", "whisper", "guard", "moderation", "image", "audio", "vision", "ocr", "transcri", "speech",
+       "realtime", "search", "computer-use", "instruct-v0", "lite-preview-02")
+
+
+def _tokens(name: str) -> list[str]:
+    return [t for t in re.split(r"[-_:./@]", name.lower()) if t]
+
+
+def pick_replacement(old: str, available: list[str]) -> str | None:
+    """Le modèle disponible le plus proche de l'ancien : même lignée (préfixe), même gabarit (flash, mini, 70b…),
+    version la plus récente ; jamais un modèle spécialisé (images, audio, embeddings…) ni une préversion si on peut l'éviter."""
+    old_t = _tokens(old.split("/")[-1])
+    if not old_t:
+        return None
+    sizes = {t for t in old_t if t in ("flash", "pro", "mini", "nano", "small", "medium", "large", "lite", "turbo", "instant",
+                                       "versatile") or re.fullmatch(r"\d+b", t)}
+
+    def score(m: str) -> tuple:
+        t = _tokens(m.split("/")[-1])
+        same_line = t[:1] == old_t[:1]
+        shared = len({x for x in set(t) & set(old_t) if not x.isdigit()})   # les chiffres de version ne comptent pas
+        size_match = len(sizes & set(t))
+        preview = any(x in t for x in ("preview", "exp", "experimental", "beta"))
+        version = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", m.split("/")[-1])[:2]] or [0.0]
+        return (same_line, size_match, not preview, version, shared)
+
+    cands = [m for m in available if m != old and not any(x in m.lower() for x in ODD)]
+    cands = [m for m in cands if _tokens(m.split("/")[-1])[:1] == old_t[:1]] or []
+    return max(cands, key=score) if cands else None
+
+
+_replacing: set[str] = set()
+
+
+def _schedule_replace(p: "Provider", model: str) -> None:
+    try:
+        from . import jobs
+        if p.id not in _replacing:
+            jobs.background(replace_model(p, model))
+    except RuntimeError:     # pas de boucle asyncio (appel hors serveur)
+        pass
+
+
+async def replace_model(p: "Provider", missing: str) -> str | None:
+    """Remplace un modèle disparu par le plus proche disponible, et prévient l'utilisateur. Renvoie le nouveau modèle."""
+    from . import hybrid, notify
+    if not hybrid.settings().get("auto_replace", True) or p.id in _replacing or model_of(p) != missing:
+        return None
+    _replacing.add(p.id)
+    try:
+        try:
+            available = await list_models(p)
+        except Exception as e:  # noqa: BLE001
+            log.warning("remplacement du modèle %s : liste indisponible (%s)", p.name, e)
+            return None
+        new = pick_replacement(missing, available)
+        if not new:
+            log.warning("remplacement du modèle %s : aucun modèle proche de %s", p.name, missing)
+            await notify.send("⚠️ Modèle disparu", f"{p.name} ne propose plus « {missing} » et aucun modèle proche n'a été "
+                              "trouvé. Choisis-en un dans Réglages → Mode hybride.", tags="warning")
+            return None
+        set_model(p.id, new)
+        _cooldown.pop(p.id, None)
+        _ping_cache.pop(p.id + missing, None)
+        hist = json.loads(db.kv_get("model_replacements") or "[]")
+        hist = (hist + [{"at": time.time(), "provider": p.id, "old": missing, "new": new}])[-20:]
+        db.kv_set("model_replacements", json.dumps(hist))
+        log.info("%s : modèle « %s » disparu, remplacé par « %s »", p.name, missing, new)
+        await notify.send("🔄 Modèle remplacé", f"{p.name} ne propose plus « {missing} ». Atom utilise désormais « {new} ». "
+                          "Tu peux en choisir un autre dans Réglages → Mode hybride.", tags="arrows_counterclockwise")
+        return new
+    finally:
+        _replacing.discard(p.id)
+
+
+def replacements() -> list[dict]:
+    try:
+        return json.loads(db.kv_get("model_replacements") or "[]")
+    except ValueError:
+        return []
+
+
 _ping_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -454,8 +538,10 @@ async def stream(p: Provider, messages: list[dict], model: str | None = None, st
                         _cooldown[p.id] = time.time() + 120
                         raise Unavailable(f"limite de l'offre {p.name} atteinte pour le moment")
                     if r.status_code == 404 and "model" in body.lower():
-                        # Erreur de configuration, pas une panne passagère : écarté 10 min (atelier, orchestration).
+                        # Erreur de configuration, pas une panne passagère : écarté 10 min (atelier, orchestration),
+                        # et Atom cherche un modèle de remplacement en tâche de fond (réglage auto_replace).
                         _cooldown[p.id] = time.time() + 600
+                        _schedule_replace(p, model)
                         raise Unavailable(f"le modèle « {model} » n'existe pas chez {p.name}")
                     if r.status_code >= 500:
                         _cooldown[p.id] = time.time() + 60

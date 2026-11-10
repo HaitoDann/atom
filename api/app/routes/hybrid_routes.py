@@ -21,6 +21,8 @@ class HybridIn(BaseModel):
     allow_web: bool | None = None
     model: str | None = Field(default=None, max_length=80)
     provider: str | None = Field(default=None, max_length=40)
+    orchestrate: str | None = Field(default=None, pattern="^(auto|suggest|off)$")
+    auto_replace: bool | None = None
 
 
 class ProviderModelIn(BaseModel):
@@ -53,3 +55,15 @@ async def hybrid_models(provider: str | None = None):
 def put_hybrid(body: HybridIn):
     hybrid.save_settings({k: v for k, v in body.model_dump().items() if v is not None})
     return hybrid.status()
+
+
+class RoutePlanIn(BaseModel):
+    message: str = Field(default="", max_length=8000)
+    engine: str = Field(default="default", pattern="^(default|local|mistral|auto)$")
+    has_files: bool = False
+
+
+@router.post("/api/route/plan")
+def route_plan(body: RoutePlanIn):
+    """Avant l'envoi : la discussion doit-elle passer par l'orchestration vérifiée ?"""
+    return hybrid.orchestration_plan(body.message, body.engine, body.has_files)

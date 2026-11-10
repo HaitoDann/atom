@@ -11,7 +11,7 @@ def test_settings_validation(client):
     assert r["time"] == "07:05" and r["days"] == [0, 2] and r["city"] == "Lyon"
     assert r["sections"]["news"] is False and r["sections"]["reminders"] is True
     assert client.put("/api/brief", json={"time": "midi"}).status_code == 422
-    assert set(r["names"]) == {"reminders", "weather", "server", "providers", "news", "memories"}
+    assert set(r["names"]) == {"agenda", "reminders", "weather", "server", "providers", "news", "memories"}
 
 
 @pytest.mark.parametrize("now,last,expected", [

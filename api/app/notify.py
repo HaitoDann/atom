@@ -18,7 +18,8 @@ log = logging.getLogger("atom.notify")
 def enabled() -> bool:
     from . import telegram
 
-    return bool(NTFY_URL) or (telegram.enabled() and bool(telegram.TELEGRAM_ALLOWED))
+    from . import push
+    return bool(NTFY_URL) or (telegram.enabled() and bool(telegram.TELEGRAM_ALLOWED)) or push.enabled()
 
 
 def _ascii_header(v: str) -> str:
@@ -33,7 +34,7 @@ def _ascii_header(v: str) -> str:
 
 
 async def send(title: str, body: str, conversation_id: int | None = None, tags: str = "",
-               buttons: list[list[tuple[str, str]]] | None = None) -> bool:
+               buttons: list[list[tuple[str, str]]] | None = None, url: str | None = None) -> bool:
     """Envoie sur tous les canaux configurés. Vrai si au moins un a réussi.
     buttons : boutons Telegram [[(texte, callback_data)]] (ntfy : lien vers l'interface)."""
     from . import telegram
@@ -42,6 +43,13 @@ async def send(title: str, body: str, conversation_id: int | None = None, tags: 
     results = [await telegram.broadcast(f"**{title}**\n{body}", markup)]
     if NTFY_URL:
         results.append(await _ntfy(title, body, conversation_id, tags))
+    from . import push
+    if push.enabled():   # appli Atom installée (téléphone) ou navigateur abonné : notification native
+        target = url or ("/?view=agenda" if tags == "calendar" else f"/?c={conversation_id}" if conversation_id else "/")
+        try:
+            results.append(await push.send(title, body, target, tags, buttons))
+        except Exception:   # une panne d'un canal ne bloque pas les autres
+            log.warning("notification web impossible", exc_info=True)
     if not any(results):
         log.info("aucun canal n'a pu envoyer : %s", title)
     return any(results)

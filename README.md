@@ -22,11 +22,11 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/agentcode.py`, `agenttools.py`, `codeedit.py`, `gitops.py`, `sandbox.py` | Mode Code : boucle de l'agent, outils et espace de travail, modifications validées, Git, tests en bac à sable |
 | `api/app/llm.py`, `providers.py`, `hybrid.py` | Modèle local (Ollama), fournisseurs distants avec relais, mode hybride |
 | `api/app/usage.py`, `observability.py`, `alerts.py`, `grafana.py` | Journal des appels aux modèles (tokens, latence, bascules, coût) et flux en direct ; identifiant de requête, journaux JSON, métriques Prometheus |
-| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
+| `api/app/memory.py`, `memory_care.py` | Mémoire automatique : extraction de faits, rappel sémantique ; entretien hebdomadaire |
 | `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
 | `api/app/canvas.py`, `workshop.py`, `orchestrator.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, orchestration vérifiée de petits modèles, analyse de données, labo des modèles |
-| `api/app/reminders.py`, `brief.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, brief du matin, notifications (ntfy, Telegram), bot et agent Telegram |
+| `api/app/reminders.py`, `agenda.py`, `brief.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, agenda, brief du matin, notifications (ntfy, Telegram), bot et agent Telegram |
 | `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
 | `api/app/db.py`, `migrations/`, `backup.py`, `offsite.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
 | `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
@@ -36,6 +36,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `docker-compose.nas.yml` | Copie chiffrée des sauvegardes sur un NAS (SMB / NFS) |
 | `web/vendor/` | KaTeX, Mermaid et polices Geist embarqués (aucune ressource externe) |
 | `docker-compose.sandbox.yml` | Option : bac à sable Docker via un proxy restreint |
+| `docker-compose.voice.yml`, `api/app/voice.py` | Option : voix (dictée transcrite en local avec Speaches, messages vocaux Telegram, lecture à voix haute) |
 
 ## Premier essai sur Proxmox (réseau local)
 
@@ -132,11 +133,21 @@ Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 - Elle a des **petits gestes** : clignements, coups d'œil, et un « souffle » d'absorption quand elle retient un souvenir.
 - **Mode présence** : touche la sphère (ou l'icône dans la barre du haut). Elle quitte son panneau et s'agrandit en plein écran, avec l'heure, la date et son dernier message ; l'écran reste allumé. Touche-la à nouveau (ou `Échap`) : elle se rétracte et reprend sa place pendant que le chat réapparaît. Idéal pour une tablette posée dans la pièce.
 
-### Installer Atom comme une application
+### Installer Atom comme une application (téléphone)
 
-Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passer par Tailscale (ci-dessous), qui fournit une adresse `https://…ts.net` avec un vrai certificat. Ensuite :
-- **Android / Chrome / Edge** : Réglages d'Atom → Apparence → « Installer l'application », ou menu du navigateur → « Installer ».
-- **iPhone / iPad (Safari)** : bouton Partager → « Sur l'écran d'accueil ».
+Atom s'installe comme une appli : icône sur l'écran d'accueil, plein écran, onglets en bas (Discussions, Bibliothèque, Agenda, Atom, Réglages) et notifications.
+
+**Le navigateur n'autorise l'installation et les notifications qu'en HTTPS.** Avec `http://IP-de-la-VM:8000`, ni le bouton d'installation ni les notifications ne peuvent apparaître : il faut l'adresse **Tailscale** `https://…ts.net` (voir ci-dessous), qui a un vrai certificat.
+
+1. Sur le téléphone, installe **Tailscale** et connecte-le à ton réseau.
+2. Ouvre **Chrome** sur `https://atom.<ton-réseau>.ts.net`. Un bandeau « Installer Atom sur ce téléphone » apparaît en bas : touche **Installer**. Sinon : menu ⋮ → « Installer l'application ».
+3. Ouvre Atom depuis l'écran d'accueil, puis **Réglages → Rappels → Notifications sur cet appareil → Activer** (ou le bouton en haut de l'onglet Agenda). Touche « Tester » pour vérifier.
+
+Sur iPhone (Safari) : bouton Partager → « Sur l'écran d'accueil ».
+
+**Notifications** : rappels, relances, rendez-vous, brief du matin et entretien de la mémoire arrivent comme des notifications de l'appli, même fermée. Les boutons d'action (**Fait**, **+1 h**, **Garder**…) s'utilisent directement sur la notification. Le contenu est **chiffré de bout en bout** (Web Push, RFC 8291) : le service de notification du téléphone (Google sur Android) ne voit qu'un message illisible. Telegram et ntfy restent possibles en parallèle.
+
+**Mises à jour** : rien à faire sur le téléphone. L'appli charge toujours la dernière version d'Atom à l'ouverture. Si elle est restée ouverte en arrière-plan, elle vérifie toutes les 10 minutes et se recharge d'elle-même quand tu reviens dessus. Après un `./update.sh` sur le serveur, la nouvelle version est donc sur le téléphone sans réinstaller.
 
 ## Sécurité
 
@@ -682,6 +693,18 @@ Le schéma **Orchestration vérifiée** de l'atelier (`api/app/orchestrator.py`)
 
 Conseils : configure au moins un fournisseur d'une **autre famille** que le modèle local, pour que le juge ne partage pas ses erreurs (le lanceur prévient sinon), et active le **bac à sable** pour que les calculs soient réellement exécutés. Confidentialité : comme le reste de l'atelier, seuls ta demande et le fil récent sont envoyés. `ATOM_ORCH_MAX_STEPS` borne le nombre d'étapes (5).
 
+### Dans la discussion
+
+Réglages → Mode hybride → **Tâches difficiles** décide quand la discussion passe par l'orchestration. Les mesures du banc d'essai ont montré deux choses : un bon modèle distant répond aussi juste et bien plus vite aux demandes simples ou moyennes, et l'orchestration rattrape surtout le petit modèle local. D'où trois réglages :
+
+- **Proposer** (par défaut) : Atom répond normalement ; si la demande enchaîne plusieurs étapes, un bouton « Refaire avec l'orchestration vérifiée » apparaît sous la réponse.
+- **Automatique** : une demande difficile part directement en orchestration.
+- **Jamais**.
+
+Une demande avec des fichiers joints, ou envoyée avec un modèle distant imposé, reste toujours dans la discussion normale.
+
+**Modèle disparu** : quand un fournisseur ne propose plus le modèle réglé (erreur « modèle introuvable »), Atom choisit le plus proche dans sa liste : même lignée, même gabarit (flash, mini, 70b…), version la plus récente, préversions évitées. Il te prévient sur Telegram et ntfy. Le brief du matin fait la même vérification chaque jour. Désactivable dans le même écran ; sans modèle proche, Atom ne devine pas et te demande d'en choisir un.
+
 ### Banc d'essai
 
 `bench/bench.py` envoie les tâches de `bench/tasks.json` à plusieurs méthodes (discussion simple en local, orchestration, rédaction-relecture), corrige automatiquement ce qui peut l'être (nombres attendus, code exécuté avec des tests, mots attendus, sources citées) et écrit `bench/results/<date>/` : `results.csv`, `rapport.md`, les réponses complètes et les statistiques d'échecs. Python standard, sans dépendance :
@@ -696,17 +719,45 @@ python3 bench/bench.py --url http://IP-DE-LA-VM:8000 --methods simple,orchestra 
 python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini,orchestra:groq --run-code
 ```
 
+**Tâches difficiles** (`--hard`, fichier `bench/tasks_hard.json`) : 13 tâches où un modèle seul se trompe souvent. Elles comprennent des calculs en plusieurs étapes (prêt immobilier, croisement de trains, facture avec remise et TVA), des **pièges** classiques (« la batte et la balle », jour de la semaine de 1789, compter des lettres), du code avec cas limites (fusion d'intervalles, chiffres romains invalides) et des rédactions. Les pièges sont notés avec les réponses fausses attendues (`forbid`). Les rédactions sont notées critère par critère par un **juge** : `--judge <moteur>`, à choisir hors des modèles comparés.
+
+```bash
+python3 bench/bench.py --hard --no-local --methods ask:gemini,orchestra:gemini --judge groq --run-code
+```
+
 `--only interets,jours` pour quelques tâches, `--repeat 3` pour lisser les variations, `--keep` pour garder les conversations créées (supprimées sinon). Le mot de passe est demandé au clavier, ou lu dans `ATOM_BENCH_PASSWORD`.
 
 ## Feuille de route
 
 1. ✅ Backend + Docker Compose + streaming
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
-3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels
+3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels, agenda (flux .ics pour le téléphone)
 4. ✅ Documents : bibliothèque (notes, PDF, OCR), recherche dedans, espaces
-5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée — prochain : domotique
+5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée
 6. ✅ Accès distant via Tailscale, fournisseurs distants avec relais et mode hybride
 
+
+## Agenda
+
+Atom gère ton agenda dans sa propre base : rien chez Google, rien dans le cloud.
+
+- **En parlant** : « ajoute dentiste jeudi à 14 h au cabinet Dupont », « foot tous les mardis à 19 h », « suis-je libre vendredi après-midi ? », « supprime le rendez-vous de demain ». Atom connaît tes rendez-vous des 14 prochains jours.
+- **Dans l'interface** : Réglages → Données → **Agenda** liste les 60 prochains jours. Tu y ajoutes un rendez-vous (heure vide pour une journée entière), avec lieu, récurrence (chaque jour, semaine, mois ou année) et rappel. Pour une série, tu peux supprimer une seule occurrence.
+- **Rappel** avant chaque rendez-vous sur Telegram et ntfy (30 min par défaut, réglable par rendez-vous). L'agenda du jour ouvre le **brief du matin**. Sur Telegram, la commande `/agenda` affiche les 7 prochains jours.
+
+**Sur le téléphone** : l'appli Atom (ci-dessous) a un onglet **Agenda** : la semaine jour par jour, un bouton « + » pour ajouter, et un toucher sur un rendez-vous pour le modifier ou le supprimer (une occurrence ou toute la série). Les rappels arrivent en **notification** de l'appli.
+
+**Facultatif, voir aussi les rendez-vous dans Google Agenda** : Réglages → Agenda donne un lien d'abonnement `.ics`. Sur Android, colle-le dans l'appli gratuite **ICSx⁵** avec l'adresse Tailscale d'Atom : l'agenda « Atom » apparaît alors dans Google Agenda, en lecture seule. N'ajoute pas ce lien sur le site calendar.google.com : il serait lu par les serveurs de Google, qui ne peuvent pas joindre ton serveur. Ne partage pas ce lien ; « Nouveau lien » désactive l'ancien.
+
+## Voix
+
+- **Dictée** : bouton micro dans la saisie. Clique pour parler, reclique pour finir : le texte apparaît dans la saisie, ou part directement selon le réglage Réglages → Général → Voix. La transcription tourne **sur ton serveur** (Whisper via Speaches), aucun son ne sort de chez toi.
+- **Lecture à voix haute** : bouton haut-parleur sous chaque réponse. Après une dictée, la réponse est lue automatiquement (réglable). La sphère passe en mode « parle » pendant la lecture. Par défaut, c'est la voix de ton appareil (locale, sans réglage) ; un serveur de synthèse compatible OpenAI peut la remplacer (`ATOM_TTS_URL`, `ATOM_TTS_MODEL`, `ATOM_TTS_VOICE`).
+- **Telegram** : envoie un **message vocal** au bot. Il est transcrit (la transcription s'affiche), puis traité comme un message écrit.
+
+**Mise en place** : dans `.env`, ajoute `docker-compose.voice.yml` à `COMPOSE_FILE` (par exemple `COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml`), puis `./update.sh`. Le modèle `Systran/faster-whisper-small` (environ 500 Mo) est téléchargé à la première dictée ; elle prend donc plus de temps. Sur CPU, compte quelques secondes de transcription par phrase. `ATOM_STT_MODEL` permet un modèle plus rapide (`base`) ou plus juste (`medium`).
+
+**Important** : les navigateurs n'autorisent le micro que sur une adresse sécurisée. Ouvre Atom en **HTTPS via Tailscale** (ou sur `localhost`) pour dicter ; sur `http://IP-de-la-VM`, le bouton micro l'explique. Les messages vocaux Telegram fonctionnent dans tous les cas.
 
 ## Relances des rappels
 
@@ -716,6 +767,18 @@ Un rappel envoyé attend ta confirmation. Sur Telegram, il arrive avec trois bou
 - **📅 Demain** : le rappel revient demain à 9 h.
 
 Sans réponse, Atom **relance** le rappel après 60 min, 2 fois au plus, jamais pendant les **heures calmes** (22:00 → 07:30 par défaut). Réglages → Données → Rappels → **À confirmer** liste les rappels en attente, avec les mêmes boutons, et permet de régler le délai, le nombre de relances et les heures calmes. Le brief du matin rappelle aussi ce qui n'a pas été fait.
+
+## Entretien de la mémoire
+
+Chaque semaine (dimanche à 10 h par défaut), Atom range ce qu'il sait de toi. Réglages → Souvenirs → **Entretien** :
+
+- **Doublons** fusionnés : le souvenir le plus important et le plus sûr est gardé.
+- **Même sujet** : le modèle local tranche. Un complément est fusionné en une phrase ; en cas de contradiction (« habite à Lyon » puis « habite à Nantes »), le plus récent l'emporte.
+- **Faits temporaires** arrivés à échéance (« prépare un examen ») : Atom te demande s'ils sont toujours vrais, avec les boutons **Garder** et **Oublier** sur Telegram (ou « à revoir » dans l'interface). Sans réponse, ils sont archivés 30 jours plus tard.
+- **Anecdotes jamais utilisées** depuis 180 jours : archivées.
+- **Résumé** sur Telegram et ntfy : ce qu'Atom a retenu ces 7 derniers jours et ce qu'il a rangé, pour que tu corriges.
+
+Rien n'est supprimé : tout ce qui est écarté est **archivé et restaurable**. « Simuler » montre ce que ferait l'entretien sans rien modifier ; « Lancer l'entretien maintenant » l'exécute tout de suite.
 
 ## Brief du matin
 
