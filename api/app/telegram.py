@@ -199,14 +199,17 @@ async def broadcast(text: str, markup: dict | None = None) -> bool:
 
 async def reminder_button(client, cq: dict) -> None:
     """Boutons d'un rappel : Fait, +1 h, Demain. Les boutons disparaissent une fois l'action faite."""
-    from . import reminders
-    m = re.fullmatch(r"rem:(done|snooze|tomorrow):(\d+)(?::(\d+))?", cq.get("data") or "")
+    from . import memory_care, reminders
+    data = cq.get("data") or ""
+    m = re.fullmatch(r"rem:(done|snooze|tomorrow):(\d+)(?::(\d+))?", data)
+    mm = re.fullmatch(r"mem:(keep|forget):(\d+)", data)        # souvenir temporaire : Garder / Oublier
     msg = cq["message"]
     try:
-        if not m:
+        if not m and not mm:
             await call(client, "answerCallbackQuery", callback_query_id=cq["id"])
             return
-        res = reminders.act(int(m.group(2)), m.group(1), int(m.group(3) or 60))
+        res = (reminders.act(int(m.group(2)), m.group(1), int(m.group(3) or 60)) if m
+               else memory_care.act(int(mm.group(2)), mm.group(1)))
         await call(client, "answerCallbackQuery", callback_query_id=cq["id"], text=res["message"][:190])
         await call(client, "editMessageReplyMarkup", chat_id=msg["chat"]["id"], message_id=msg["message_id"],
                    reply_markup={"inline_keyboard": []})
@@ -413,7 +416,7 @@ async def run() -> None:
                     elif "callback_query" in u:   # boutons (agent : diff, appliquer, commit…)
                         cq = u["callback_query"]
                         if cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message") \
-                                and str(cq.get("data", "")).startswith("rem:"):
+                                and str(cq.get("data", "")).startswith(("rem:", "mem:")):
                             asyncio.create_task(reminder_button(client, cq))
                         elif cq.get("from", {}).get("id") in TELEGRAM_ALLOWED and cq.get("message"):
                             import sys

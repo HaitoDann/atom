@@ -347,6 +347,23 @@
             <button class="btn" id="memAdd">Ajouter</button>
           </div>
         </div>
+        <div class="block">
+          <h4>Entretien</h4>
+          <p class="desc">Chaque semaine, Atom range sa mémoire : il fusionne les doublons, met à jour ce qui a changé, te demande si les faits temporaires sont toujours vrais et archive les anecdotes jamais utilisées. Puis il t'envoie ce qu'il a retenu, pour que tu corriges. Rien n'est supprimé : tout reste restaurable.</p>
+          <label class="switch"><span>Entretien hebdomadaire</span><input type="checkbox" id="mcEnabled"></label>
+          <label class="switch"><span>M'envoyer le résumé (Telegram, ntfy)</span><input type="checkbox" id="mcSummary"></label>
+          <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0">
+            <label class="note" for="mcDay">Le</label>
+            <select class="field" id="mcDay" style="width:auto"><option value="0">lundi</option><option value="1">mardi</option><option value="2">mercredi</option><option value="3">jeudi</option><option value="4">vendredi</option><option value="5">samedi</option><option value="6">dimanche</option></select>
+            <label class="note" for="mcTime">à</label><input class="field" type="time" id="mcTime" style="width:auto">
+          </div>
+          <p class="note" id="mcInfo"></p>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="btn" id="mcDry">Simuler</button>
+            <button class="btn primary" id="mcRun">Lancer l'entretien maintenant</button>
+          </div>
+          <div class="md" id="mcOut" style="margin-top:12px" hidden></div>
+        </div>
         <button class="btn danger" id="clearMem">Tout oublier</button>
       </section>
 

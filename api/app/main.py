@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import health as healthcheck
-from . import agent, agentcode, alerts, analysis, auth, backup, brief, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
+from . import agent, agentcode, alerts, analysis, auth, backup, brief, memory_care, canvas, proxmox, providers, research, sandbox, spaces, db, ocr, library, llm, observability, reminders, search, telegram, usage
 from .config import DEFAULT_MODEL, DEFAULT_PERSONA, EMBED_MODEL, PROVIDER, WEB_DIR
 
 logging.basicConfig(level=logging.INFO)
@@ -44,7 +44,7 @@ async def run_chat(*args) -> AsyncIterator[bytes]:
 async def lifespan(_app: FastAPI):
     tasks = [asyncio.create_task(reminders.scheduler()), asyncio.create_task(telegram.run()),
              asyncio.create_task(backup.scheduler()), asyncio.create_task(alerts.scheduler()),
-             asyncio.create_task(brief.scheduler())]
+             asyncio.create_task(brief.scheduler()), asyncio.create_task(memory_care.scheduler())]
     asyncio.create_task(sandbox.cleanup())
 
     async def maintenance():   # tous les jours : rétention des échanges indexés

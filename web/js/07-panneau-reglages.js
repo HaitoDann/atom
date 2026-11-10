@@ -83,7 +83,7 @@ const SET_GROUPS = {
 };
 const PANE_TITLES = { general: "Général", look: "Apparence", entity: "Entité", workshop: "Atelier multi-IA", memory: "Souvenirs",
   reminders: "Rappels", brief: "Brief du matin", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", proxmox: "Serveur Proxmox", lab: "Modèles locaux", security: "Sécurité" };
-const PANE_LOAD = { memory: () => loadMemories(), reminders: () => loadReminders(), backup: () => { loadBackups(); loadOffsite(); }, status: () => loadStatus(),
+const PANE_LOAD = { memory: () => { loadMemories(); loadCare(); }, reminders: () => loadReminders(), backup: () => { loadBackups(); loadOffsite(); }, status: () => loadStatus(),
   security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop(), lab: () => loadLab(), proxmox: () => loadProxmox(), brief: () => loadBrief() };
 const setGroupOf = (pane) => Object.keys(SET_GROUPS).find((g) => SET_GROUPS[g].includes(pane)) || pane;
 document.querySelectorAll(".pane").forEach((p) => {
@@ -267,3 +267,31 @@ const demoRow = document.createElement("div");
 demoRow.className = "emos"; demoRow.style.marginTop = "12px";
 for (const [label, fn] of DEMOS) { const b = document.createElement("button"); b.className = "chip"; b.textContent = label; b.onclick = fn; demoRow.appendChild(b); }
 $("emos").after(demoRow);
+
+/* Entretien de la mémoire (Réglages → Souvenirs) */
+async function loadCare() {
+  let c; try { c = await getJSON("/api/memory/care"); } catch { return; }
+  $("mcEnabled").checked = c.enabled; $("mcSummary").checked = c.summary; $("mcDay").value = String(c.weekday); $("mcTime").value = c.time;
+  const l = c.last || {};
+  $("mcInfo").textContent = (l.at ? `Dernier entretien : ${new Date(l.at * 1000).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })} — ${(l.merged || []).length} fusion(s), ${(l.contradictions || []).length} mise(s) à jour, ${(l.stale || []).length + (l.expired || []).length} archivé(s). ` : "")
+    + (c.to_review.length ? `${c.to_review.length} souvenir(s) temporaire(s) à confirmer (marqués « à revoir » ci-dessus).` : "");
+}
+const mcSave = (patch) => send_("/api/memory/care", "PUT", patch).then(() => { toast("Entretien enregistré."); loadCare(); }).catch((e) => toast(esc(e.message)));
+$("mcEnabled").onchange = () => mcSave({ enabled: $("mcEnabled").checked });
+$("mcSummary").onchange = () => mcSave({ summary: $("mcSummary").checked });
+$("mcDay").onchange = () => mcSave({ weekday: +$("mcDay").value });
+$("mcTime").onchange = () => $("mcTime").value && mcSave({ time: $("mcTime").value });
+async function mcRun(dry) {
+  const btn = dry ? $("mcDry") : $("mcRun"), t = btn.textContent;
+  btn.disabled = true; btn.textContent = dry ? "Simulation…" : "Entretien…";
+  try {
+    const r = await send_(`/api/memory/care/run?dry=${dry}`, "POST").then((x) => x.json());
+    $("mcOut").hidden = false;
+    setMd($("mcOut"), (dry ? "**Simulation — rien n'a été modifié.**\n\n" : "") + r.text);
+    if (!dry) { loadMemories(); refreshPanel(); }
+    loadCare();
+  } catch (e) { toast(esc(e.message)); }
+  btn.disabled = false; btn.textContent = t;
+}
+$("mcDry").onclick = () => mcRun(true);
+$("mcRun").onclick = () => mcRun(false);
