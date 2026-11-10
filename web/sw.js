@@ -1,7 +1,7 @@
 // Service worker d'Atom : rend l'appli installable et affiche l'interface
 // même si le réseau flanche. L'API n'est jamais mise en cache.
-const CACHE = "atom-shell-v4";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+const CACHE = "atom-shell-v6";
+const SHELL = ["/", "/manifest.webmanifest", "/icons/icon-192.png?v=3", "/icons/icon-512.png?v=3", "/icons/badge-96.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -34,7 +34,7 @@ self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Atom", body: e.data ? e.data.text() : "" }; }
   e.waitUntil(self.registration.showNotification(d.title || "Atom", {
-    body: d.body || "", icon: "/icons/icon-192.png", badge: "/icons/icon-192.png",
+    body: d.body || "", icon: "/icons/icon-192.png?v=3", badge: "/icons/badge-96.png",
     tag: d.tag ? `${d.tag}-${Date.now()}` : undefined, data: { url: d.url || "/" },
     actions: (d.actions || []).slice(0, 2),
   }));
@@ -53,7 +53,7 @@ self.addEventListener("notificationclick", (e) => {
         const j = await r.json().catch(() => ({}));
         msg = r.ok ? (j.message || "C'est noté.") : (j.detail || "Action impossible : ouvre Atom pour te reconnecter.");
       } catch { msg = "Atom est injoignable (Tailscale actif ?)."; }
-      return self.registration.showNotification("Atom", { body: msg, icon: "/icons/icon-192.png", tag: "atom-ack" });
+      return self.registration.showNotification("Atom", { body: msg, icon: "/icons/icon-192.png?v=3", badge: "/icons/badge-96.png", tag: "atom-ack" });
     }
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const w of wins) { if ("focus" in w) { w.navigate(url).catch(() => {}); return w.focus(); } }
