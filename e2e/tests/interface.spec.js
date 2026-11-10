@@ -443,30 +443,82 @@ test("voix : dictée transcrite puis envoyée, lecture à voix haute", async ({ 
   expect(errors).toEqual([]);
 });
 
-test("agenda : ajout, liste, série, lien d'abonnement", async ({ page }) => {
+test("agenda : page de la semaine, ajout, modification, série, suppression", async ({ page }) => {
   const errors = watchErrors(page);
   await login(page);
-  await page.evaluate(() => openSettings("agenda"));
-  await page.fill("#agTitle", "Dentiste");
-  const d = new Date(Date.now() + 3 * 86400000); const iso = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  await page.fill("#agDate", iso);
-  await page.fill("#agTime", "14:30");
-  await page.fill("#agLoc", "Cabinet Dupont");
-  await page.click("#agAdd");
-  await expect(page.locator("#agList")).toContainText("Dentiste");
-  await expect(page.locator("#agList")).toContainText("14:30");
-  await page.fill("#agTitle", "Sport");
-  await page.fill("#agTime", "18:00");
-  await page.selectOption("#agRep", "weekly");
-  await page.click("#agAdd");
-  await expect(page.locator("#agList .ag-ev", { hasText: "Sport" }).first()).toContainText("chaque semaine");
-  await expect(page.locator("#agFeed")).toHaveValue(/\/agenda\/.+\.ics$/);
-  const feed = await page.locator("#agFeed").inputValue();
-  const ics = await (await page.request.get(new URL(feed).pathname)).text();
-  expect(ics).toContain("SUMMARY:Dentiste");
-  expect(ics).toContain("RRULE:FREQ=WEEKLY");
+  await page.click("#navAgenda");
+  await expect(page.locator("#agendaView")).toBeVisible();
+  await expect(page.locator("#agvDays .agv-day")).toHaveCount(7);
+  await page.click("#agvAdd");
+  await expect(page.locator("#agSheet")).toBeVisible();
+  const d = new Date(Date.now() + 86400000); const iso = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  await page.fill("#agsName", "Dentiste");
+  await page.fill("#agsDate", iso);
+  await page.fill("#agsTime", "14:30");
+  await page.fill("#agsLoc", "Cabinet Dupont");
+  await page.click("#agsSave");
+  await expect(page.locator("#agSheet")).toBeHidden();
+  if (new Date(d).getDay() === 1) await page.click("#agvNext");                // demain est lundi : semaine suivante
+  const ev = page.locator(".agv-ev", { hasText: "Dentiste" });
+  await expect(ev).toContainText("14:30");
+  await ev.click();                                                                // modification
+  await expect(page.locator("#agsName")).toHaveValue("Dentiste");
+  await page.fill("#agsName", "Dentiste (contrôle)");
+  await page.click("#agsSave");
+  await expect(page.locator(".agv-ev", { hasText: "Dentiste (contrôle)" })).toBeVisible();
+  await page.click("#agvToday");
+  await page.click("#agvAdd");
+  await page.fill("#agsName", "Sport");
+  await page.fill("#agsTime", "18:00");
+  await page.selectOption("#agsRep", "weekly");
+  await page.click("#agsSave");
+  await page.click("#agvNext");
+  await expect(page.locator(".agv-ev", { hasText: "Sport" })).toContainText("chaque semaine");
+  await page.locator(".agv-ev", { hasText: "Sport" }).click();
+  await expect(page.locator("#agsDelOne")).toBeVisible();
   page.once("dialog", (dlg) => dlg.accept());
-  await page.locator("#agList .ag-ev", { hasText: "Dentiste" }).locator("button").click();
-  await expect(page.locator("#agList")).not.toContainText("Dentiste");
+  await page.click("#agsDelOne");                                                  // cette semaine seulement
+  await expect(page.locator(".agv-ev", { hasText: "Sport" })).toHaveCount(0);
+  await page.click("#agvNext");
+  await expect(page.locator(".agv-ev", { hasText: "Sport" })).toHaveCount(1);     // la série continue
+  await page.evaluate(() => openSettings("agenda"));
+  await expect(page.locator("#agFeed")).toHaveValue(/\/agenda\/.+\.ics$/);
+  const ics = await (await page.request.get(new URL(await page.locator("#agFeed").inputValue()).pathname)).text();
+  expect(ics).toContain("SUMMARY:Dentiste (contrôle)");
+  expect(ics).toContain("EXDATE");
   expect(errors).toEqual([]);
+});
+
+test.describe("téléphone", () => {
+  test.use({ viewport: { width: 393, height: 851 }, hasTouch: true, isMobile: true });
+  test("onglet Agenda, bandeau d'installation et notifications", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.addInitScript(() => {
+      if (window !== window.top) return;            // cadres isolés (aperçus) : rien à simuler
+      // Pas de service de notification en test : abonnement simulé (clés au bon format).
+      const b64 = (n) => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(n)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const p256 = () => { const k = new Uint8Array(65); crypto.getRandomValues(k); k[0] = 4; return btoa(String.fromCharCode(...k)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+      let sub = null;
+      window.__pm = { getSubscription: async () => sub, subscribe: async () => (sub = { endpoint: "https://push.test/e2e", toJSON: () => ({ endpoint: "https://push.test/e2e", keys: { p256dh: p256(), auth: b64(16) } }), unsubscribe: async () => { sub = null; return true; } }) };
+      Object.defineProperty(Notification, "permission", { get: () => "granted" });
+      Notification.requestPermission = async () => "granted";
+      Object.defineProperty(navigator.serviceWorker, "ready", { get: () => Promise.resolve({ pushManager: window.__pm }) });
+    });
+    await login(page);
+    await expect(page.locator("#installBanner")).toBeVisible({ timeout: 5000 });   // pas encore installé
+    await expect(page.locator("#instText")).toContainText("Installer l'application");
+    await page.click("#instClose");
+    await expect(page.locator("#installBanner")).toBeHidden();
+    await page.click('#tabbar [data-tab="agenda"]');
+    await expect(page.locator("#agendaView")).toBeVisible();
+    await expect(page.locator("#agvFab")).toBeVisible();
+    await expect(page.locator("#agvTip button")).toBeVisible();
+    await page.click("#agvTip button");                                            // activer les notifications
+    await expect(page.locator("#agvTip")).toBeHidden();
+    const st = await (await page.request.get("/api/push")).json();
+    expect(st.devices.length).toBeGreaterThan(0);
+    await page.click("#agvFab");
+    await expect(page.locator("#agSheet")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });

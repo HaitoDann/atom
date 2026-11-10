@@ -165,7 +165,7 @@ document.querySelectorAll("#tabbar button").forEach((b) => b.onclick = () => {
   const t = b.dataset.tab;
   app.classList.remove("panel-open");
   if (t === "chats") { if (currentView !== "chat") { showView("chat"); app.classList.remove("side-open"); } else app.classList.toggle("side-open"); }
-  else if (t === "library" || t === "code") { app.classList.remove("side-open"); showView(t); }
+  else if (t === "library" || t === "code" || t === "agenda") { app.classList.remove("side-open"); showView(t); }
   else if (t === "atom") { app.classList.remove("side-open"); app.classList.add("panel-open"); refreshPanel(); refreshSystem(); }
   else if (t === "settings") { app.classList.remove("side-open"); openSettings(); }
   applyLayout(); syncTabbar();

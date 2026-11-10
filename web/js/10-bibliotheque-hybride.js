@@ -12,11 +12,13 @@ function showView(v) {
   $("libView").hidden = v !== "library";
   $("codeView").hidden = v !== "code";
   $("dashView").hidden = v !== "dash";
+  $("agendaView").hidden = v !== "agenda";
   $("scroller").hidden = v !== "chat";
   document.querySelector(".composer").hidden = v !== "chat";
   $("navLib").classList.toggle("on", v === "library");
   $("navCode").classList.toggle("on", v === "code");
   $("navDash").classList.toggle("on", v === "dash");
+  $("navAgenda").classList.toggle("on", v === "agenda");
   ["pinBtn", "exportBtn"].forEach((id) => { if (v !== "chat") $(id).style.display = "none"; });
   app.classList.remove("side-open");
   if (v !== "chat") exitHero();
@@ -24,6 +26,7 @@ function showView(v) {
   if (v === "library") { $("title").textContent = "Bibliothèque"; loadLibrary(); }
   else if (v === "code") { $("title").textContent = "Code"; loadCodeProjects(); }
   else if (v === "dash") { $("title").textContent = "Tableau de bord"; loadDashboard(); }
+  else if (v === "agenda") { $("title").textContent = "Agenda"; loadAgendaView(); }
   else { updateTitle(); if (!library.collections.some((c) => c.status === "indexing")) clearTimeout(libTimer); }
   if (typeof syncTabbar === "function") syncTabbar();
 }

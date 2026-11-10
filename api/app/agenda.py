@@ -44,7 +44,12 @@ def _row(r) -> dict:
 def get(eid: int) -> dict | None:
     with db.conn() as c:
         r = c.execute("SELECT * FROM events WHERE id = ?", (eid,)).fetchone()
-    return _row(r) if r else None
+    if not r:
+        return None
+    d = _row(r)
+    st = datetime.fromtimestamp(d["start_at"], TZ)
+    d.update(start_date=st.strftime("%Y-%m-%d"), start_hm=st.strftime("%H:%M"), minutes=round((d["end_at"] - d["start_at"]) / 60))
+    return d
 
 
 def all_events() -> list[dict]:
@@ -152,8 +157,12 @@ def between(start: float, end: float) -> list[dict]:
     out = []
     for ev in all_events():
         for s, e in occurrences(ev, start, end):
+            a, z = datetime.fromtimestamp(s, TZ), datetime.fromtimestamp(e, TZ)
             out.append({**{k: ev[k] for k in ("id", "uid", "title", "all_day", "location", "notes", "repeat",
                                               "repeat_interval", "remind_min")}, "start": s, "end": e,
+                        # jour et heures dans le fuseau d'Atom : l'interface les affiche tels quels (même si le
+                        # navigateur est dans un autre fuseau, ce qu'on voit est ce qu'on enregistre)
+                        "day": a.strftime("%Y-%m-%d"), "start_hm": a.strftime("%H:%M"), "end_hm": z.strftime("%H:%M"),
                         "when": human_range(s, e, bool(ev["all_day"]))})
     out.sort(key=lambda x: x["start"])
     return out

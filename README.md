@@ -133,11 +133,21 @@ Atom répète alors ton message, mot par mot, avec une émotion au hasard.
 - Elle a des **petits gestes** : clignements, coups d'œil, et un « souffle » d'absorption quand elle retient un souvenir.
 - **Mode présence** : touche la sphère (ou l'icône dans la barre du haut). Elle quitte son panneau et s'agrandit en plein écran, avec l'heure, la date et son dernier message ; l'écran reste allumé. Touche-la à nouveau (ou `Échap`) : elle se rétracte et reprend sa place pendant que le chat réapparaît. Idéal pour une tablette posée dans la pièce.
 
-### Installer Atom comme une application
+### Installer Atom comme une application (téléphone)
 
-Les navigateurs n'autorisent l'installation qu'en **HTTPS** : il faut donc passer par Tailscale (ci-dessous), qui fournit une adresse `https://…ts.net` avec un vrai certificat. Ensuite :
-- **Android / Chrome / Edge** : Réglages d'Atom → Apparence → « Installer l'application », ou menu du navigateur → « Installer ».
-- **iPhone / iPad (Safari)** : bouton Partager → « Sur l'écran d'accueil ».
+Atom s'installe comme une appli : icône sur l'écran d'accueil, plein écran, onglets en bas (Discussions, Bibliothèque, Agenda, Atom, Réglages) et notifications.
+
+**Le navigateur n'autorise l'installation et les notifications qu'en HTTPS.** Avec `http://IP-de-la-VM:8000`, ni le bouton d'installation ni les notifications ne peuvent apparaître : il faut l'adresse **Tailscale** `https://…ts.net` (voir ci-dessous), qui a un vrai certificat.
+
+1. Sur le téléphone, installe **Tailscale** et connecte-le à ton réseau.
+2. Ouvre **Chrome** sur `https://atom.<ton-réseau>.ts.net`. Un bandeau « Installer Atom sur ce téléphone » apparaît en bas : touche **Installer**. Sinon : menu ⋮ → « Installer l'application ».
+3. Ouvre Atom depuis l'écran d'accueil, puis **Réglages → Rappels → Notifications sur cet appareil → Activer** (ou le bouton en haut de l'onglet Agenda). Touche « Tester » pour vérifier.
+
+Sur iPhone (Safari) : bouton Partager → « Sur l'écran d'accueil ».
+
+**Notifications** : rappels, relances, rendez-vous, brief du matin et entretien de la mémoire arrivent comme des notifications de l'appli, même fermée. Les boutons d'action (**Fait**, **+1 h**, **Garder**…) s'utilisent directement sur la notification. Le contenu est **chiffré de bout en bout** (Web Push, RFC 8291) : le service de notification du téléphone (Google sur Android) ne voit qu'un message illisible. Telegram et ntfy restent possibles en parallèle.
+
+**Mises à jour** : rien à faire sur le téléphone. L'appli charge toujours la dernière version d'Atom à l'ouverture. Si elle est restée ouverte en arrière-plan, elle vérifie toutes les 10 minutes et se recharge d'elle-même quand tu reviens dessus. Après un `./update.sh` sur le serveur, la nouvelle version est donc sur le téléphone sans réinstaller.
 
 ## Sécurité
 
@@ -735,12 +745,9 @@ Atom gère ton agenda dans sa propre base : rien chez Google, rien dans le cloud
 - **Dans l'interface** : Réglages → Données → **Agenda** liste les 60 prochains jours. Tu y ajoutes un rendez-vous (heure vide pour une journée entière), avec lieu, récurrence (chaque jour, semaine, mois ou année) et rappel. Pour une série, tu peux supprimer une seule occurrence.
 - **Rappel** avant chaque rendez-vous sur Telegram et ntfy (30 min par défaut, réglable par rendez-vous). L'agenda du jour ouvre le **brief du matin**. Sur Telegram, la commande `/agenda` affiche les 7 prochains jours.
 
-**Sur un téléphone Android (Google Pixel)** : Atom publie un **lien d'abonnement** `.ics`, à copier dans Réglages → Agenda.
-1. Installe **ICSx⁵**, gratuite sur le Play Store, et **Tailscale** sur le téléphone.
-2. Dans ICSx⁵ : « + », colle le lien en utilisant l'adresse **Tailscale** d'Atom (HTTPS), puis choisis une synchronisation toutes les 15 min ou toutes les heures.
-3. L'agenda « Atom » apparaît dans **Google Agenda** sur le téléphone, avec ses rappels. Il est en lecture seule : on ajoute et on modifie via Atom (interface, Telegram ou voix).
+**Sur le téléphone** : l'appli Atom (ci-dessous) a un onglet **Agenda** : la semaine jour par jour, un bouton « + » pour ajouter, et un toucher sur un rendez-vous pour le modifier ou le supprimer (une occurrence ou toute la série). Les rappels arrivent en **notification** de l'appli.
 
-N'ajoute pas ce lien sur le site calendar.google.com : il serait lu par les serveurs de Google, qui ne peuvent pas joindre ton serveur, et ton agenda passerait chez Google. Le lien donne accès à l'agenda sans mot de passe : ne le partage pas. « Nouveau lien » désactive l'ancien.
+**Facultatif, voir aussi les rendez-vous dans Google Agenda** : Réglages → Agenda donne un lien d'abonnement `.ics`. Sur Android, colle-le dans l'appli gratuite **ICSx⁵** avec l'adresse Tailscale d'Atom : l'agenda « Atom » apparaît alors dans Google Agenda, en lecture seule. N'ajoute pas ce lien sur le site calendar.google.com : il serait lu par les serveurs de Google, qui ne peuvent pas joindre ton serveur. Ne partage pas ce lien ; « Nouveau lien » désactive l'ancien.
 
 ## Voix
 

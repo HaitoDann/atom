@@ -25,7 +25,9 @@ loadHybrid().then(loadWorkshop);
 initVoice();
 loadLibrary();
 loadSpaces();
-if (store.get("view", "chat") === "code" || store.get("view", "chat") === "library") showView(store.get("view", "chat"));
+const viewParam = new URLSearchParams(location.search).get("view");   // lien d'une notification (ex. agenda)
+if (viewParam === "agenda") { window.history.replaceState(null, "", "/"); showView("agenda"); }
+else if (["code", "library", "agenda"].includes(store.get("view", "chat"))) showView(store.get("view", "chat"));
 refreshCounts();
 setInterval(refreshCounts, 60000);
 checkNight();

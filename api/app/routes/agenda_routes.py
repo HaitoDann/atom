@@ -37,12 +37,28 @@ def _fields(body: EventIn) -> dict:
 
 
 @router.get("/api/agenda")
-def get_agenda(days: int = 30, past: int = 0):
-    """Occurrences des `days` prochains jours (et des `past` derniers), plus la liste des événements."""
+def get_agenda(days: int = 30, past: int = 0, start: str | None = None, end: str | None = None):
+    """Occurrences des `days` prochains jours (et des `past` derniers), ou de la période [start, end[ (AAAA-MM-JJ)."""
     now = time.time()
-    days, past = max(1, min(400, days)), max(0, min(400, past))
-    return {"occurrences": agenda.between(now - past * 86400, now + days * 86400),
-            "events": len(agenda.all_events())}
+    if start and end:
+        a, b = agenda.parse_when(start), agenda.parse_when(end)
+        if not a or not b or b[0] <= a[0] or b[0] - a[0] > 400 * 86400:
+            raise HTTPException(400, "Période invalide")
+        lo, hi = a[0], b[0]
+    else:
+        days, past = max(1, min(400, days)), max(0, min(400, past))
+        lo, hi = now - past * 86400, now + days * 86400
+    from ..config import TIMEZONE
+    return {"occurrences": agenda.between(lo, hi), "events": len(agenda.all_events()), "timezone": TIMEZONE,
+            "today": agenda.now_local().strftime("%Y-%m-%d")}
+
+
+@router.get("/api/agenda/{eid:int}")
+def get_event(eid: int):
+    ev = agenda.get(eid)
+    if not ev:
+        raise HTTPException(404, "Rendez-vous introuvable")
+    return ev
 
 
 @router.post("/api/agenda")
@@ -51,7 +67,7 @@ def post_event(body: EventIn):
     return agenda.create(**f)
 
 
-@router.put("/api/agenda/{eid}")
+@router.put("/api/agenda/{eid:int}")
 def put_event(eid: int, body: EventIn):
     if not agenda.get(eid):
         raise HTTPException(404, "Rendez-vous introuvable")
@@ -61,7 +77,7 @@ def put_event(eid: int, body: EventIn):
     return agenda.update(eid, **{**f, "all_day": int(f["all_day"])})
 
 
-@router.delete("/api/agenda/{eid}")
+@router.delete("/api/agenda/{eid:int}")
 def delete_event(eid: int, occurrence: float | None = None):
     """occurrence : début (timestamp) d'une seule occurrence à retirer d'un événement récurrent."""
     if not agenda.delete(eid, occurrence):

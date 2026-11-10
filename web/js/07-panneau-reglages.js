@@ -83,7 +83,7 @@ const SET_GROUPS = {
 };
 const PANE_TITLES = { general: "Général", look: "Apparence", entity: "Entité", workshop: "Atelier multi-IA", memory: "Souvenirs",
   reminders: "Rappels", agenda: "Agenda", brief: "Brief du matin", backup: "Sauvegarde", hybrid: "Mode hybride", status: "État", proxmox: "Serveur Proxmox", lab: "Modèles locaux", security: "Sécurité" };
-const PANE_LOAD = { memory: () => { loadMemories(); loadCare(); }, reminders: () => loadReminders(), backup: () => { loadBackups(); loadOffsite(); }, status: () => loadStatus(),
+const PANE_LOAD = { memory: () => { loadMemories(); loadCare(); }, reminders: () => { loadReminders(); loadPush(); }, backup: () => { loadBackups(); loadOffsite(); }, status: () => loadStatus(),
   security: () => loadSecurity(), hybrid: () => loadHybrid(), workshop: () => loadWorkshop(), lab: () => loadLab(), proxmox: () => loadProxmox(), brief: () => loadBrief(), agenda: () => loadAgenda() };
 const setGroupOf = (pane) => Object.keys(SET_GROUPS).find((g) => SET_GROUPS[g].includes(pane)) || pane;
 document.querySelectorAll(".pane").forEach((p) => {

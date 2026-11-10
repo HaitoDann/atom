@@ -222,7 +222,7 @@ async function sendMessage(text, files = []) {
           if (ev.action === "created") toast(`<b>📅 Ajouté à l'agenda</b> · ${esc(ev.when)} — ${esc(ev.title)}`);
           else if (ev.action === "cancelled") toast(`<b>Rendez-vous supprimé</b> · ${esc(ev.title)}`);
           else toast(`<b>Rendez-vous non ajouté</b> · ${esc(ev.message)}`);
-          if (typeof loadAgenda === "function" && $("settings").classList.contains("open")) loadAgenda();
+          if (typeof loadAgendaView === "function" && currentView === "agenda") loadAgendaView();
         } else if (ev.type === "reminder") {
           if (ev.action === "created" || ev.action === "cancelled") { remCards.push(ev); pendingReminders = null; }
           if (ev.action === "created") toast(`<b>Rappel programmé</b> · ${esc(ev.when)} — ${esc(ev.text)}`);
