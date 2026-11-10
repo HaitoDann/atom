@@ -397,6 +397,39 @@
         <button class="btn" id="notifTest">Envoyer une notification de test</button>
       </section>
 
+      <section class="pane" data-pane="agenda">
+        <div class="block">
+          <h4>Prochains rendez-vous</h4>
+          <p class="desc">L'agenda d'Atom, dans sa propre base. Tu peux aussi lui parler : « ajoute dentiste jeudi à 14 h », « suis-je libre vendredi ? », « supprime le rendez-vous de demain ». Un rappel part avant chaque rendez-vous.</p>
+          <div id="agList"></div>
+        </div>
+        <div class="block">
+          <h4>Ajouter</h4>
+          <div class="ag-form">
+            <input class="field" id="agTitle" placeholder="Titre (ex. Dentiste)" maxlength="200" aria-label="Titre du rendez-vous">
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <input class="field" type="date" id="agDate" aria-label="Date" style="width:auto">
+              <input class="field" type="time" id="agTime" aria-label="Heure (vide : journée entière)" style="width:auto">
+              <select class="field" id="agDur" aria-label="Durée" style="width:auto"><option value="15">15 min</option><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>1 h</option><option value="90">1 h 30</option><option value="120">2 h</option><option value="180">3 h</option><option value="480">journée de travail</option></select>
+            </div>
+            <input class="field" id="agLoc" placeholder="Lieu (facultatif)" maxlength="200" aria-label="Lieu">
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <select class="field" id="agRep" aria-label="Récurrence" style="width:auto"><option value="">Une seule fois</option><option value="daily">Chaque jour</option><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option><option value="yearly">Chaque année</option></select>
+              <select class="field" id="agRem" aria-label="Rappel" style="width:auto"><option value="">Sans rappel</option><option value="10">Rappel 10 min avant</option><option value="30" selected>Rappel 30 min avant</option><option value="60">Rappel 1 h avant</option><option value="1440">Rappel la veille</option></select>
+            </div>
+            <p class="note">Heure vide : journée entière.</p>
+            <button class="btn primary" id="agAdd">Ajouter à l'agenda</button>
+          </div>
+        </div>
+        <div class="block">
+          <h4>Sur ton téléphone</h4>
+          <p class="desc">Abonne ton téléphone à l'agenda d'Atom : tes rendez-vous apparaissent dans son calendrier, en lecture seule (tu ajoutes et modifies via Atom).</p>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><input class="field" id="agFeed" readonly aria-label="Lien d'abonnement" style="flex:1;min-width:200px"><button class="btn" id="agFeedCopy">Copier</button><button class="btn" id="agFeedNew" title="L'ancien lien cesse de fonctionner">Nouveau lien</button></div>
+          <p class="note"><b>Android (Pixel)</b> : installe l'appli gratuite <b>ICSx⁵</b> (Play Store), « + », colle le lien, puis choisis une synchronisation toutes les 15 min ou 1 h. L'agenda « Atom » apparaît dans Google Agenda sur le téléphone. Le téléphone doit joindre Atom : utilise l'adresse <b>Tailscale</b> (HTTPS) avec Tailscale actif sur le Pixel. N'ajoute pas ce lien sur le site de Google Agenda : il serait lu par les serveurs de Google, qui ne peuvent pas joindre ton serveur.</p>
+          <p class="note">Ce lien donne accès à ton agenda sans mot de passe : ne le partage pas. « Nouveau lien » désactive l'ancien.</p>
+        </div>
+      </section>
+
       <section class="pane" data-pane="brief">
         <div class="block">
           <h4>Brief du matin</h4>
@@ -737,6 +770,7 @@
 <script src="/js/14-consommation.js?v=__V__"></script>
 <script src="/js/14b-brief.js?v=__V__"></script>
 <script src="/js/14c-voix.js?v=__V__"></script>
+<script src="/js/14d-agenda.js?v=__V__"></script>
 <script src="/js/15-demarrage.js?v=__V__"></script>
 </body>
 </html>

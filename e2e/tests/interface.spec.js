@@ -442,3 +442,31 @@ test("voix : dictée transcrite puis envoyée, lecture à voix haute", async ({ 
   await expect.poll(() => page.evaluate(() => window.__spoken.length)).toBeGreaterThan(1);
   expect(errors).toEqual([]);
 });
+
+test("agenda : ajout, liste, série, lien d'abonnement", async ({ page }) => {
+  const errors = watchErrors(page);
+  await login(page);
+  await page.evaluate(() => openSettings("agenda"));
+  await page.fill("#agTitle", "Dentiste");
+  const d = new Date(Date.now() + 3 * 86400000); const iso = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  await page.fill("#agDate", iso);
+  await page.fill("#agTime", "14:30");
+  await page.fill("#agLoc", "Cabinet Dupont");
+  await page.click("#agAdd");
+  await expect(page.locator("#agList")).toContainText("Dentiste");
+  await expect(page.locator("#agList")).toContainText("14:30");
+  await page.fill("#agTitle", "Sport");
+  await page.fill("#agTime", "18:00");
+  await page.selectOption("#agRep", "weekly");
+  await page.click("#agAdd");
+  await expect(page.locator("#agList .ag-ev", { hasText: "Sport" }).first()).toContainText("chaque semaine");
+  await expect(page.locator("#agFeed")).toHaveValue(/\/agenda\/.+\.ics$/);
+  const feed = await page.locator("#agFeed").inputValue();
+  const ics = await (await page.request.get(new URL(feed).pathname)).text();
+  expect(ics).toContain("SUMMARY:Dentiste");
+  expect(ics).toContain("RRULE:FREQ=WEEKLY");
+  page.once("dialog", (dlg) => dlg.accept());
+  await page.locator("#agList .ag-ev", { hasText: "Dentiste" }).locator("button").click();
+  await expect(page.locator("#agList")).not.toContainText("Dentiste");
+  expect(errors).toEqual([]);
+});

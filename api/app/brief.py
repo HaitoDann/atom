@@ -32,10 +32,10 @@ DEFAULTS = {
     "days": [0, 1, 2, 3, 4, 5, 6],            # 0 = lundi
     "city": "",
     "news": "",                                # sujets séparés par des virgules ; vide = pas d'actualités
-    "sections": {"reminders": True, "weather": True, "server": True, "providers": True, "news": True, "memories": False},
+    "sections": {"agenda": True, "reminders": True, "weather": True, "server": True, "providers": True, "news": True, "memories": False},
     "intro": True,                             # mot d'Atom rédigé par le modèle
 }
-SECTION_NAMES = {"reminders": "Rappels du jour", "weather": "Météo", "server": "Serveur", "providers": "Fournisseurs d'IA",
+SECTION_NAMES = {"agenda": "Agenda du jour", "reminders": "Rappels du jour", "weather": "Météo", "server": "Serveur", "providers": "Fournisseurs d'IA",
                  "news": "Actualités", "memories": "Souvenirs récents"}
 
 WMO = {0: "ciel dégagé", 1: "plutôt dégagé", 2: "partiellement nuageux", 3: "couvert", 45: "brouillard", 48: "brouillard givrant",
@@ -89,6 +89,11 @@ def section_reminders() -> str:
     if not rows:
         return "\n".join(lines + ["Aucun rappel aujourd'hui."]) if lines else "Aucun rappel aujourd'hui."
     return "\n".join(lines) + ("\n" if lines else "") + "\n".join(f"- {human(r['due_at']).replace("aujourd'hui à ", "")} : {r['text']}" for r in rows)
+
+
+def section_agenda() -> str:
+    from . import agenda
+    return agenda.today_text() or "Rien de prévu aujourd'hui."
 
 
 async def section_weather(city: str) -> str:
@@ -194,6 +199,7 @@ async def build(s: dict | None = None) -> dict:
     s = s or settings()
     on = s["sections"]
     jobs = {
+        "agenda": (lambda: asyncio.sleep(0, section_agenda())) if on.get("agenda", True) else None,
         "reminders": (lambda: asyncio.sleep(0, section_reminders())) if on["reminders"] else None,
         "weather": (lambda: section_weather(s["city"])) if on["weather"] else None,
         "server": section_server if on["server"] else None,

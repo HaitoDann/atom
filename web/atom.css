@@ -1416,3 +1416,11 @@ textarea.field { line-height: 1.55; }
 @keyframes micPulse { 50% { opacity: .45; } }
 #micBtn.busy { opacity: .5; pointer-events: none; }
 .acts .iconbtn.on { color: rgb(var(--orb)); }
+
+/* Agenda */
+.ag-day { font-size: 12px; font-weight: 600; opacity: .7; margin: 12px 0 4px; text-transform: none; }
+.ag-ev { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line, rgba(127,127,127,.15)); }
+.ag-ev .ag-t { font-variant-numeric: tabular-nums; font-size: 12.5px; opacity: .8; min-width: 92px; }
+.ag-ev .ag-n { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ag-ev .ag-n small { opacity: .7; font-size: 12px; }
+.ag-form { display: flex; flex-direction: column; gap: 8px; }

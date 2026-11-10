@@ -26,7 +26,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
 | `api/app/canvas.py`, `workshop.py`, `orchestrator.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, orchestration vérifiée de petits modèles, analyse de données, labo des modèles |
-| `api/app/reminders.py`, `brief.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, brief du matin, notifications (ntfy, Telegram), bot et agent Telegram |
+| `api/app/reminders.py`, `agenda.py`, `brief.py`, `notify.py`, `telegram.py`, `tgagent.py` | Rappels, agenda, brief du matin, notifications (ntfy, Telegram), bot et agent Telegram |
 | `api/app/security.py`, `auth.py` | Protections transversales, mot de passe et sessions |
 | `api/app/db.py`, `migrations/`, `backup.py`, `offsite.py`, `jobs.py` | Stockage SQLite, migrations versionnées (un fichier par version), sauvegardes, tâches de fond |
 | `api/app/health.py`, `system.py`, `proxmox.py` | État des services, infos système, surveillance Proxmox |
@@ -721,11 +721,26 @@ python3 bench/bench.py --hard --no-local --methods ask:gemini,orchestra:gemini -
 
 1. ✅ Backend + Docker Compose + streaming
 2. ✅ Markdown, longueur adaptative, conversations multiples, mémoire automatique
-3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels
+3. ✅ Atom qui écrit : ntfy, rappels, bot Telegram bidirectionnel, brief du matin, relances des rappels, agenda (flux .ics pour le téléphone)
 4. ✅ Documents : bibliothèque (notes, PDF, OCR), recherche dedans, espaces
 5. ✅ Outils : Proxmox, recherche web, mode Code, atelier multi-IA et orchestration vérifiée
 6. ✅ Accès distant via Tailscale, fournisseurs distants avec relais et mode hybride
 
+
+## Agenda
+
+Atom gère ton agenda dans sa propre base : rien chez Google, rien dans le cloud.
+
+- **En parlant** : « ajoute dentiste jeudi à 14 h au cabinet Dupont », « foot tous les mardis à 19 h », « suis-je libre vendredi après-midi ? », « supprime le rendez-vous de demain ». Atom connaît tes rendez-vous des 14 prochains jours.
+- **Dans l'interface** : Réglages → Données → **Agenda** liste les 60 prochains jours. Tu y ajoutes un rendez-vous (heure vide pour une journée entière), avec lieu, récurrence (chaque jour, semaine, mois ou année) et rappel. Pour une série, tu peux supprimer une seule occurrence.
+- **Rappel** avant chaque rendez-vous sur Telegram et ntfy (30 min par défaut, réglable par rendez-vous). L'agenda du jour ouvre le **brief du matin**. Sur Telegram, la commande `/agenda` affiche les 7 prochains jours.
+
+**Sur un téléphone Android (Google Pixel)** : Atom publie un **lien d'abonnement** `.ics`, à copier dans Réglages → Agenda.
+1. Installe **ICSx⁵**, gratuite sur le Play Store, et **Tailscale** sur le téléphone.
+2. Dans ICSx⁵ : « + », colle le lien en utilisant l'adresse **Tailscale** d'Atom (HTTPS), puis choisis une synchronisation toutes les 15 min ou toutes les heures.
+3. L'agenda « Atom » apparaît dans **Google Agenda** sur le téléphone, avec ses rappels. Il est en lecture seule : on ajoute et on modifie via Atom (interface, Telegram ou voix).
+
+N'ajoute pas ce lien sur le site calendar.google.com : il serait lu par les serveurs de Google, qui ne peuvent pas joindre ton serveur, et ton agenda passerait chez Google. Le lien donne accès à l'agenda sans mot de passe : ne le partage pas. « Nouveau lien » désactive l'ancien.
 
 ## Voix
 

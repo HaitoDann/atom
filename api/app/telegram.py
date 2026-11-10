@@ -39,6 +39,7 @@ HELP = (
     "/souvenirs — ce que je sais de toi\n"
     "/serveur — état du serveur Proxmox\n"
     "/brief — le brief du matin, maintenant\n"
+    "/agenda — tes rendez-vous des 7 prochains jours\n"
     "/agent projet tâche — confier une tâche à l'agent de code\n"
     "/aide — ce message"
 )
@@ -265,6 +266,12 @@ async def handle_command(client, chat_id: int, text: str) -> None:
 
         from . import tgagent
         await tgagent.start(sys.modules[__name__], client, chat_id, args.strip())
+    elif cmd == "/agenda":
+        from . import agenda
+
+        rows = agenda.between(time.time() - 3600, time.time() + 7 * 86400)
+        txt = "\n".join(f"• {x['when']} — {x['title']}" + (f" ({x['location']})" if x["location"] else "") for x in rows[:30])
+        await send_text(client, chat_id, f"**📅 7 prochains jours**\n\n{txt}" if rows else "Rien de prévu ces 7 prochains jours.")
     elif cmd == "/brief":
         from . import brief
 
@@ -415,6 +422,7 @@ async def run() -> None:
                 {"command": "agent", "description": "Confier une tâche à l'agent de code"},
                 {"command": "serveur", "description": "État du serveur Proxmox"},
                 {"command": "brief", "description": "Brief du matin, maintenant"},
+                {"command": "agenda", "description": "Rendez-vous des 7 prochains jours"},
                 {"command": "aide", "description": "Aide"},
             ])
         except (TelegramError, httpx.HTTPError) as e:

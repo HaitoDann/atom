@@ -10,6 +10,7 @@ router = APIRouter()
 
 
 class Sections(BaseModel):
+    agenda: bool | None = None
     reminders: bool | None = None
     weather: bool | None = None
     server: bool | None = None

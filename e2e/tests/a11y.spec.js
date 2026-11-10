@@ -47,6 +47,8 @@ test("accessibilité : réglages (consommation, sauvegarde)", async ({ page }) =
   expect(await audit(page, "#settings")).toEqual([]);
   await page.evaluate(() => openSettings("backup"));
   expect(await audit(page, "#settings")).toEqual([]);
+  await page.evaluate(() => openSettings("agenda"));
+  expect(await audit(page, "#settings")).toEqual([]);
 });
 
 test.describe("téléphone", () => {
