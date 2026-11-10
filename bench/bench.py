@@ -14,6 +14,7 @@ Usage (depuis le dossier atom, sur le serveur ou ton PC) :
   python3 bench/bench.py --url http://IP-DE-LA-VM:8000
   python3 bench/bench.py --methods simple,orchestra --only interets,jours --repeat 2
   python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini
+  python3 bench/bench.py --hard --no-local --methods ask:gemini,orchestra:gemini --judge groq --run-code
 
 Aucune dépendance : bibliothèque standard de Python 3.9+.
 Le mot de passe d'Atom est lu dans ATOM_BENCH_PASSWORD, sinon demandé au clavier (jamais écrit sur disque).
@@ -187,8 +188,42 @@ def run_code(answer: str, tests: list[str], timeout: int = 20) -> tuple[bool, st
     return False, (r.stderr.strip().splitlines() or ["échec"])[-1][:150]
 
 
-def grade(task: dict, answer: str, allow_code: bool) -> tuple[str, str]:
-    """(score, détail) ; score « 1 », « 0 », une fraction, ou « ? » (à noter à la main)."""
+JUDGE_PROMPT = """Tu es un correcteur exigeant et impartial. Voici une consigne, une réponse, et des critères numérotés.
+Pour CHAQUE critère, réponds 1 s'il est pleinement satisfait, 0 sinon. Ne sois pas indulgent.
+Réponds UNIQUEMENT par du JSON : {{"notes": [1, 0, ...], "justification": "une phrase"}}
+
+Consigne :
+{task}
+
+Critères :
+{criteria}
+
+Réponse à corriger :
+{answer}"""
+
+
+def judge_criteria(atom: "Atom", engine: str, task: dict, answer: str) -> tuple[float | None, str]:
+    """Notation des critères qualitatifs par un modèle juge (via /api/bench/ask). (part réussie, note) ou (None, erreur)."""
+    crit = "\n".join(f"{i + 1}. {c}" for i, c in enumerate(task["criteria"]))
+    prompt = JUDGE_PROMPT.format(task=task["text"], criteria=crit, answer=answer[:6000])
+    try:
+        r = atom.json("POST", "/api/bench/ask", {"message": prompt, "engine": engine})
+    except Exception as e:  # noqa: BLE001
+        return None, f"juge indisponible ({str(e)[:60]})"
+    m = re.search(r"\{[\s\S]*\}", r.get("answer", ""))
+    try:
+        notes = [1 if int(x) else 0 for x in json.loads(m.group(0))["notes"]][:len(task["criteria"])]
+    except (AttributeError, ValueError, KeyError, TypeError):
+        return None, "juge : réponse illisible"
+    if len(notes) < len(task["criteria"]):
+        return None, "juge : notes incomplètes"
+    missed = [c for c, n in zip(task["criteria"], notes, strict=True) if not n]
+    return sum(notes) / len(notes), f"juge {sum(notes)}/{len(notes)}" + (f" (manque : {' | '.join(missed)})" if missed else "")
+
+
+def grade(task: dict, answer: str, allow_code: bool, judge=None) -> tuple[str, str]:
+    """(score, détail) ; score « 1 », « 0 », une fraction, ou « ? » (à noter à la main).
+    judge : fonction (task, answer) → (part, note) pour les critères qualitatifs ; sans juge, à noter à la main."""
     if not answer.strip():
         return "0", "réponse vide"
     notes, parts = [], []
@@ -213,7 +248,22 @@ def grade(task: dict, answer: str, allow_code: bool) -> tuple[str, str]:
         cited = bool(re.search(r"\[\d+\]|https?://", answer))
         parts.append(1.0 if cited else 0.0)
         notes.append("sources citées" if cited else "aucune source")
-    if task.get("criteria"):
+    if task.get("regex"):
+        ok = [bool(re.search(rx, fold(answer), re.I)) for rx in task["regex"]]
+        parts.append(sum(ok) / len(ok))
+        if not all(ok):
+            notes.append("motif attendu absent")
+    if task.get("forbid"):
+        hit = [w for w in task["forbid"] if fold(w) in fold(answer)]
+        parts.append(0.0 if hit else 1.0)
+        if hit:
+            notes.append("piège : " + ", ".join(hit))
+    if task.get("criteria") and judge:
+        part, note = judge(task, answer)
+        notes.append(note)
+        if part is not None:
+            parts.append(part)
+    elif task.get("criteria"):
         notes.append("à noter à la main : " + " | ".join(task["criteria"]))
         if not parts:
             return "?", "; ".join(notes)
@@ -265,9 +315,14 @@ def main() -> None:
     ap.add_argument("--repeat", type=int, default=1, help="répétitions (les petits modèles varient d'un essai à l'autre)")
     ap.add_argument("--timeout", type=int, default=1800, help="délai max par réponse, en secondes")
     ap.add_argument("--run-code", action="store_true", help="exécute le code produit pour le vérifier (processus isolé, -I)")
+    ap.add_argument("--judge", default="", help="moteur juge pour les critères qualitatifs (ex. groq) ; choisis-en un "
+                    "autre que ceux comparés")
+    ap.add_argument("--hard", action="store_true", help="tâches difficiles et pièges (bench/tasks_hard.json)")
     ap.add_argument("--keep", action="store_true", help="garde les conversations créées dans Atom (supprimées sinon)")
     a = ap.parse_args()
 
+    if a.hard and a.tasks == str(HERE / "tasks.json"):
+        a.tasks = str(HERE / "tasks_hard.json")
     tasks = json.loads(Path(a.tasks).read_text(encoding="utf-8"))
     if a.only:
         wanted = set(a.only.split(","))
@@ -315,7 +370,9 @@ def main() -> None:
                     except Exception as e:  # noqa: BLE001
                         res = {"answer": "", "cid": None, "error": str(e)[:200], "steps": 0, "calls": 0}
                     secs = time.time() - t0
-                    score, detail = grade(t, res["answer"], a.run_code)
+                    judge = (lambda tk, ans: judge_criteria(atom, a.judge if ":" in a.judge else f"p:{a.judge}"
+                                                            if a.judge != "local" else "local", tk, ans)) if a.judge else None
+                    score, detail = grade(t, res["answer"], a.run_code, judge)
                     row = {"task": t["id"], "kind": t.get("kind", ""), "method": m, "run": rep, "score": score,
                            "seconds": f"{secs:.1f}", "detail": detail, **{k: res.get(k, "") for k in fields if k in res}}
                     rows.append(row)
