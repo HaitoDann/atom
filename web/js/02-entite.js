@@ -114,6 +114,8 @@ function setEntityState(t) { $("emoState").textContent = t; }
   const SIG = 90, sgE = new Int32Array(SIG).fill(-1), sgT = new Float32Array(SIG), sgV = new Float32Array(SIG);
   let sigAcc = 0;
   const bucketPaths = Array.from({ length: 10 }, () => null);
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+  const waveA = new Float32Array(N), wavePaths = Array.from({ length: 7 }, () => null);   // onde de couleur (repos)
 
   // Fragments « nourriture » (recherche web) : ils arrivent de l'extérieur et sont absorbés.
   const fx = new Float32Array(F), fy = new Float32Array(F), fv = new Float32Array(F), fa = new Uint8Array(F), fs = new Float32Array(F);
@@ -510,7 +512,18 @@ function setEntityState(t) { $("emoState").textContent = t; }
     const rotY = entity.angle + gaze.x * 0.012, tilt = gaze.y * 0.01;
     const cosR = Math.cos(rotY), sinR = Math.sin(rotY), cosT = Math.cos(tilt), sinT = Math.sin(tilt), fov = 460;
     const breath = entity.night ? 0.7 : 1.1 * (1 + entity.load * 0.8);
-    const rad = cur.radius * (1 + Math.sin(t * breath) * 0.016) * (1 - entity.blink * 0.06) * (1 - entity.absorb * 0.1) * (1 + entity.grow * 0.25);
+    // Au repos : respiration calme (environ 7 par minute) — inspiration douce, petite pause, expiration —
+    // et une onde de couleur subtile qui parcourt la maille. Les autres états gardent leur rythme propre.
+    const restful = entity.activity === "idle" && !typing && !(entity.workK > 0.05);
+    entity.idleK = (entity.idleK || 0) + ((restful ? 1 : 0) - (entity.idleK || 0)) * Math.min(1, dt * 0.8);
+    const idleK = entity.idleK, calm = reducedMotion.matches;
+    const cyc = (t % 8.6) / 8.6;                                                    // un cycle ≈ 8,6 s
+    const inhale = cyc < 0.42 ? 0.5 - 0.5 * Math.cos(Math.PI * cyc / 0.42)         // inspiration
+      : cyc < 0.5 ? 1                                                               // courte pause, poumons pleins
+      : 0.5 + 0.5 * Math.cos(Math.PI * (cyc - 0.5) / 0.5);                          // expiration plus longue
+    const breathR = (1 - idleK) * Math.sin(t * breath) * 0.016 + idleK * (inhale - 0.4) * (calm ? 0.012 : 0.045);
+    const breathL = 1 + idleK * (inhale - 0.5) * 0.28;                              // la maille s'éclaire en inspirant
+    const rad = cur.radius * (1 + breathR) * (1 - entity.blink * 0.06) * (1 - entity.absorb * 0.1) * (1 + entity.grow * 0.25);
     const oA = cur.oscAmp * 0.75, oF = cur.oscFreq, jit = cur.jitter, sw = cur.swirl, purr = cur.purr;
     const beat = 1 + (Math.pow(Math.abs(Math.sin(t * 3.2)), 6) * 2 - 0.35) * cur.pulse + entity.tokenKick * 0.025 + entity.keyKick * 0.02;
     const sY = cur.stretchY, spk = cur.spike, orbMul = (1 + (cur.radius - 1) * 0.5) * (1 - entity.absorb * 0.2) * (1 - entity.snuggle * 0.25);
@@ -622,7 +635,7 @@ function setEntityState(t) { $("emoState").textContent = t; }
       for (let e = 0; e < edges.length; e++) {
         const a = edges[e][0], b = edges[e][1];
         if (!visA[a] || !visA[b]) continue;
-        let al = 0.5 * cur.dim * globalA * Math.min(depthA(szA[a]), depthA(szA[b]));
+        let al = 0.5 * cur.dim * globalA * breathL * Math.min(depthA(szA[a]), depthA(szA[b]));
         if (spK > 0.05 && (a % nSplit) !== (b % nSplit)) al *= 1 - spK;          // atelier : les amas se détachent
         if (scK > 0.01) { const near = 1 - Math.abs((syA[a] + syA[b]) / 2 - scanY * 0.9) / (R0 * 0.2); if (near > 0) al *= 1 + near * 1.5 * scK; }
         // un lien trop étiré (onde de choc, pointes) s'affine
@@ -685,8 +698,38 @@ function setEntityState(t) { $("emoState").textContent = t; }
         const r = (0.7 + 1.1 * f) * pxSize * (1 + P * 0.3);
         ctx.beginPath(); ctx.arc(sxA[i], syA[i], r, 0, 6.283); ctx.fill();
       };
-      for (const i of nodeIdx) drawNode(i, 0.95);
+      for (const i of nodeIdx) drawNode(i, 0.95 * breathL);
       for (const i of orbNodes) drawNode(i, 0.6);
+
+      // ---- au repos : onde de couleur qui traverse la maille en diagonale (lente, discrète, teinte qui dérive)
+      if (idleK > 0.02) {
+        const period = calm ? 16 : 9.5, u = (t % period) / period, pos = -1.6 + 3.2 * u, sig = 0.3;
+        const hue = 215 + 45 * Math.sin(t * 0.045) + 20 * Math.sin(t * 0.017);       // bleu glacier ↔ lavande ↔ rose pâle
+        for (const i of nodeIdx) {
+          const d = (ay[i] * 0.78 - ax[i] * 0.62) / (R0 || 1) - pos;
+          waveA[i] = Math.exp(-(d * d) / (2 * sig * sig));
+        }
+        for (let b2 = 0; b2 < 7; b2++) wavePaths[b2] = null;
+        for (let e = 0; e < edges.length; e++) {
+          const a = edges[e][0], b = edges[e][1];
+          if (!visA[a] || !visA[b]) continue;
+          const w = (waveA[a] + waveA[b]) * 0.5 * Math.min(depthA(szA[a]), depthA(szA[b]));
+          const k = Math.min(6, (w * 7) | 0);
+          if (k <= 0) continue;
+          (wavePaths[k] ||= new Path2D());
+          wavePaths[k].moveTo(sxA[a], syA[a]); wavePaths[k].lineTo(sxA[b], syA[b]);
+        }
+        ctx.strokeStyle = `hsl(${hue.toFixed(0)},60%,${lightT ? 45 : 74}%)`; ctx.lineWidth = lw * 1.15;
+        for (let k = 1; k <= 6; k++) if (wavePaths[k]) { ctx.globalAlpha = (k / 6) * 0.3 * idleK * globalA * cur.dim; ctx.stroke(wavePaths[k]); }
+        ctx.fillStyle = `hsl(${(hue + 15).toFixed(0)},65%,${lightT ? 48 : 80}%)`;
+        for (const i of nodeIdx) {
+          const w = waveA[i];
+          if (w < 0.3 || !visA[i]) continue;
+          const f = szA[i] > 0 ? 1 - Math.min(0.8, szA[i] / 260) : 1;
+          ctx.globalAlpha = Math.min(1, w * f * 0.32 * idleK * globalA);
+          ctx.beginPath(); ctx.arc(sxA[i], syA[i], (1 + 1.3 * f) * pxSize * (1 + P * 0.3), 0, 6.283); ctx.fill();
+        }
+      }
     }
 
     // ---- nourriture : fragments bleus attirés vers la sphère
