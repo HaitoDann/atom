@@ -22,7 +22,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `api/app/agentcode.py`, `agenttools.py`, `codeedit.py`, `gitops.py`, `sandbox.py` | Mode Code : boucle de l'agent, outils et espace de travail, modifications validées, Git, tests en bac à sable |
 | `api/app/llm.py`, `providers.py`, `hybrid.py` | Modèle local (Ollama), fournisseurs distants avec relais, mode hybride |
 | `api/app/usage.py`, `observability.py`, `alerts.py`, `grafana.py` | Journal des appels aux modèles (tokens, latence, bascules, coût) et flux en direct ; identifiant de requête, journaux JSON, métriques Prometheus |
-| `api/app/memory.py` | Mémoire automatique : extraction de faits, rappel sémantique |
+| `api/app/memory.py`, `memory_care.py` | Mémoire automatique : extraction de faits, rappel sémantique ; entretien hebdomadaire |
 | `api/app/library.py`, `codeprojects.py`, `extract.py`, `ocr.py`, `spaces.py` | Bibliothèque de documents et projets, extraction et découpage du texte, OCR, espaces |
 | `api/app/search.py`, `research.py` | Recherche web (SearXNG) et recherche approfondie |
 | `api/app/canvas.py`, `workshop.py`, `orchestrator.py`, `analysis.py`, `models_lab.py` | Canevas, atelier multi-IA, orchestration vérifiée de petits modèles, analyse de données, labo des modèles |
@@ -36,6 +36,7 @@ Navigateur (PC) ──réseau local──▶ VM/LXC Proxmox : Docker Compose
 | `docker-compose.nas.yml` | Copie chiffrée des sauvegardes sur un NAS (SMB / NFS) |
 | `web/vendor/` | KaTeX, Mermaid et polices Geist embarqués (aucune ressource externe) |
 | `docker-compose.sandbox.yml` | Option : bac à sable Docker via un proxy restreint |
+| `docker-compose.voice.yml`, `api/app/voice.py` | Option : voix (dictée transcrite en local avec Speaches, messages vocaux Telegram, lecture à voix haute) |
 
 ## Premier essai sur Proxmox (réseau local)
 
@@ -708,6 +709,12 @@ python3 bench/bench.py --url http://IP-DE-LA-VM:8000 --methods simple,orchestra 
 python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini,orchestra:groq --run-code
 ```
 
+**Tâches difficiles** (`--hard`, fichier `bench/tasks_hard.json`) : 13 tâches où un modèle seul se trompe souvent. Elles comprennent des calculs en plusieurs étapes (prêt immobilier, croisement de trains, facture avec remise et TVA), des **pièges** classiques (« la batte et la balle », jour de la semaine de 1789, compter des lettres), du code avec cas limites (fusion d'intervalles, chiffres romains invalides) et des rédactions. Les pièges sont notés avec les réponses fausses attendues (`forbid`). Les rédactions sont notées critère par critère par un **juge** : `--judge <moteur>`, à choisir hors des modèles comparés.
+
+```bash
+python3 bench/bench.py --hard --no-local --methods ask:gemini,orchestra:gemini --judge groq --run-code
+```
+
 `--only interets,jours` pour quelques tâches, `--repeat 3` pour lisser les variations, `--keep` pour garder les conversations créées (supprimées sinon). Le mot de passe est demandé au clavier, ou lu dans `ATOM_BENCH_PASSWORD`.
 
 ## Feuille de route
@@ -720,6 +727,16 @@ python3 bench/bench.py --no-local --methods ask:groq,ask:gemini,orchestra:gemini
 6. ✅ Accès distant via Tailscale, fournisseurs distants avec relais et mode hybride
 
 
+## Voix
+
+- **Dictée** : bouton micro dans la saisie. Clique pour parler, reclique pour finir : le texte apparaît dans la saisie, ou part directement selon le réglage Réglages → Général → Voix. La transcription tourne **sur ton serveur** (Whisper via Speaches), aucun son ne sort de chez toi.
+- **Lecture à voix haute** : bouton haut-parleur sous chaque réponse. Après une dictée, la réponse est lue automatiquement (réglable). La sphère passe en mode « parle » pendant la lecture. Par défaut, c'est la voix de ton appareil (locale, sans réglage) ; un serveur de synthèse compatible OpenAI peut la remplacer (`ATOM_TTS_URL`, `ATOM_TTS_MODEL`, `ATOM_TTS_VOICE`).
+- **Telegram** : envoie un **message vocal** au bot. Il est transcrit (la transcription s'affiche), puis traité comme un message écrit.
+
+**Mise en place** : dans `.env`, ajoute `docker-compose.voice.yml` à `COMPOSE_FILE` (par exemple `COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml`), puis `./update.sh`. Le modèle `Systran/faster-whisper-small` (environ 500 Mo) est téléchargé à la première dictée ; elle prend donc plus de temps. Sur CPU, compte quelques secondes de transcription par phrase. `ATOM_STT_MODEL` permet un modèle plus rapide (`base`) ou plus juste (`medium`).
+
+**Important** : les navigateurs n'autorisent le micro que sur une adresse sécurisée. Ouvre Atom en **HTTPS via Tailscale** (ou sur `localhost`) pour dicter ; sur `http://IP-de-la-VM`, le bouton micro l'explique. Les messages vocaux Telegram fonctionnent dans tous les cas.
+
 ## Relances des rappels
 
 Un rappel envoyé attend ta confirmation. Sur Telegram, il arrive avec trois boutons :
@@ -728,6 +745,18 @@ Un rappel envoyé attend ta confirmation. Sur Telegram, il arrive avec trois bou
 - **📅 Demain** : le rappel revient demain à 9 h.
 
 Sans réponse, Atom **relance** le rappel après 60 min, 2 fois au plus, jamais pendant les **heures calmes** (22:00 → 07:30 par défaut). Réglages → Données → Rappels → **À confirmer** liste les rappels en attente, avec les mêmes boutons, et permet de régler le délai, le nombre de relances et les heures calmes. Le brief du matin rappelle aussi ce qui n'a pas été fait.
+
+## Entretien de la mémoire
+
+Chaque semaine (dimanche à 10 h par défaut), Atom range ce qu'il sait de toi. Réglages → Souvenirs → **Entretien** :
+
+- **Doublons** fusionnés : le souvenir le plus important et le plus sûr est gardé.
+- **Même sujet** : le modèle local tranche. Un complément est fusionné en une phrase ; en cas de contradiction (« habite à Lyon » puis « habite à Nantes »), le plus récent l'emporte.
+- **Faits temporaires** arrivés à échéance (« prépare un examen ») : Atom te demande s'ils sont toujours vrais, avec les boutons **Garder** et **Oublier** sur Telegram (ou « à revoir » dans l'interface). Sans réponse, ils sont archivés 30 jours plus tard.
+- **Anecdotes jamais utilisées** depuis 180 jours : archivées.
+- **Résumé** sur Telegram et ntfy : ce qu'Atom a retenu ces 7 derniers jours et ce qu'il a rangé, pour que tu corriges.
+
+Rien n'est supprimé : tout ce qui est écarté est **archivé et restaurable**. « Simuler » montre ce que ferait l'entretien sans rien modifier ; « Lancer l'entretien maintenant » l'exécute tout de suite.
 
 ## Brief du matin
 

@@ -1410,3 +1410,9 @@ textarea.field { line-height: 1.55; }
 /* Discussion : proposer l'orchestration vérifiée pour une tâche difficile */
 .msg .orch-suggest { margin-top: 8px; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; }
 .msg .orch-suggest svg { width: 14px; height: 14px; }
+
+/* Voix : bouton micro (enregistrement, transcription) et lecture en cours */
+#micBtn.rec { color: var(--danger, #e66); animation: micPulse 1.2s ease-in-out infinite; }
+@keyframes micPulse { 50% { opacity: .45; } }
+#micBtn.busy { opacity: .5; pointer-events: none; }
+.acts .iconbtn.on { color: rgb(var(--orb)); }

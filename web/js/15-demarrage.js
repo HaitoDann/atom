@@ -22,6 +22,7 @@ connect();
 applyLook();
 renderWebBtn();
 loadHybrid().then(loadWorkshop);
+initVoice();
 loadLibrary();
 loadSpaces();
 if (store.get("view", "chat") === "code" || store.get("view", "chat") === "library") showView(store.get("view", "chat"));

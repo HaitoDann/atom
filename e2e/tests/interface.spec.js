@@ -414,3 +414,31 @@ test("tâche difficile : orchestration proposée, puis automatique", async ({ pa
   await page.request.put("/api/hybrid", { data: { orchestrate: "suggest" }, headers: { "X-Atom": "1" } });
   expect(errors).toEqual([]);
 });
+
+test("voix : dictée transcrite puis envoyée, lecture à voix haute", async ({ page }) => {
+  const errors = watchErrors(page);
+  // Pas de vrai micro en test : getUserMedia et MediaRecorder simulés, synthèse vocale espionnée.
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop() {} }] });
+    window.MediaRecorder = class {
+      static isTypeSupported() { return true; }
+      constructor() { this.state = "inactive"; this.mimeType = "audio/webm"; }
+      start() { this.state = "recording"; }
+      stop() { this.state = "inactive"; this.ondataavailable({ data: new Blob(["son"], { type: "audio/webm" }) }); this.onstop(); }
+    };
+    window.__spoken = [];
+    window.speechSynthesis.speak = (u) => { window.__spoken.push(u.text); setTimeout(() => u.onend && u.onend(), 10); };
+  });
+  await login(page);
+  await page.evaluate(() => { settings.voiceAutoSend = true; settings.voiceRead = true; saveSettings(); });
+  await expect(page.locator("#micBtn")).toBeVisible();
+  await page.click("#micBtn");
+  await expect(page.locator("#micBtn")).toHaveClass(/rec/);
+  await page.click("#micBtn");                                                    // fin de la dictée
+  await expect(page.locator(".msg.user").last()).toContainText("dictée de test", { timeout: 15_000 });
+  await expect(page.locator(".msg.atom").last()).toContainText("dictée de test", { timeout: 20_000 });
+  await expect.poll(() => page.evaluate(() => window.__spoken.length), { timeout: 10_000 }).toBeGreaterThan(0);   // lue
+  await page.locator('.msg.atom .acts [title="Lire à voix haute"]').last().click();
+  await expect.poll(() => page.evaluate(() => window.__spoken.length)).toBeGreaterThan(1);
+  expect(errors).toEqual([]);
+});

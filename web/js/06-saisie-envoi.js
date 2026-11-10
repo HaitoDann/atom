@@ -140,6 +140,7 @@ async function sendMessage(text, files = []) {
     loadConversations();
     if (stopped) syncIds();
     presenceSay(content);
+    if (!stopped && typeof voiceAfterReply === "function") voiceAfterReply(content);
     entity.feeding = false; entity.remote = false; entity.scan = false;
     setTimeout(refreshMood, 500);
     input.focus();

@@ -170,6 +170,7 @@
             <div class="scope-wrap" id="engineWrap" style="display:none"><button type="button" class="sel" id="engineBtn" title="Quel modèle répond"></button><div class="scope-menu" id="engineMenu"></div></div>
             <div class="scope-wrap"><button type="button" class="sel" id="scopeBtn" title="Ce qu'Atom consulte dans ta bibliothèque"></button><div class="scope-menu" id="scopeMenu"></div></div>
             <span class="spacer"></span>
+            <button id="micBtn" type="button" class="iconbtn" title="Dicter (cliquer pour parler, recliquer pour finir)" aria-label="Dicter" data-i="mic" hidden></button>
             <button id="send" type="submit" disabled title="Envoyer" data-i="up"></button>
           </div>
           <input type="file" id="fileIn" multiple hidden>
@@ -230,6 +231,12 @@
       <button class="iconbtn" id="closeSettings" style="position:absolute;top:10px;right:10px" title="Fermer" data-i="x"></button>
 
       <section class="pane on" data-pane="general">
+        <div class="block" id="voiceBlock">
+          <h4>Voix</h4>
+          <p class="desc" id="voiceInfo">Dicte avec le bouton micro de la saisie, et écoute les réponses avec le bouton haut-parleur sous chaque réponse. La lecture utilise la voix de ton appareil.</p>
+          <label class="switch"><span>Envoyer la dictée directement</span><input type="checkbox" id="voiceAutoSend"></label>
+          <label class="switch"><span>Lire la réponse à voix haute après une dictée</span><input type="checkbox" id="voiceRead"></label>
+        </div>
         <div class="block">
           <h4>Personnalité</h4>
           <p class="desc">Comment Atom se présente et se comporte. Utilisée aussi par Telegram.</p>
@@ -729,6 +736,7 @@
 <script src="/js/13-interface-commandes-mobile.js?v=__V__"></script>
 <script src="/js/14-consommation.js?v=__V__"></script>
 <script src="/js/14b-brief.js?v=__V__"></script>
+<script src="/js/14c-voix.js?v=__V__"></script>
 <script src="/js/15-demarrage.js?v=__V__"></script>
 </body>
 </html>

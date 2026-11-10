@@ -279,6 +279,29 @@ async def handle_command(client, chat_id: int, text: str) -> None:
         await send_text(client, chat_id, "Commande inconnue. /aide pour la liste.")
 
 
+async def transcribe_voice(client, chat_id: int, media: dict) -> str:
+    """Message vocal Telegram → texte (serveur de transcription local). Renvoie « » en cas d'échec (déjà signalé)."""
+    from . import voice
+    if not voice.status()["stt"]:
+        await send_text(client, chat_id, "🎤 Les messages vocaux ne sont pas activés : il faut le service de "
+                                         "transcription (README → Voix).")
+        return ""
+    try:
+        info = await call(client, "getFile", file_id=media["file_id"])
+        r = await client.get(f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{info['file_path']}")
+        r.raise_for_status()
+        text = await voice.transcribe(r.content, "vocal.ogg", media.get("mime_type") or "audio/ogg")
+    except (TelegramError, httpx.HTTPError, voice.VoiceError, KeyError) as e:
+        log.warning("message vocal : %s", e)
+        await send_text(client, chat_id, f"🎤 Je n'ai pas pu transcrire ce message ({str(e)[:120]}).")
+        return ""
+    if not text:
+        await send_text(client, chat_id, "🎤 Je n'ai rien entendu dans ce message.")
+        return ""
+    await send_text(client, chat_id, f"🎤 _{text}_")
+    return text
+
+
 async def handle_message(client, msg: dict) -> None:
     chat_id = msg["chat"]["id"]
     user_id = msg.get("from", {}).get("id")
@@ -292,8 +315,12 @@ async def handle_message(client, msg: dict) -> None:
             "Ajoute-le à ATOM_TELEGRAM_ALLOWED dans le fichier .env d'Atom, puis relance-le.",
         )
         return
+    if not text and (msg.get("voice") or msg.get("audio")):
+        text = await transcribe_voice(client, chat_id, msg.get("voice") or msg.get("audio"))
+        if not text:
+            return
     if not text:
-        await send_text(client, chat_id, "Je ne lis que le texte pour l'instant.")
+        await send_text(client, chat_id, "Je lis le texte et les messages vocaux.")
         return
     if text.startswith("/"):
         await handle_command(client, chat_id, text)

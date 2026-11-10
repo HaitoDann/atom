@@ -1,0 +1,26 @@
+# Voix : dictée transcrite en local (Speaches, faster-whisper sur CPU).
+# Activation : dans .env, ajoute docker-compose.voice.yml à COMPOSE_FILE, par exemple
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.voice.yml
+# (avec le bac à sable : docker-compose.yml:docker-compose.sandbox.yml:docker-compose.voice.yml) puis ./update.sh
+#
+# Le modèle de transcription (environ 500 Mo pour « small ») est téléchargé au premier usage et gardé dans un volume.
+# Lecture à voix haute : par défaut dans le navigateur ; un serveur de synthèse se règle avec ATOM_TTS_URL (README).
+services:
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:0.8.3-cpu   # version épinglée
+    restart: unless-stopped
+    volumes:
+      - speaches-models:/home/ubuntu/.cache/huggingface/hub
+    networks: [default]
+  atom:
+    depends_on: [speaches]
+    environment:
+      - ATOM_STT_URL=http://speaches:8000
+      - ATOM_STT_MODEL=${ATOM_STT_MODEL:-Systran/faster-whisper-small}
+      - ATOM_STT_LANGUAGE=${ATOM_STT_LANGUAGE:-fr}
+      - ATOM_TTS_URL=${ATOM_TTS_URL:-}
+      - ATOM_TTS_MODEL=${ATOM_TTS_MODEL:-}
+      - ATOM_TTS_VOICE=${ATOM_TTS_VOICE:-}
+
+volumes:
+  speaches-models:
