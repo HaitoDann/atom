@@ -1,6 +1,6 @@
 services:
   ollama:
-    image: ollama/ollama:0.40.15   # version épinglée
+    image: ollama/ollama:0.40.16   # version épinglée
     restart: unless-stopped
     volumes:
       - ollama:/root/.ollama
@@ -21,7 +21,7 @@ services:
 
   # Télécharge le modèle au premier démarrage, puis s'arrête.
   ollama-pull:
-    image: ollama/ollama:0.40.15
+    image: ollama/ollama:0.40.16
     depends_on:
       ollama:
         condition: service_healthy
