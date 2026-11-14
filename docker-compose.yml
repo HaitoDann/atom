@@ -32,7 +32,7 @@ services:
 
   # Moteur de recherche auto-hébergé (interne : pas de port exposé)
   searxng:
-    image: searxng/searxng:2026.11.2-cccbc9e15   # version épinglée
+    image: searxng/searxng:2026.11.6-ac11e14c5   # version épinglée
     restart: unless-stopped
     environment:
       - SEARXNG_BASE_URL=http://searxng:8080/
