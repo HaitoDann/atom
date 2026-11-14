@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.15-slim
 WORKDIR /srv/api
 # git : pour lire tes dépôts GitHub dans la bibliothèque
 # tesseract + poppler : lecture des scans (OCR) dans la bibliothèque et les pièces jointes
